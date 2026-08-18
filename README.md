@@ -6,74 +6,117 @@ Warband.pro already answers "who should I play tonight" from the API — ilvl, s
 
 - bags / bank / Warband bank contents
 - gold per character
-- mail
-- currencies (including volatile ones like crests, flightstones, coalescing?)
+- mail counts
+- currencies (crests, flightstones, valorstones, coalescence, etc)
 - reagents, consumables, how many health pots you actually have
 - which alt has the Spark, which has the Enchanted Crest
 
 Those are impossible from the web. An in-client addon is the only way.
 
-This repo is that addon: a tiny, retail-only, single-purpose exporter that turns your current character into a copyable hash string you paste into warband.pro.
+This repo is that addon: a tiny retail-only exporter that quietly remembers every character you log, and when you remember, one paste updates warband.pro with the whole warband.
 
-No auto-sync, no background uploading, no CurseForge account needed. You press a button in game, you paste in web. That's it.
+No auto-sync, no background uploading, no CurseForge account needed. Play normally, hit export when you remember, paste in web. That's it.
+
+## Core decision — multi-character from start
+
+Single-char paste gets old fast. You'd have to remember to export on every alt every night, or your warband screen is always half stale.
+
+So v1 is **warband bundle**: the addon keeps a small account-wide SavedVariables table (`WarbandProDB`). Each time you log a character, it passively updates that character's snapshot (bags, bank, gold, currencies, when). When you type `/warband` on any char, it exports the last-known state of *all* your Voc- tanks you've played since installing — one `wb1!...` string that warband.pro splits into 6 rows.
+
+- Play normally Mon–Sat
+- Saturday before your push you hit `/warband` → Copy → Paste once
+- warband.pro ingests 6 characters at once
+
+You still can toggle "current only" if you're streaming or just testing. Default is bundle.
 
 ## How it works (the 10-second flow)
 
-1. In WoW, type `/warband` or click the minimap button — opens the exporter
-2. Hit Copy — copies something like `wb1!aH...long base64...` to clipboard
-3. In warband.pro, open Import (soon: `i` key, or `/settings/import`)
-4. Paste — warband.pro ingests, validates version prefix, decompresses, shows you "what's inside" before it saves
+1. Install addon, log any character — it saves a snapshot silently in background
+2. Log alts through the week as you normally would (0 extra steps)
+3. Whenever you want: `/warband` → Copy button → copies `wb1!aH...`
+4. In warband.pro → Import (hotkey `i` soon) → Paste → preview
 
-The string is opaque and versioned. `wb1!` is v1. Future versions add fields without breaking old pastes. If you paste into Discord by accident, it's just compressed JSON — no tokens, no auth, no location.
+Preview shows:
 
-## Why hash-string, not direct upload?
+```
+Vocnar (Wyrmrest) — 2h ago — 847g — 312 pots
+Voctara (Wyrmrest) — 3d ago (!) stale — 12g — Warband Bank not seen since Aug 14
+Vocgrim — 12m ago — fresh
+```
 
-- Trust: you see exactly when data leaves the game. Nothing phones home.
-- Simplicity: no OAuth dance in-game, no server for the addon to talk to
-- Works offline on the LUA side — you can copy in a raid and paste later when you get back to browser
-- Same pattern as WeakAuras / Plater import strings — players already know it
+You confirm, D1 upserts each character with its `exportedAt` / `importedAt`.
 
-The web app never has to guess: if you pasted it, you meant to share it.
+If a character isn't in the bundle (never logged since install), we don't delete it — we show it as "never seen via addon" and keep API-only data.
 
-## What it captures (v1 sketch)
+## What it captures (v1 bundle)
 
-From your current character, read-only, at export time:
+Per character, read-only, at last login of that character:
 
 ```
 meta:
   v: 1
-  addonVersion: "1.0.0"
-  exportedAt: 172321...
-  character: "Vocnar"
-  realm: "Wyrmrest Accord"
-  guid: optional, for dedupe, never sent elsewhere
-  retail: true (no Classic)
-
-bags:
-  - bagId, slots, items: [id, count, quality, bound?]
-bank + reagent bank + warband bank (if open)
-
-gold: copper int
-
-currencies:
-  - id, name, count, max, weeklyMax, isAccountWide
-
-consumables summary (derived):
-  pots, phials, runes, food, augments — counts across bags+bank so Tonight Plan can say "you're out of flask charges"
-
-reagents: optional roll-up for crafting cover
-
-location: zone? optional, for "last seen" freshness
+  addon: "1.0.0"
+  exportedAt: 1724000000
+  bundle: 6 entries
+  gameVersion: "12.1.0"
+  
+characters[]:
+  - name: "Vocnar"
+    realm: "Wyrmrest Accord"
+    realmSlug: "wyrmrest-accord"
+    faction: "Horde"
+    guid: optional (for dedupe)
+    lastSeen: timestamp (when snapshot taken)
+    bagVersion: increment on BAG_UPDATE
+    bankSeenAt: null | timestamp (null until you open bank)
+    warbandBankSeenAt: null | timestamp
+    gold: copper int
+    bags: [{bagId, slots, items: [{id, count, quality, isBound, isCraftingReagent}]}]
+    bank: [{...}] (empty if never opened)
+    reagentBank: [...]
+    warbandBank: [{...}] (only if opened since install)
+    currencies: [{id, name, count, max, weeklyMax, isAccountWide, discoveredAt}]
+    consumablesDerived: { pot, phial, rune, food, augment } counts across bags+bank
+    professionsSnapshot: optional stub (API already has better, but useful for freshness)
 ```
 
 Explicitly not in v1:
 
-- Equipped gear (API already has it and better)
-- Achievement / illusion / mount lists (account-wide, heavy, not needed for this job)
-- Chat, guild chat, mail contents beyond counts
-- Anything that requires scanning other characters — v1 is "this character only." Warband view is built by pasting 6 times, one per alt, not by the addon peeking.
+- Equipped gear (API has it)
+- Mounts / pets / toys (account-wide bloat)
+- Mail body text / chat
+- Scanning guild bank (restricted)
+- Real-time sync — still user-initiated export, no auto-upload
 
-v2 ideas: scan all warband alts from the Warband bank window if you open it, auto-roll all 6 characters from one export if they're cached locally.
+## Size target
+
+One char with full bags+bank ~2-4KB string. Six chars ~12-18KB uncompressed JSON, ~4-7KB after deflate+b64url. WoW StaticPopup EditBox handles ~20KB fine if we use `SetMaxLetters(0)` and scroll frame. If it tips over, we slice into `wb1.1/3` chunks (not v1) or ship slim mode that drops item names (we only need IDs — web looks up Game Data for names later).
+
+## Staleness UX on warband.pro (you asked)
+
+App side needs two tables/views:
+
+1. New `character_addon_cache` D1: `user_id, realm_slug, char_name, data_json, last_seen_ms, bank_seen_ms, warband_bank_seen_ms, imported_at_ms, addon_version`
+2. Dashboard vitals already has API freshness (30m TTL). Addon freshness is orthogonal and user-driven, so show it separately:
+
+In Camp table row:
+
+- dot: 🟢 fresh `<6h`, 🟡 `<3d`, 🔴 `>3d`, ⚪ `never`
+- on hover: "Bags 2h ago, Bank 5d ago (open bank to refresh), Warband Bank 14d ago"
+- compact: "2h / bank 5d" second line under item level
+
+In Inspector pane:
+
+- section "Addon import" listing each char in bundle with age + Bank/Warbank status
+- filter: "show only stale >3d"
+- call to action if no import yet: "Install addon → Paste once → see reagents here"
+
+In Tonight Plan:
+
+- If you have 0 phials across all characters *known to addon* but data is stale >7d, don't block the +12 recommendation — grey it: "out of phials per last import (5d ago) — verify?"
+- If fresh and 0 phials, do block: "You're out, hit AH before raid"
+
+Data never auto-deletes: stale just means lower confidence, not missing. User can clear a character from bundle via addon panel: `/warband clear Vocgrim` or via web settings.
 
 ## Format
 
@@ -81,102 +124,77 @@ v2 ideas: scan all warband alts from the Warband bank window if you open it, aut
 wb1!<base64url(deflate(JSON))>
 ```
 
-- JSON first so it's debuggable
-- deflate for size (bags are repetitive)
-- base64url so it survives Discord/WhatsApp but still paste-safe
-- `wb1!` prefix so warband.pro can route: `wb0` would be DNA camp strings, `wb1` is inventory, future `wb2` could be talents or something else
-- No encryption — you already have the data in your paste buffer if you want to base64-decode it locally. If you want proof it hasn't been tampered with between client and site, we add a CRC32 suffix later — but paste is user-to-own-site, so it's overkill for v1.
+Bundle JSON example shape unsaid above, includes `characters: []`. Same envelope for single-char (array len 1) so web parser doesn't branch.
 
-Size target: one maxed character with full bags+bank+Warband bank tab ~ 2-4KB string. Big but still selectable in the Blizzard copy box. If it gets bigger we chunk with `wb1.1/3` etc, or we ship a "slim mode" that skips item names and only sends IDs.
+- `wb0` reserved for Camp DNA URLs you already have
+- `wb1` inventory bundle
+- `wb2` future (talents / hero talents?)
 
-## Privacy / trust model
+No encryption. Paste is user → own site. If we want tamper-evidence later, add CRC32 `!` suffix, but not v1.
 
-- No network requests from the addon, ever — verify in .toc: no OptionalDeps on anything that talks to web
-- No SavedVariables bloat — one string, generated on demand, not kept on disk
-- User-initiated only — no `OnUpdate` scanning in background; we listen to `BAG_UPDATE` only to show freshness dot, not to export
-- String is local. If you stream, hide the window — same as showing your bags on stream. It's not secret like an API key, but it's yours.
-- Warband.pro side: pasted string goes `D1 -> your user only`, never shared to camp unless you say "include in camp cover" — gold and Warband bank are account-wide sensitive, must be opt-in to share
+## Trust model
 
-## How to install (for testers — until we ship CurseForge)
+- No network requests from addon, ever
+- SavedVariables only: `WarbandProDB` account-wide, <200KB for 6 chars
+- No `OnUpdate` scanning — we listen to `BAG_UPDATE`, `PLAYER_MONEY`, `CURRENCY_DISPLAY_UPDATE`, `BANKFRAME_OPENED`, `ACCOUNT_BANK_OPENED` just to update that char's snapshot. No scan of other characters.
+- Export copies string to clipboard via Blizzard copy popup — you then decide to paste to warband.pro
+- Web: pasted string writes D1 under your user_id only. Gold/Warband Bank never shared in camp DNA unless you opt-in "include gold in share"
+- Stream-safe: addon window shows counts, not gold by default — streamer toggle collapses gold to "•••"
+
+## How to install (tester flow pre-CurseForge)
 
 ```
-# one paste:
 git clone https://github.com/warband-pro/addon.git WarbandPro
-
-# then move into Interface/AddOns:
-# Windows: %WOW%\Interface\AddOns\WarbandPro
-# Mac: /Applications/World of Warcraft/_retail_/Interface/AddOns/WarbandPro
-
-# Reload:
+# Move to _retail_/Interface/AddOns/WarbandPro
 # /reload
 # /warband
 ```
 
-Or via CurseForge app later: search `Warband.pro Companion` (reserved).
+Future: CurseForge "Warband.pro Companion" (name reserved).
 
-## How to use (developer flow — pre-UI)
+## How to use (dev)
 
 ```
-/warband
-/copy   -> copies string
-/warband dump -> prints raw JSON to SavedVariables debug
+/warband             -> panel, bundle preview (6 chars, freshness dots)
+/warband copy        -> copy bundle
+/warband copy current-> single-char only
+/warband dump        -> print raw JSON to /console for debug
+/warband clear       -> wipe that guid from local DB
 ```
 
-In warband.pro (coming):
+Web:
 
-- `/import` route or `i` hotkey
-- Textarea + paste → preview table:
-  - "Vocnar — 847g — 312 pots, 47 flightstones — 2 vault keys?"
-- Confirm → writes to `character_addon_cache` D1 table (new), TTL 6h like roster but user-controlled
-
-Tonight Plan will use it if present: if you have 0 phials in bags+bank, don't recommend +12 key at 10pm when the AH is closed. That sort of thing.
+- `/import` textarea + preview table
+- Confirm → upserts `character_addon_cache`
 
 ## What this repo is
 
-- Flat root (fewest files)
-- One .toc, one core.lua, one ui.xml, one exporter, one vendor LibDeflate if needed
-- No external libs except maybe `LibDeflate` (MIT) — deflate locally, not a web dep
-- No test framework — WoW addon loader is the test, plus a tiny `scripts/verify.lua` that lints build
+- Flat root, fewest files
+- `WarbandPro.toc`
+- `core.lua` (lifecycle, slash)
+- `store.lua` (SavedVariables accumulation across characters)
+- `scan.lua` (bags/bank/currencies/gold read-only, current char)
+- `bundle.lua` (assemble characters[] -> json)
+- `export.lua` (json -> deflate -> b64u + wb1! prefix + copy popup)
+- `ui.lua` + optionally `ui.xml` single panel
+- Vendor: LibDeflate (MIT) one file
 
-```
-WarbandPro/
-  WarbandPro.toc
-  core.lua         <- slash command, lifecycle
-  scan.lua         <- bags, bank, currencies, gold read-only
-  export.lua       <- json -> deflate -> b64u + wb1! prefix + copy box
-  ui.xml + ui.lua  <- single panel, copy button, freshness
-  Vendor/
-    LibDeflate/
-```
+No test harness — WoW loader is the test + `scripts/verify.lua` lint.
 
-## What it is not
+## Non-goals
 
-- Not an Altoholic replacement — no search UI, no tooltip injection, no database of 200 alts. It answers one question for the web: "what is this character holding right now."
-- Not a sync engine — we will never auto-upload on login
-- Not Classic / SoD / Hardcore — retail Midnight (12.1) only for v1
+- Not Altoholic / Bagnon rewrite — no tooltip injection, no item search UI in-game, no 200-alt database viewer. One panel.
+- Not a sync engine — never auto-uploads
+- Not Classic — retail Midnight 12.1 only
 
-## Decisions to lock early
+## Open questions
 
-1. v1 prefix is `wb1!` — do we reserve `wb0` for DNA strings already?
-2. Chunking at 4096 chars? WoW EditBox has limit but copy-friendly static popup bypasses it.
-3. Warband Bank: Blizzard restricts API for Warband bank outside the bank window — addon can only read it when you actually open the bank. So first paste without opening bank = incomplete — do we mark freshness as `bankClosed` and grey it out?
-4. D1 schema: new `character_addon_cache` vs. extend `character_detail_cache` with nullable addon column? Separate is cleaner for TTL, but join burden for Tonight Plan.
-5. CurseForge vs. wago.io vs. GitHub-only for install? CurseForge gives updates but requires packaging chapter.
-
-## Prior art
-
-- Altoholic (inventory — what we are a slice of)
-- Bagnon / BagSync / Alto (local DB approach, heavy)
-- WarcraftPets & SimC export strings (the copy/paste UX we steal)
-
-## Open questions you're brainstorming now
-
-- Do you want the string to be per-account in one go (all 6 Voc- tanks in one paste) or per-character and you paste 6 times? Single-char is simpler, multi-char is fewer clicks Saturday night.
-- Gold + Warband bank are account-wide — if someone shares a camp DNA with gold info inside, are we comfortable? Might need to strip on share.
-- Currencies: Game Data changes every patch, ids drift. Store both id+name or id only? Name is safe for web to show, but id is canonical for counting.
+- Bundle size: do we include itemName or only id+count? id-only smaller, but needs Game Data lookup on web side. Simpler v1 maybe include name for currencies only.
+- Warband Bank is account-wide but Blizzard only lets you read it when you open it on *any* char — do we stamp it as shared? If you open Warband Bank on Vocnar, is that valid for Voctara bundle? Yes, but freshness should be "Warband Bank updated 1h ago (by Vocnar)"
+- Freshness thresholds: 6h/3d? Does Saturday push mean most data is week-old Monday? Maybe Tonight Plan should down-weight addon data that age more gently.
+- Reset before implementing: do we need a guid to key characters across renames? realm+name is stable for Voc- prefix you locked, but guid is safer — store both.
+- CurseForge packaging chapter
 
 ---
 
-Write ideas directly in GitHub Issues tagged `[idea]` before code — or drop a line in the warband-pro workspace wiki `.wiki/wiki/topics/camp-vitals.md` under "Companion Addon" section so the next polish run picks it up.
-
-No code in this README — just concepts, until you say build v1.
+V1 next: implement store.lua + bundle JSON + panel with freshness, then web import route that accepts wb1! and writes `character_addon_cache`. No balance changes until bundle round-trips once.
