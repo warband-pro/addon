@@ -1,0 +1,16 @@
+std = "lua51"
+globals = {
+  "WarbandProDB","WarbandPro",
+  "SLASH_WARBANDPRO1","SlashCmdList",
+}
+read_globals = {
+  "time","date","type","pairs","ipairs","select","tostring","tonumber",
+  "string","table","math","collectgarbage",
+  "CreateFrame","C_Timer","C_Container","C_Bank","C_CurrencyInfo","C_MythicPlus","C_WeeklyRewards","C_ChallengeMode",
+  "UnitGUID","UnitName","GetRealmName","UnitFactionGroup","UnitClass","UnitLevel","GetBindLocation",
+  "GetSavedInstanceInfo","RequestRaidInfo","GameTooltip","IsInInstance","InCombatLockdown",
+  "Settings","InterfaceOptions_AddCategory","InterfaceOptionsFrame_OpenToCategory",
+  "StaticPopupDialogs","StaticPopup_Show",
+  "LibStub","LibDeflate"
+}
+ignore = {"212","213"}

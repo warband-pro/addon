@@ -1,0 +1,20 @@
+{
+  "v": 1,
+  "addon": "0.0.0-test",
+  "exportedAt": 1724000000,
+  "gameVersion": "12.1.0",
+  "interface": 120001,
+  "bundle": {"count":1,"freshestSeenAt":1724000000,"oldestSeenAt":1724000000},
+  "characters": [{
+    "guid":"Player-1-TEST",
+    "name":"Vocnar",
+    "realm":"Wyrmrest Accord",
+    "realmSlug":"wyrmrest-accord",
+    "faction":"Horde","class":"DRUID","classId":11,"level":80,
+    "gold":100000,
+    "bags":[{"bagID":0,"size":30,"free":3,"items":[{"id":211493,"count":20,"quality":2}]}],
+    "currencies":[{"id":2815,"quantity":100}],
+    "instances":[],
+    "seenAt":{"lastSeen":1724000000,"bag":1724000000}
+  }]
+}
