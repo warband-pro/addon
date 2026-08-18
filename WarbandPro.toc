@@ -1,0 +1,22 @@
+## Interface: 120001
+## Title: Warband.pro
+## Notes: Lightweight warband bundle — bags, bank, currencies, lockouts from every alt you log
+## Author: warband.pro
+## Version: @project-version@
+## SavedVariables: WarbandProDB
+## IconTexture: Interface\Icons\INV_Misc_Bag_10
+## AddonCompartmentFunc: WarbandPro_OnAddonCompartmentClick
+## Category-enUS: warband.pro
+## X-Website: https://warband.pro
+
+# Load order: vendor, then namespace, then data, then UI, then the dispatcher
+# that wires them together. Core is last because it registers events at load.
+Vendor\LibDeflate.lua
+Init.lua
+Store.lua
+Scan.lua
+Instances.lua
+Bundle.lua
+Export.lua
+UI.lua
+Core.lua

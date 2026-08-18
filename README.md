@@ -46,6 +46,27 @@ Take both lists intersectioned Midnight relevance, prune mounts/pets/recipes ful
 
 Explicitly skip v1: full equipment (API has), mounts/pets/toys/achieves (account-wide bloat), recipe full list (keep counts), guild bank (only personal warbank), chat log, auction full listings.
 
+### What the scaffold does not capture yet
+
+The list above is the target. Five fields on it are not in the first scaffold,
+each for a stated reason — the contract treats every one as optional, so the
+website reads a bundle without them today and picks them up the day they appear:
+
+- **`playtime`** — `RequestTimePlayed()` prints "Total time played" to chat, and
+  "chat is silent on load" is the louder promise. Needs a chat filter first.
+- **`knownRecipes` / `totalRecipes` / `expansionTier`** — need the profession
+  window open and a full `C_TradeSkillUI` walk, the most expensive thing this
+  addon could do. Skill level and cap are captured.
+- **`professionCooldowns`** — same window, same cost.
+- **`auctions.goldHeld`** — `GetNumOwnedAuctions()` is free on
+  `OWNED_AUCTIONS_UPDATED`; the gold total needs a full owned-auction query.
+- **`keystone.where`** — we know you own a key, not which bag it sits in.
+
+Two more moved rather than vanished: `warbandBank` is at the payload root
+instead of on every character, and item entries dropped `link` and
+`isCraftingReagent`. Both are measured decisions, written up in
+[docs/CONTRACT.md](docs/CONTRACT.md) under "v1 as implemented".
+
 ## Staleness UX
 
 Dashboard per-char dot 🟢<6h 🟡<3d 🔴>3d ⚪ never. Hover "Bags 2h ago, Bank 5d ago (open bank to refresh), Warbank 14d". Inspector "Addon import" section age+bank status, filter stale>3d.
@@ -64,7 +85,9 @@ Single line hash, not human readable on purpose — compact, no chat linkify, ha
 - wb1 inventory bundle.
 - wb2 future talents.
 
-Encoding: json -> LibDeflate CompressDeflate level9 -> EncodeForPrint swap +/ -> -_ strip = padding -> prefix. Web decode uses pako/DecompressionStream inverse Validate v==1 chars len 1..20 size <25KB.
+Encoding: json -> LibDeflate CompressDeflate level9 (raw deflate) -> base64url, no padding -> prefix. Web decode is the inverse: `DecompressionStream("deflate-raw")` or `pako.inflateRaw`, then validate v==1 and characters len 1..20. Not `EncodeForPrint`, and not `"deflate"` — CONTRACT.md explains both.
+
+Size, measured rather than guessed: **~8.6KB for one character, ~26KB for six**, with full bag/bank/warband contents. The 4-7KB figure above is what you get without per-item lists.
 
 See `docs/CONTRACT.md` + vector `docs/contract/vectors/v1-min.json`.
 
@@ -91,11 +114,10 @@ CF: Warband.pro Companion (name reserved).
 
 ```
 /warband                panel + bundle preview freshness
-/warband copy           bundle wb1!
+/warband copy           same panel — the panel is how you copy
 /warband copy current   single-char only for test/stream
-/warband dump           raw json to /console redacted (debug)
-/warband clear <name>   remove guid from DB (prune)
-/warband status         debug dump count,len,lastSeen
+/warband clear <name>   remove a character from the DB
+/warband status         count, bundle size, per-section ages, API failures
 /warband optimize       prune chars not seen 90d
 ```
 
@@ -118,9 +140,16 @@ See `docs/FLOW.md` full story, `docs/UI.md` copy pain detail.
 
 ## Repo shape — tiny, buildable artifact
 
-- flat root: WarbandPro.toc, Init.lua, Core.lua, Store.lua, Scan.lua, Instances.lua, Bundle.lua, Export.lua, UI.lua, Vendor/LibDeflate.lua, .pkgmeta, .luacheckrc, .github/workflows ci.yml + packager.yml
+- flat root: WarbandPro.toc, Init.lua, Store.lua, Scan.lua, Instances.lua, Bundle.lua, Export.lua, UI.lua, Core.lua, Vendor/LibDeflate.lua, .pkgmeta, .luacheckrc
+- tools/vector.mjs — contract round-trip, the only test that runs without WoW
 - docs/ reference folder (trim before CF ship) — see docs/README.md read order.
 - No test harness inside WoW — but pure functions testable offline via luacheck + busted + vector round-trip.
+- CI workflows are not written yet. `luacheck .` and `node tools/vector.mjs` are what a ci.yml would run.
+
+Load order in the .toc is vendor → namespace → data → UI → dispatcher; Core.lua is
+last because it registers events the moment it loads. The installed folder must be
+named `WarbandPro`, matching `WarbandPro.toc`, or the client silently skips it —
+and a .toc change needs a full client restart, not `/reload`.
 
 For AI coder: see `docs/PROMPT.md` single prompt copy-paste that has /app + /addon paths, locked decisions list, file list, acceptance checks mem<2MB bundle<8KB single taint 0 dots green, QA PASS/FAIL format.
 
@@ -138,6 +167,7 @@ Template tracked Interface 120001 Lua 5.1, secret values taint apocalypse (CLEU 
 - docs/QA.md — manual checklist release 5-min copy-paste PASS/FAIL lines
 - docs/CI.md — packager, semver, tokens
 - docs/PROMPT.md — prompt for AI coder /app+/addon
+- docs/APP-IMPORT.md — the /app side proposal: D1 tables, import route, pure decoder
 
 When shipping light: keep this README + CONTRACT excerpt, nuke docs/.
 

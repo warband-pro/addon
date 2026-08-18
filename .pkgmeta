@@ -1,0 +1,15 @@
+package-as: WarbandPro
+
+# No externals, deliberately. LibDeflate is vendored as a single file in Vendor/
+# so a release never depends on fetching a repo at package time. If an
+# `externals:` block ever appears here, the zero-dependency rule has slipped.
+
+enable-nolib-creation: no
+
+ignore:
+  - docs
+  - tools
+  - .luacheckrc
+  - .pkgmeta
+  - .git
+  - .github
