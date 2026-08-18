@@ -2,199 +2,223 @@
 
 > Problem: the Battle.net Profile API cannot see what your characters are actually holding.
 
-Warband.pro already answers "who should I play tonight" from the API — ilvl, spec, lockouts, vault, professions. But the other half of Altoholic — *where did I put that* — is a wall. No endpoint returns:
+Warband.pro answers "who should I play tonight" from the API — ilvl, spec, lockouts, vault, professions. The other half is the wall: where did I put that, how broke am I, which alt has the spark. No endpoint returns:
 
 - bags / bank / Warband bank contents
 - gold per character
-- mail counts
-- currencies (crests, flightstones, valorstones, coalescence, etc)
-- reagents, consumables, how many health pots you actually have
-- which alt has the Spark, which has the Enchanted Crest
+- mail pending
+- currencies with caps (crests, flightstones, trader's tender, etc)
+- reagents, consumables counts
+- lockouts per boss per difficulty fresh enough to trust
 
-Those are impossible from the web. An in-client addon is the only way.
+This addon is that bridge: tiny, retail-only, no auto-sync. Play normally, paste once, web gets the rest.
 
-This repo is that addon: a tiny retail-only exporter that quietly remembers every character you log, and when you remember, one paste updates warband.pro with the whole warband.
+## Core decision — multi-character bundle
 
-No auto-sync, no background uploading, no CurseForge account needed. Play normally, hit export when you remember, paste in web. That's it.
+Single-char paste is annoying. You'd have to remember 6 exports every Saturday.
 
-## Core decision — multi-character from start
+v1 is warband bundle: addon keeps account-wide `WarbandProDB`. Each login silently updates that char's snapshot. `/warband` → Copy exports all 6 Voc- tanks you've played since installing in one `wb1!...` string. One paste.
 
-Single-char paste gets old fast. You'd have to remember to export on every alt every night, or your warband screen is always half stale.
+You can still do `/warband copy current` for streaming / testing. Default is bundle.
 
-So v1 is **warband bundle**: the addon keeps a small account-wide SavedVariables table (`WarbandProDB`). Each time you log a character, it passively updates that character's snapshot (bags, bank, gold, currencies, when). When you type `/warband` on any char, it exports the last-known state of *all* your Voc- tanks you've played since installing — one `wb1!...` string that warband.pro splits into 6 rows.
+## How it works
 
-- Play normally Mon–Sat
-- Saturday before your push you hit `/warband` → Copy → Paste once
-- warband.pro ingests 6 characters at once
-
-You still can toggle "current only" if you're streaming or just testing. Default is bundle.
-
-## How it works (the 10-second flow)
-
-1. Install addon, log any character — it saves a snapshot silently in background
-2. Log alts through the week as you normally would (0 extra steps)
-3. Whenever you want: `/warband` → Copy button → copies `wb1!aH...`
-4. In warband.pro → Import (hotkey `i` soon) → Paste → preview
-
-Preview shows:
+1. Install, log any char — snapshot saved
+2. Log alts through week (0 extra steps)
+3. `/warband` → Copy
+4. warband.pro Import (i) → Paste → preview:
 
 ```
-Vocnar (Wyrmrest) — 2h ago — 847g — 312 pots
-Voctara (Wyrmrest) — 3d ago (!) stale — 12g — Warband Bank not seen since Aug 14
+Vocnar — 2h ago — 847g — 312 pots — fresh
+Voctara — 3d ago (!) — 12g — Warband Bank not seen since Aug 14
 Vocgrim — 12m ago — fresh
 ```
 
-You confirm, D1 upserts each character with its `exportedAt` / `importedAt`.
+Confirm → D1 upserts each char with `imported_at`.
 
-If a character isn't in the bundle (never logged since install), we don't delete it — we show it as "never seen via addon" and keep API-only data.
+If char never seen, we keep API-only and show "never via addon."
 
-## What it captures (v1 bundle)
+## Staleness UX (you asked)
 
-Per character, read-only, at last login of that character:
+Dashboard shows per-char:
+
+- dot 🟢 <6h / 🟡 <3d / 🔴 >3d / ⚪ never
+- hover: "Bags 2h ago, Bank 5d ago (open bank to refresh), Warbank 14d"
+- inspector: "Addon import" section with age + bank status, filter "stale >3d"
+- Tonight Plan: if 0 phials and data 5d old → grey "per last import (5d ago) verify?", if 20m old → hard block "hit AH before raid"
+
+Data never deletes — stale just lowers confidence.
+
+## Altoholic + SavedInstances — what we match
+
+You said pull anything those two do. They are gold standard. If we miss a field, users notice.
+
+### Altoholic tracks
+
+- Summary: level, xp, rest xp, money, playtime, ilevel, bind loc, hearth, guild+rank, spec, last zone
+- Inventory: bags size/free, bank slots/free, reagent bank, equipped (light), bag contents exhaustive id/count/link/quality/bound
+- Professions: primary/secondary level, current tier, recipes known/total per expansion, cooldown timers ready-at (Transmute etc)
+- Currencies: gold + every token (Flightstones, Crests, Tender, etc) with total/weekly/max, account-wide flag
+- Quests/Resets: dailies/weeklies completed, LFR cooldowns
+- Mail & Auctions: count, gold pending, expiry — needs mailbox open
+- Talents, guild?
+
+### SavedInstances tracks
+
+- Raid lockouts per instance per difficulty (LFR/N/H/M), reset time, bosses killed bool array, extended flag
+- World Bosses killed bool + reset
+- Mythic+: runs this week, best per map, score, keystone in bags/bank (level+dungeon)
+- Vault: raid/M+/world progress thresholds
+- Emissaries/Callings/Paragon: callings completed, paragon caches, weekly Sparks/Catalyst charges, profession weekly knowledge
+- Weekly currency caps/warnings, trade skill daily CDs ready
+- Warband vault flow
+
+### Our v1 bundle — unified superset we actually need
+
+Take both, cut to Midnight 12.1 relevance, prune bloat:
 
 ```
-meta:
-  v: 1
-  addon: "1.0.0"
-  exportedAt: 1724000000
-  bundle: 6 entries
-  gameVersion: "12.1.0"
-  
+meta { v, addonVersion, exportedAt, gameVersion, bundleCount }
+
 characters[]:
-  - name: "Vocnar"
-    realm: "Wyrmrest Accord"
-    realmSlug: "wyrmrest-accord"
-    faction: "Horde"
-    guid: optional (for dedupe)
-    lastSeen: timestamp (when snapshot taken)
-    bagVersion: increment on BAG_UPDATE
-    bankSeenAt: null | timestamp (null until you open bank)
-    warbandBankSeenAt: null | timestamp
-    gold: copper int
-    bags: [{bagId, slots, items: [{id, count, quality, isBound, isCraftingReagent}]}]
-    bank: [{...}] (empty if never opened)
-    reagentBank: [...]
-    warbandBank: [{...}] (only if opened since install)
-    currencies: [{id, name, count, max, weeklyMax, isAccountWide, discoveredAt}]
-    consumablesDerived: { pot, phial, rune, food, augment } counts across bags+bank
-    professionsSnapshot: optional stub (API already has better, but useful for freshness)
+  identity:
+    guid, name, realmSlug, faction, class, level, xp, restXP
+    guild{name, rank}, lastZone, hearthZone, bindZone
+    playtimeSec, itemLevelAvg/Equipped (cross-check)
+
+  money + banks:
+    gold copper
+    bags [{bagID, size, free, items[{id, count, link, quality, isBound, isCraftingReagent}]}]
+    bank + bankBags [{...}] + free
+    reagentBank [{...}]
+    warbandBank [{...}] + seenAt (null if never opened)
+    mail {countItems, goldPending, soonestExpiryDays} — only if mailbox opened
+    auctions {countActive, goldHeld} — light
+
+  currencies:
+    [{id, name, quantity, maxQty, weeklyMax, isAccountWide}]
+
+  professions + CDs:
+    professions [{id, name, skill, maxLevel, expansionTier, knownRecipes, totalRecipes}]
+    professionCooldowns [{spellID, name, readyTime, remainingSec}]
+
+  lockouts (SavedInstances core):
+    instances [{name, instanceID, difficulty (1=LFR/2=N/3=H/4=M), locked, resetTime, bosses[{name,killed}], extended}]
+    worldBosses [{name, killed, resetTime}]
+  
+  mythic+ / vault:
+    keystone {level, dungeonID, dungeonName, where (bag|bank)}
+    mythicPlusRuns [{mapID, level, timed, chestCount}]
+    mythicPlusScore
+    weeklyVault {raid tiers, mPlus tiers, world tiers, unlocked? thresholds}
+
+  consumable rollup (derived fast for Tonight Plan):
+    {phial, healthPotion, tempPotion, foodFeast, weaponRune, augment, bandage}
+
+  meta per char:
+    lastSeen, bagSeenAt, bankSeenAt, warbankSeenAt, currencySeenAt, instanceSeenAt, vaultSeenAt
 ```
 
-Explicitly not in v1:
+### What we skip even though they do it
 
-- Equipped gear (API has it)
-- Mounts / pets / toys (account-wide bloat)
-- Mail body text / chat
-- Scanning guild bank (restricted)
-- Real-time sync — still user-initiated export, no auto-upload
+- Full equipment (API already good)
+- Full recipe list 10k rows — keep counts only for v1 (60% size saved)
+- Mounts/pets/toys/achievements — account-wide bloat, API-available
+- Full guild bank (only warband bank, personal)
+- Auction full listings, chat logs
+- No OnUpdate scanner — events only: BAG_UPDATE, PLAYER_MONEY, CURRENCY_DISPLAY_UPDATE, BANKFRAME_OPENED, ACCOUNT_BANK_OPENED, BOSS_KILL
 
-## Size target
+### Why this wins
 
-One char with full bags+bank ~2-4KB string. Six chars ~12-18KB uncompressed JSON, ~4-7KB after deflate+b64url. WoW StaticPopup EditBox handles ~20KB fine if we use `SetMaxLetters(0)` and scroll frame. If it tips over, we slice into `wb1.1/3` chunks (not v1) or ship slim mode that drops item names (we only need IDs — web looks up Game Data for names later).
+API gave 40% — ilvl, spec, guild, prof name, lockout summary. This gives other 60% — where stuff is, broke or not, lockout fresh enough for reset math, craft CD ready, tender about to cap, 0 phials.
 
-## Staleness UX on warband.pro (you asked)
+Enables Tonight Plan:
 
-App side needs two tables/views:
+- "Don't +12 Vocgrim — 0 phials, AH closed, but Vocnar has 120 in WBank"
+- "Voctara 8/9 Normal Amirdrassil — 1 left vs fresh alt"
+- "WBank 47 Spark fragments scattered across 3 chars — consolidate"
+- "Herbalism transmute ready on 4 chars — log them first ~12k"
 
-1. New `character_addon_cache` D1: `user_id, realm_slug, char_name, data_json, last_seen_ms, bank_seen_ms, warband_bank_seen_ms, imported_at_ms, addon_version`
-2. Dashboard vitals already has API freshness (30m TTL). Addon freshness is orthogonal and user-driven, so show it separately:
-
-In Camp table row:
-
-- dot: 🟢 fresh `<6h`, 🟡 `<3d`, 🔴 `>3d`, ⚪ `never`
-- on hover: "Bags 2h ago, Bank 5d ago (open bank to refresh), Warband Bank 14d ago"
-- compact: "2h / bank 5d" second line under item level
-
-In Inspector pane:
-
-- section "Addon import" listing each char in bundle with age + Bank/Warbank status
-- filter: "show only stale >3d"
-- call to action if no import yet: "Install addon → Paste once → see reagents here"
-
-In Tonight Plan:
-
-- If you have 0 phials across all characters *known to addon* but data is stale >7d, don't block the +12 recommendation — grey it: "out of phials per last import (5d ago) — verify?"
-- If fresh and 0 phials, do block: "You're out, hit AH before raid"
-
-Data never auto-deletes: stale just means lower confidence, not missing. User can clear a character from bundle via addon panel: `/warband clear Vocgrim` or via web settings.
+One paste, no per-char remembering.
 
 ## Format
 
-```
-wb1!<base64url(deflate(JSON))>
-```
+`wb1!<base64url(deflate(JSON))>`
 
-Bundle JSON example shape unsaid above, includes `characters: []`. Same envelope for single-char (array len 1) so web parser doesn't branch.
+Same envelope for single-char (len 1 array) and bundle (len 6) so web parser doesn't branch.
 
-- `wb0` reserved for Camp DNA URLs you already have
-- `wb1` inventory bundle
-- `wb2` future (talents / hero talents?)
+- wb0 reserved Camp DNA you have
+- wb1 inventory+lockouts bundle
+- wb2 future talents
 
-No encryption. Paste is user → own site. If we want tamper-evidence later, add CRC32 `!` suffix, but not v1.
+No encryption, paste user→own site. Add CRC suffix later if needed.
 
-## Trust model
+Size: 1 char 2-4KB raw ~1KB deflated, 6 chars ~12-18KB raw → 4-7KB b64. WoW EditBox with SetMaxLetters(0) + scroll handles ~20KB fine. If overflow we add slim mode (id+count only) or chunk wb1.1/3.
 
-- No network requests from addon, ever
-- SavedVariables only: `WarbandProDB` account-wide, <200KB for 6 chars
-- No `OnUpdate` scanning — we listen to `BAG_UPDATE`, `PLAYER_MONEY`, `CURRENCY_DISPLAY_UPDATE`, `BANKFRAME_OPENED`, `ACCOUNT_BANK_OPENED` just to update that char's snapshot. No scan of other characters.
-- Export copies string to clipboard via Blizzard copy popup — you then decide to paste to warband.pro
-- Web: pasted string writes D1 under your user_id only. Gold/Warband Bank never shared in camp DNA unless you opt-in "include gold in share"
-- Stream-safe: addon window shows counts, not gold by default — streamer toggle collapses gold to "•••"
+## Trust
 
-## How to install (tester flow pre-CurseForge)
+- No network requests, ever — verify in .toc
+- SavedVariables only, <200KB for 6 chars
+- No OnUpdate — update current char only on events
+- Export via Blizzard copy popup — user decides paste
+- Web writes D1 user_id only, gold/warbank never in camp DNA unless opt-in "include gold"
+- Stream-safe toggle hides gold to "•••"
+
+## How to install (pre-CF)
 
 ```
 git clone https://github.com/warband-pro/addon.git WarbandPro
-# Move to _retail_/Interface/AddOns/WarbandPro
-# /reload
-# /warband
+# move to _retail_/Interface/AddOns/
+# /reload /warband
 ```
 
-Future: CurseForge "Warband.pro Companion" (name reserved).
+CF: Warband.pro Companion (reserved name)
 
-## How to use (dev)
+## How to use
 
 ```
-/warband             -> panel, bundle preview (6 chars, freshness dots)
-/warband copy        -> copy bundle
-/warband copy current-> single-char only
-/warband dump        -> print raw JSON to /console for debug
-/warband clear       -> wipe that guid from local DB
+/warband                panel + bundle preview
+/warband copy           bundle
+/warband copy current   single
+/warband dump           raw json to console
+/warband clear <name>   remove guid from DB
 ```
 
-Web:
+Web: /import textarea preview → upsert character_addon_cache D1 (user_id, realm_slug, char_name, data_json, last_seen_ms, bank_seen_ms, warband_seen_ms, imported_at_ms)
 
-- `/import` textarea + preview table
-- Confirm → upserts `character_addon_cache`
+## Repo shape
 
-## What this repo is
+- flat root, fewest moving parts
+- WarbandPro.toc
+- core.lua (slash, lifecycle)
+- store.lua (account-wide accumulation)
+- scan.lua (bags/bank/currency/gold read-only current)
+- instances.lua (lockouts, bosses, keys, vault) — SavedInstances parity
+- bundle.lua (chars array → json)
+- export.lua (deflate → b64u + wb1! + copy box)
+- ui.lua (single panel, freshness dots)
+- Vendor/LibDeflate (MIT, one file)
 
-- Flat root, fewest files
-- `WarbandPro.toc`
-- `core.lua` (lifecycle, slash)
-- `store.lua` (SavedVariables accumulation across characters)
-- `scan.lua` (bags/bank/currencies/gold read-only, current char)
-- `bundle.lua` (assemble characters[] -> json)
-- `export.lua` (json -> deflate -> b64u + wb1! prefix + copy popup)
-- `ui.lua` + optionally `ui.xml` single panel
-- Vendor: LibDeflate (MIT) one file
-
-No test harness — WoW loader is the test + `scripts/verify.lua` lint.
+No test harness — WoW loader is test + scripts/verify.lua lint.
 
 ## Non-goals
 
-- Not Altoholic / Bagnon rewrite — no tooltip injection, no item search UI in-game, no 200-alt database viewer. One panel.
-- Not a sync engine — never auto-uploads
-- Not Classic — retail Midnight 12.1 only
+- Not full Altoholic rewrite — no tooltip injection, item search UI in-game
+- Not sync engine
+- Not Classic — Midnight 12.1 only retail
 
-## Open questions
+## Decisions locked
 
-- Bundle size: do we include itemName or only id+count? id-only smaller, but needs Game Data lookup on web side. Simpler v1 maybe include name for currencies only.
-- Warband Bank is account-wide but Blizzard only lets you read it when you open it on *any* char — do we stamp it as shared? If you open Warband Bank on Vocnar, is that valid for Voctara bundle? Yes, but freshness should be "Warband Bank updated 1h ago (by Vocnar)"
-- Freshness thresholds: 6h/3d? Does Saturday push mean most data is week-old Monday? Maybe Tonight Plan should down-weight addon data that age more gently.
-- Reset before implementing: do we need a guid to key characters across renames? realm+name is stable for Voc- prefix you locked, but guid is safer — store both.
-- CurseForge packaging chapter
+- Multi-char bundle default ✓ you chose this today
+- Staleness UX per-char + per-section (bank/warbank separate stamps) ✓
+
+## Open
+
+- Bundle includes itemName or id only? id-only smaller, needs Game Data lookup on web. Currencies include names.
+- Warbank account-wide stamp shared across chars? Yes freshness "WBank 1h ago (by Vocnar)" makes sense.
+- Freshness thresholds: 6h/3d worked for push groups? Saturday push = Monday data 3d old = yellow, maybe fine.
+- Guid keying vs realm+name (Voc- locked so stable, guid safer)
+- CF packaging chapter
 
 ---
-
-V1 next: implement store.lua + bundle JSON + panel with freshness, then web import route that accepts wb1! and writes `character_addon_cache`. No balance changes until bundle round-trips once.
+Next: scaff WarbandPro.toc + store.lua + single panel, then web import route that accepts wb1! and writes character_addon_cache. No balance until round-trip works.
