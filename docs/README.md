@@ -1,22 +1,21 @@
 # Docs — coding reference (trim before ship)
 
-This folder is instruction manual for coder AI that will never see game output. Each file answers one question, no overlap. When you ship light, keep README + CONTRACT excerpt only and delete rest.
+Instruction manual for coder AI that never sees game output. Each file answers one question, no overlap.
 
-**Read order for AI:**
+**Read this order:**
 
-1. **FLOW.md** — Goal + user behavior. Why addon exists (API has 0 paths for gold/bank/bags/curr/vault/mail — vendor search proves), who Voc is (6 Voc- tanks 3H/3A, second-monitor web+game back-and-forth 4-10 exports per night, Saturday push), what success looks like, when data matters for Tonight Plan.
-2. **RESEARCH-REFERENCE.md** — Midnight 12.0+ modern best practices. Interface 120001, no Ace3/libstub, load order libs→core→data→ui, account-wide WarbandProDB guid-keyed, event-driven not OnUpdate, throttle BAG_UPDATE .5s, C_Container/C_Bank 5-tab warbank only readable at banker, CLEU dead + Secret Values taint gotcha, LibDeflate wb1! standard.
-3. **CONTRACT.md** — wb1! wire law. JSON shape top-level {v,addon,exportedAt,gameVersion,interface,bundle{count,freshest,oldest},characters[CharacterObject]}, CharacterObject fields gold/bags/bank/bankBags/reagentBank/warbandBank{seenAt,seenByGuid,tabs}/mail/auctions/currencies/professions/cooldowns/instances/worldBosses/keystone/runs/score/vault/consumables/seenAt timestamps. Encoding json->deflate lvl9->b64url -_ strip padding -> "wb1!" + payload. Validation: reject >20 chars, >25KB decoded, null tolerant for never-seen banks, gold stream-safe optional, missing chars not deleted.
-4. **UI.md** — Copy pain fix + Import ease. Game panel 520x460 frame, ScrollFrame+EditBox Multi MaxLetters(0) AutoFocus HighlightText on Show wrapped Timer.After(0), Select All button, Esc closes, combat queue fail closed, warbank freshness header. Web Import omnipresent top-right sink `[ ↻ sync / ↥ import ▼ ]` next to battletag avatar, tries `navigator.clipboard.readText()` inside click (must be gesture), auto-fill preview if wb1! present else big textarea auto-focus placeholder paste fallback. Preview table 🟢<6h 🟡<3d 🔴>3d ⚪never with hover bag 2m bank 5d warbank 14d open to refresh, warn half stale, Confirm upserts D1 character_addon_cache, Toast imported 6 freshest 2m, Tonight Plan re-eval block vs grey based on freshness.
-5. **TESTING.md** — Layers: offline luacheck + busted pure Bundle/Export/freshness dots + contract vector round-trip decode identical addon↔web, then 5-min manual scripted screenshot-parsable for AI (single char fresh, multi-char 6 bundle, warbank shared shared seenAt seenBy, combat disabled, vault matches in-game UI visual, memory <2MB, string 4-7KB).
-6. **QA.md** — Copy-paste checklist release. Single char fresh, multi 6, warbank shared, combat lockdown, taintLog 0, BugSack empty, mem, len, dots. Result format `PASS/FAIL` lines human pastes back to AI for iteration.
-7. **CI.md** — GitHub Actions ci.yml push luacheck+toc validator+vector, packager.yml on tag v* BigWigsMods -> CF/Wago/WI, .pkgmeta minimal, version via tag @project-version@ replace, changelog conventional commits.
-8. **PROMPT.md** — Single copy-paste prompt for coder that has /app and /addon, full file list, locked decisions, impl roadmap pure->impure->UI, acceptance taint 0 mem <2MB bundle <8KB single, string prefix wb1!
+1. FLOW.md — Goal + user behavior. Why API has 0 paths for gold/bank/bags/curr/vault/mail, who Voc (6 Voc- tanks 3H/3A second-monitor back-and-forth 4-10 exports/night Sat push), success, when data matters for Tonight Plan, omnipresent sink why.
+2. RESEARCH-REFERENCE.md — Midnight 12.0+ best practices, Interface 120001, no Ace3/libstub, load order libs→core→data→ui, account-wide WarbandProDB guid-keyed, event-driven throttle .5s, C_Container new, C_Bank 5 tabs only at banker, CLEU dead + Secret Values taint, LibDeflate wb1! -_ std, Compartment Func, Settings modern, packager.
+3. CONTRACT.md — wb1! law, versioning wb0/wb1/wb2, JSON top-level+CharacterObject shape, field rules seenAt unix sec null tolerant, banks null vs empty warbank seenByGuid, encoding json->deflate lvl9->b64url strip= -> wb1!+payload, validation DoS caps >20 chars >25KB reject, bump policy.
+4. UI.md — Game panel 520x460 BackdropTemplate draggable header freshness dots ScrollFrame+EditBox Multi MaxLetters(0) AutoFocus HighlightText After(0), Select All Copy Close Esc closes combat queue fail closed, Web sink `[ ↻ sync / ↥ import ▼ ]` tries clipboard.readText() inside click auto-fill else textarea fallback preview 🟢🟡🔴 hover bag 2m bank 5d etc warn half stale Confirm upserts D1 toast.
+5. TESTING.md — Pure vs impure split offline luacheck+busted+vector round-trip identical addon↔web then 5-min manual screenshot-parsable single char fresh multi 6 warbank shared combat safe vault match mem<2MB string 4-7KB edge list null guards.
+6. QA.md — Checklist release 5-min BugSack empty taint 0 single count1 multi count6 warbank shared combat safe wb1! len 6420ish dots 6 green web preview same mem <2MB vault matches, result PASS/FAIL lines parseable.
+7. CI.md — GitHub Actions ci.yml push luacheck+toc validator+vector + packager.yml on tag v* BigWigsMods CF/Wago/WI .pkgmeta minimal vendored LibDeflate one-file, version tag @project-version@, changelog conventional commits no em dash.
+8. PROMPT.md — One copy-paste prompt /app+/addon paths read order locked 8 file list flat root fewest moving parts 10 Lua + vendor + pkgmeta + luacheckrc + workflows app side pure warband-import.ts + ImportModal.astro + Menubar sink + hotkey i keys.ts tests checklist manual PASS lines.
+9. EXECUTION-READY.md — Final check this file summary, why optimized simple flow, locked vs open 5 before code not blocking, next 3 days pure->impure->UI acceptance.
 
-**Contract vectors:** `contract/vectors/v1-min.json` minimal golden vector for CI — addon compress -> web decompress must identity. Add `v1-full.json`, `v1-bundle-6.json` via manual `/warband dump` later.
+Vectors: contract/vectors/v1-min.json minimal golden for CI identity. Add v1-full.json + v1-bundle-6.json via /warband dump manual later.
 
-**When shipping light:** Delete docs/ except CONTRACT.md excerpt pasted into README appendix. Keep root flat per your rule (Problem -> How to install one paste/npx -> How to use 2-3 copy-pastes -> What it catches -> Inside 4-6 files). No badges, no extra dotfiles.
+When shipping light, delete docs/ except CONTRACT.md excerpt into README appendix. Root flat per your rule Problem→Install one paste→Use 2-3→What it catches→Inside 4-6 files. No badges.
 
-**Second-monitor flow doc** lives inside FLOW.md section 2-3 — omnipresent sink reason.
-
-How to edit docs before code: keep CONTRACT shape stable, version bumps minor additive null tolerant major wb2! break. Update FLOW.md if behavior observed in actual Saturday push differs.
+EXECUTION-READY says ready.
