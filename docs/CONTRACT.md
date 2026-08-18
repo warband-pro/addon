@@ -126,23 +126,39 @@ Top-level:
 Addon:
 
 ```
-json = JSON encode (no whitespace or pretty, sort keys deterministic for test vectors)
-deflate = LibDeflate:CompressDeflate(json, {level=9})
-b64url = LibDeflate:EncodeForPrint(deflate) -> replace +/ with -_, strip = padding
-output = "wb1!" .. b64url
+json    = Bundle.JSON(payload)                         -- no whitespace, keys sorted
+deflate = LibDeflate:CompressDeflate(json, {level=9})  -- RAW deflate, no zlib header
+b64url  = Export.Base64URL(deflate)                    -- RFC 4648 §5, no = padding
+output  = "wb1!" .. b64url
 ```
 
 Web:
 
 ```
 assert string startsWith "wb1!"
-b64 = strip prefix
-inflate via pako or LibDeflate JS counterpart (we use DecompressionStream)
+body = strip prefix
+inflate: DecompressionStream("deflate-raw"), or pako.inflateRaw
 parse JSON, validate v==1, characters array len 1..20, each object validates minimal fields (guid, name, seenAt.lastSeen)
-reject if >25KB after decode (DoS) or >20 chars
+reject if over the decoded size cap (see below) or >20 chars
 ```
 
-Test vectors in `docs/contract/vectors/v1.json` and `v1-bundle-6.json` must be kept.
+Test vectors live in `docs/contract/vectors/`. `node tools/vector.mjs` round-trips
+every `.json` there and writes the matching `.wb1` fixture with `--write`; the
+web decoder tests read those fixtures.
+
+### Two corrections the code made to this section
+
+Both were found while writing Export.lua, and the code is right.
+
+1. **It is not `EncodeForPrint`.** LibDeflate's print codec uses its own
+   printable 6-bit alphabet — not base64, not base64url — so no amount of
+   swapping `+/` for `-_` turns its output into something `atob` can read.
+   `Export.Base64URL` is a real RFC 4648 §5 encoder, verified byte-for-byte
+   against Node's `Buffer.toString("base64url")`.
+2. **It is `deflate-raw`, not `deflate`.** `CompressDeflate` emits a bare
+   deflate stream with no zlib header, so `DecompressionStream("deflate")`
+   rejects it. Use `"deflate-raw"` / `pako.inflateRaw`. `CompressZlib` would be
+   the other way to settle this, at the cost of six bytes; raw stays.
 
 ## Version bump policy
 
@@ -150,12 +166,80 @@ Test vectors in `docs/contract/vectors/v1.json` and `v1-bundle-6.json` must be k
 - Minor v1 -> web adds optional fields but still accepts old. Old addon still valid.
 - Major v1 -> v2 (wb2!) shape breaking, old string rejected with helpful "update addon" message in web UI.
 
+## v1 as implemented — four shape changes
+
+The CharacterObject above is the target. Four things moved when it met the game
+and a byte count. Each is additive or narrowing, so a website written to the
+shape above still reads these bundles; a website written to *these* notes reads
+them better.
+
+### 1. `warbandBank` sits at the payload root, not on each character
+
+```json
+{ "v":1, "bundle":{…}, "warbandBank":{ "seenAt":…, "seenByGuid":…, "seenByName":"Vocnar", "gold":…, "tabs":[…] }, "characters":[…] }
+```
+
+It is one account-wide vault. Repeating five tabs of items on every character
+cost **22KB of wire on a six-character bundle** for data every character shares,
+because deflate's 32KB window cannot reach back far enough to fold the copies
+into each other. Each character still carries `seenAt.warbank`, so the dots can
+still say which character last stood at the banker, and `seenByName` is the
+credit line for "Warband Bank 1h ago (by Vocnar)".
+
+### 2. Items carry `{id, count, quality?, isBound?}` — no `link`, no `isCraftingReagent`
+
+Name, icon, quality colour and item class are all derivable from the id through
+Game Data, which the website already calls. `link` is available behind
+`WarbandProDB.opts.includeLinks = true` for debugging a specific item and costs
+about 30% more wire when on.
+
+### 3. `consumables` is `{phial, potion, foodFeast, weaponRune}`
+
+Bucketed by item subclass (flask / potion / food-drink / item-enhancement), not
+by a table of item ids that goes stale every patch. `healthPotion` and
+`tempPotion` cannot be told apart from each other by class, so they are **absent
+rather than zero** until `POTION_IDS` in Scan.lua is filled with Midnight ids —
+absent means "unknown", zero would mean "you have none", and the Tonight Plan
+blocks a raid on that difference.
+
+### 4. `weeklyVault` buckets carry counts, not a single boolean
+
+```json
+"weeklyVault": { "raid": {"progress":4,"threshold":6,"unlocked":1,"slots":3,"level":626} }
+```
+
+`unlocked` is how many of that row's three slots are earned, `threshold` is the
+next one still reachable and is **absent once all three are earned**. Bucket keys
+come from `Enum.WeeklyRewardChestThresholdType` as the client shipped it, so a
+type the addon does not recognise is dropped rather than guessed at.
+
 ## Security / DoS
 
 - Never allow >20 characters in bundle, reject.
 - Never stuff borrower data cross-user_id: web writes D1 only under authed user_id.
 - Gold/warbank never in wb0 DNA shares unless user toggles "include gold" — web option, not addon feature.
 
+### The size caps, measured
+
+The "4-7KB for six characters" estimate elsewhere in these docs holds only for a
+bundle with **no per-item lists**. With bags, bank and warband bank contents —
+which is the entire "where is my stuff" feature — the real numbers, from
+`tools/vector.mjs` against a synthetic full-inventory warband:
+
+| characters | JSON | wire (`wb1!…`) |
+|---|---|---|
+| 1 | ~39KB | ~8.6KB |
+| 6 | ~154KB | ~26KB |
+| 20 (the cap) | ~474KB | ~73KB |
+
+So the "reject >25KB after decode" rule would reject a single character. The
+importer's real caps must be **1MB decoded and 20 characters**, with the
+paste-box guard at ~150KB of wire. A 26KB paste is unremarkable — WeakAuras
+strings routinely run larger — and `SetMaxLetters(0)` on the export EditBox is
+what makes it copyable.
+
 ## Sample vectors
 
-See `vectors/v1-min.json` (1 char minimal) and `vectors/v1-full.json` (1 char full with all banks). Generated via `tools/generate-vector.lua` if you make one later.
+`vectors/v1-min.json` is one minimal character, and `v1-min.wb1` beside it is
+that vector encoded — the fixture the web decoder tests against. Regenerate both
+with `node tools/vector.mjs --write`.
