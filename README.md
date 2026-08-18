@@ -222,3 +222,45 @@ No test harness — WoW loader is test + scripts/verify.lua lint.
 
 ---
 Next: scaff WarbandPro.toc + store.lua + single panel, then web import route that accepts wb1! and writes character_addon_cache. No balance until round-trip works.
+
+---
+
+## For coding later — modern stack reference (Midnight 12.0+, condensed)
+
+> Full 241-line checklist is in `docs/RESEARCH-REFERENCE.md` in this repo. That doc is the code bible — this is tl;dr for quick recall.
+
+**Target:** Retail Midnight/12.1, Interface 120001, Lua 5.1, vanilla (no Ace3/LibStub), LibDeflate only vendor.
+
+**TOC:**
+```
+## Interface: 120001
+## Title: Warband.pro
+## SavedVariables: WarbandProDB
+## IconTexture: Interface\Icons\INV_Misc_Bag_10
+## AddonCompartmentFunc: WarbandPro_OnAddonCompartmentClick
+Init.lua | Libs/LibDeflate.lua | Core.lua | Store.lua | Scan.lua | Instances.lua | Bundle.lua | Export.lua | UI.lua
+```
+
+**Why no Ace3:** minimal surface = fewer breakage points on patches — Midnight template explicitly says modern pattern is no Ace3 dep. Our exporter doesn't need AceDB.
+
+**SavedVariables:** one account-wide `WarbandProDB = { v=1, chars={[guid]=…}, warbandBank, lastExport }`. GUID-keyed stable across renames. Update current char only on events, bundle values of whole table. ~8KB per char vs typical 50KB per char for bigger addons because we skip recipes/mounts.
+
+**Events + perf:** PLAYER_LOGIN, BAG_UPDATE throttled .5s, PLAYER_MONEY, CURRENCY_DISPLAY_UPDATE, BANKFRAME_OPENED/ACCOUNT_BANK_OPENED/REAGENTBANK, BOSS_KILL/ENCOUNTER_END/UPDATE_INSTANCE_INFO, WEEKLY_REWARDS_UPDATE. No OnUpdate, use C_Timer generation counter to cancel stale callbacks. Fail closed if called in combat.
+
+**C_Container new:** `C_Container.GetContainerNumSlots`, `GetContainerItemInfo` — old GetBag API dead. Warband Bank = `C_Bank` 5 tabs, only live when banker open — stamp seenAt shared: "WBank 1h ago (by Vocnar)" valid all alts.
+
+**Midnight breaks:** Secret Values — reading aura.spellId on private aura throws taint forever. Don't touch combat auras. CLEU doesn't fire for addons anymore, use per-event replacements (we don't meter anyway). So inventory+lockout exporter unaffected if we avoid combat log.
+
+**Export:** WeakAuras pattern `Copy Import String` → Ctrl-A Ctrl-C. Same UX. JSON → deflate → base64url `wb1!`. 6 chars => 4-7KB fits EditBox SetMaxLetters(0) + scroll. wb0 reserved Camp DNA.
+
+**UI:** One panel, Blizzard native widgets, Compartment entry point (no minimap lib default), slash /warband /warband copy /warband status. Debug first-class /addon status + /addon debug. No tooltip hooks (overlap fix to avoid taint with ElvUI). No global leakage besides `WarbandPro`.
+
+**Compat:** Folder name == .toc base name (WoW hard rule). Load order libs → core → data → ui → config. Unique SavedVariables name. No frame scanning, no GetGlobal loops. TOC bump needs full WoW restart, not just /reload.
+
+**Data scope = Altoholic + SavedInstances ideal vendor:** Warbandeer issue says REST API has zero paths for vault/curr/gold/lockout/mail/bank/bag/playtime/housing — addon only source. Warbandeer_Characters stores per char gold + warbank gold, currencies/crests, Great Vault, M+ keystones + history + score, raid/delve lockouts + bosses + reset, world bosses, mail+expiry, auctions+gold, playtime, bags+bank+wbank items, quests, titles catalog for external naming, rep, prof knowledge. That's exact superset we bundle (skip mounts/equipment full for weight/size).
+
+**Size/perf goal:** <5MB mem idle, <200KB SavedVars for 6 chars, no polling, throttle BAG_UPDATE to not spam on loot.
+
+**Packaging:** BigWigs packager .pkgmeta → CF/Wago zip via GitHub Action. .luacheckrc + scripts/get-interface-version.ps1 validation.
+
+For full thing with sources, see `docs/RESEARCH-REFERENCE.md`. That file will be deleted before ship to keep repo light — it's coding reference now.
