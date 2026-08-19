@@ -186,6 +186,8 @@ into each other. Each character still carries `seenAt.warbank`, so the dots can
 still say which character last stood at the banker, and `seenByName` is the
 credit line for "Warband Bank 1h ago (by Vocnar)".
 
+When that character is forgotten (`/warband clear`) or pruned (`/warband optimize`), the account-wide vault remains — the tabs and gold do not belong to the character — but `seenByGuid`/`seenByName` are cleared so the UI never names a GUID that no longer has a snapshot. Web Import keeps the vault row under `warband_bank_cache`, attribution moves to next seer.
+
 ### 2. Items carry `{id, count, quality?, isBound?}` — no `link`, no `isCraftingReagent`
 
 Name, icon, quality colour and item class are all derivable from the id through

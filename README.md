@@ -136,9 +136,9 @@ CF: Warband.pro Companion (name reserved).
 /warband                panel + bundle preview freshness
 /warband copy           same panel — the panel is how you copy
 /warband copy current   single-char only for test/stream
-/warband clear <name>   remove a character from the DB
+/warband clear <name>   remove a character from the DB — clears warband bank attribution if that char was its seer
 /warband status         count, bundle size, per-section ages, API failures
-/warband optimize       prune chars not seen 90d
+/warband optimize       prune chars not seen 90d — keeps account vault, drops orphaned seer name
 ```
 
 Web: `/settings/import` textarea auto-clipboard grab if wb1! present, preview table, Confirm → upserts `character_addon_cache`.

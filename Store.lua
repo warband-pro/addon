@@ -111,28 +111,51 @@ function Store.Characters()
 end
 
 -- /warband clear <name> — remove by character name, case-insensitive.
+-- Account-wide orphan guard: if the forgotten character was the one who last
+-- saw the warbank, clear the attribution — the vault tabs are account-wide
+-- and remain, but "by Vocnar" must not point at a deleted GUID.
 function Store.Forget(name)
   if not Store.Ready() or type(name) ~= "string" or name == "" then return 0 end
   local want, removed = name:lower(), 0
+  local removedGuids = {}
   for guid, c in pairs(Store.db.chars) do
     if type(c.name) == "string" and c.name:lower() == want then
       Store.db.chars[guid] = nil
+      removedGuids[guid] = true
       removed = removed + 1
+    end
+  end
+  if removed > 0 then
+    local wb = Store.db.warbandBank
+    if wb and wb.seenByGuid and removedGuids[wb.seenByGuid] then
+      wb.seenByGuid = nil
+      wb.seenByName = nil
     end
   end
   return removed
 end
 
 -- /warband optimize — drop characters not logged in 90 days.
+-- Same orphan rule as Forget: keep the vault, drop the ghost attribution when
+-- its owner is pruned or already missing.
 function Store.Prune()
   if not Store.Ready() then return 0 end
   local cutoff, removed = ns.now() - ns.STALE_PRUNE, 0
   local mine = UnitGUID("player")
+  local removedGuids = {}
   for guid, c in pairs(Store.db.chars) do
     local last = c.seenAt and c.seenAt.lastSeen or 0
     if guid ~= mine and last < cutoff then
       Store.db.chars[guid] = nil
+      removedGuids[guid] = true
       removed = removed + 1
+    end
+  end
+  if removed > 0 then
+    local wb = Store.db.warbandBank
+    if wb and wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
+      wb.seenByGuid = nil
+      wb.seenByName = nil
     end
   end
   return removed
