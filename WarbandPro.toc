@@ -1,4 +1,4 @@
-## Interface: 120001
+## Interface: 120100
 ## Title: Warband.pro
 ## Notes: Lightweight warband bundle — bags, bank, currencies, lockouts from every alt you log
 ## Author: warband.pro
