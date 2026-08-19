@@ -2,14 +2,30 @@ package-as: WarbandPro
 
 # No externals, deliberately. LibDeflate is vendored as a single file in Vendor/
 # so a release never depends on fetching a repo at package time. If an
-# `externals:` block ever appears here, the zero-dependency rule has slipped.
+# `externals:` block ever appears here, the zero-dependency rule has slipped —
+# and tools/validate.mjs fails the build to say so.
 
 enable-nolib-creation: no
 
+# The zip carries its own license copy. MIT for this addon; LibDeflate's zlib
+# notice stays at the top of Vendor/LibDeflate.lua, where that license requires.
+license-output: LICENSE.txt
+
+# Release notes come from the hand-written changelog, not from the commit log.
+# What a player wants to read is "gold now updates when you sell", not
+# "fix(scan): guard nil on C_Bank tab 5".
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+# Everything a player never needs. docs/ is the coding reference and tools/ only
+# runs on a laptop; both would be dead weight in every download.
 ignore:
   - docs
   - tools
-  - .luacheckrc
-  - .pkgmeta
   - .git
   - .github
+  - .gitignore
+  - .editorconfig
+  - .luacheckrc
+  - .pkgmeta
