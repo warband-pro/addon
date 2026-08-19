@@ -1,0 +1,22 @@
+# Packager output — `release.sh` / BigWigsMods-packager builds here.
+/.release/
+*.zip
+
+# luacheck
+.luacheckcache
+
+# Node — tools/ are plain ESM scripts with no dependencies, but a stray
+# `npm init` should not end up committed.
+node_modules/
+package-lock.json
+
+# Generated contract fixtures are committed on purpose; nothing else is.
+# (docs/contract/vectors/*.wb1 are tracked — see tools/vector.mjs --write)
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
