@@ -14,7 +14,7 @@
 ## X-Website: https://warband.pro
 ## X-Site: https://warband.pro
 ## X-License: MIT
-## X-Curse-Project-ID: 000000
+## X-Curse-Project-ID: 1660174
 ## X-Wago-ID: 0000000
 ## X-WoWI-ID: 00000
 
