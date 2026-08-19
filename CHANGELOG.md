@@ -15,11 +15,27 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
-### Added
+## [1.0.0] — 2026-08-19 — Warband.pro Companion launch
 
-- **Warband.pro Companion** — Companion addon for warband.pro (https://warband.pro). Collects bags, bank, warband bank, gold, currencies, professions, mail, auctions, instance lockouts, keystone, and weekly vault from every alt you log.
-- Account-wide snapshot store, keyed by character GUID, updated silently on login and on bag / bank / vault activity.
-- `wb1!` bundle export — canonical JSON, raw deflate, base64url — and the `/warband` panel that hands it to your clipboard for warband.pro Import.
-- MIT license, and an automated release pipeline: GitHub Actions → GitHub Release → CurseForge / Wago / WoWInterface as "Warband.pro Companion".
+First CurseForge release.
 
-[Unreleased]: https://github.com/warband-pro/addon/commits/main
+**Warband.pro Companion** — companion addon for warband.pro (https://warband.pro). You play normally, log alts 2..6 through the week with zero extra steps — account-wide `WarbandProDB` GUID-keyed updates silently on login, bag move (.5s throttle), bank open, vault open, mail.
+
+Any char: `/warband` → auto-highlighted box → Ctrl+C copies `wb1!aH...` (multi-char bundle default, 4-7KB for 6 chars, ~26KB with full bag contents). Paste on warband.pro Import (hotkey `i`) → preview 🟢🟡🔴 → Confirm. Missing chars stay ⚪ never, stale just lowers confidence.
+
+What it captures — Altoholic + SavedInstances superset, pruned Midnight 12.1:
+- Bags, bank+bags, reagentBank, warbandBank with seenByGuid/tabs
+- Gold, currencies with weeklyMax/isAccountWide — Crests, Flightstones, Tender
+- Professions skill/max, mail count+goldPending, auctions count+goldHeld
+- Lockouts LFR/N/H/M with bosses killed + resetTime, worldBosses
+- Keystone level/dungeonID, M+ runs timed/chest, score, weeklyVault raid/mplus/world thresholds
+- Consumables rollup for Tonight Plan, per-section seenAt for staleness dots
+
+Trust: no network ever, <200KB for 6 chars, no OnUpdate scanner, copy-only, vanilla Lua no Ace3/LibStub, zero deps except vendored LibDeflate MIT zlib (license in Vendor/LibDeflate.lua header).
+
+Retail Midnight 12.1 only. Works with whatever UI you run.
+
+Then future tags auto-upload via BigWigs packager once Project IDs are set.
+
+[Unreleased]: https://github.com/warband-pro/addon/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/warband-pro/addon/releases/tag/v1.0.0
