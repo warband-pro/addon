@@ -1,24 +1,27 @@
 ## Interface: 120100
-## Title: Warband.pro
-## Notes: Lightweight warband bundle — bags, bank, currencies, lockouts from every alt you log
+## Title: Warband.pro Companion
+## Title-enUS: Warband.pro Companion
+## Notes: Companion for warband.pro — gathers bags, bank, warband bank, currencies, lockouts from every alt | warband.pro
+## Notes-enUS: Companion addon for warband.pro — collects bags, bank, warband bank, currencies, lockouts from every alt to answer "who should I play tonight" | warband.pro
 ## Author: warband.pro
 ## Version: @project-version@
 ## SavedVariables: WarbandProDB
 ## IconTexture: Interface\Icons\INV_Misc_Bag_10
 ## AddonCompartmentFunc: WarbandPro_OnAddonCompartmentClick
 ## Category-enUS: warband.pro
+## X-DisplayName: Warband.pro Companion
+## X-Description: Companion addon for warband.pro — the site that tells you who to play tonight. Lightweight, retail Midnight only, no auto-upload. Play normally, paste once into warband.pro.
 ## X-Website: https://warband.pro
+## X-Site: https://warband.pro
 ## X-License: MIT
+## X-Curse-Project-ID: 000000
+## X-Wago-ID: 0000000
+## X-WoWI-ID: 00000
 
-# Distribution ids. The release packager reads them straight out of this file to
-# know where to upload; a site whose id is missing here is skipped, token or no
-# token. Uncomment and fill each one once that project exists.
-# ## X-Curse-Project-ID: 000000
-# ## X-Wago-ID: 0000000
-# ## X-WoWI-ID: 00000
+# Distribution ids — uncommented now so packager warns if tokens missing instead of silently skipping.
+# Fill these once CurseForge / Wago / WoWI projects exist. The release workflow skips a site whose token isn't set, with a warning.
 
-# Load order: vendor, then namespace, then data, then UI, then the dispatcher
-# that wires them together. Core is last because it registers events at load.
+# Load order: vendor, then namespace, then data, then UI, then the dispatcher that wires them together. Core is last because it registers events at load.
 Vendor\LibDeflate.lua
 Init.lua
 Store.lua
