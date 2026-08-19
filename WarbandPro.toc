@@ -8,6 +8,14 @@
 ## AddonCompartmentFunc: WarbandPro_OnAddonCompartmentClick
 ## Category-enUS: warband.pro
 ## X-Website: https://warband.pro
+## X-License: MIT
+
+# Distribution ids. The release packager reads them straight out of this file to
+# know where to upload; a site whose id is missing here is skipped, token or no
+# token. Uncomment and fill each one once that project exists.
+# ## X-Curse-Project-ID: 000000
+# ## X-Wago-ID: 0000000
+# ## X-WoWI-ID: 00000
 
 # Load order: vendor, then namespace, then data, then UI, then the dispatcher
 # that wires them together. Core is last because it registers events at load.

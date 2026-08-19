@@ -1,0 +1,92 @@
+name: CI
+
+# Three questions, asked on every push: does the Lua lint clean, would the
+# client actually load this, and does the wire format still round-trip. The
+# release workflow calls this same file, so nothing ships that has not answered
+# all three.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: luacheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lua5.1 luarocks
+          sudo luarocks install luacheck
+
+      # .luacheckrc lists every global this addon is allowed to touch, so a new
+      # warning here is usually a leaked global rather than a style nit.
+      - name: luacheck .
+        run: luacheck .
+
+  validate:
+    name: packaging + contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Catches the failures WoW reports by silently not loading the addon.
+      - name: Validate .toc and .pkgmeta
+        run: node tools/validate.mjs
+
+      # The half of the wb1! contract that can be tested without a game client:
+      # encode a vector the way Export.lua does, decode it the way the website
+      # will, and require the payload to survive the trip unchanged.
+      - name: Contract vectors round-trip
+        run: node tools/vector.mjs
+
+      # A drifted fixture means /app is testing against a string this addon no
+      # longer produces. Regenerate with `node tools/vector.mjs --write`.
+      - name: Committed .wb1 fixtures match
+        run: |
+          node tools/vector.mjs --write
+          git diff --exit-code -- docs/contract/vectors \
+            || { echo "::error::.wb1 fixtures are stale — run 'node tools/vector.mjs --write' and commit"; exit 1; }
+
+  package:
+    name: package (dry run)
+    runs-on: ubuntu-latest
+    needs: [lint, validate]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Same tool that does the real release, with uploads switched off. If
+      # .pkgmeta is malformed, this is where it surfaces — not on a tag.
+      - name: Build the zip
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -d
+
+      # A downloadable build for testers on every push to main, so trying a
+      # change never requires cutting a version.
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarbandPro-${{ github.sha }}
+          path: .release/*.zip
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,40 @@
+name: Feature request
+description: Capture something the bundle does not carry yet, or change how it behaves
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Some gaps are already known and written up — see "What the scaffold does
+        not capture yet" in the README before filing. Saying your case is still
+        useful there; it moves the priority.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to decide
+      description: >
+        This addon exists to answer "who should I play tonight". Describe the
+        question you cannot answer today rather than the field you want added —
+        the field usually follows from it.
+      placeholder: >
+        I cannot tell which alt still has a Transmute cooldown up, so I log four
+        characters every night to check.
+    validations:
+      required: true
+
+  - type: textarea
+    id: shape
+    attributes:
+      label: Where it would live
+      description: >
+        Optional. If you know the API or the bundle field, name it — the wire
+        format is documented in docs/CONTRACT.md.
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints this respects
+      options:
+        - label: It does not require the addon to transmit anything
+        - label: It does not require an OnUpdate loop or a scan on every frame

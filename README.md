@@ -1,5 +1,8 @@
 # warband.pro — companion addon
 
+[![CI](https://github.com/warband-pro/addon/actions/workflows/ci.yml/badge.svg)](https://github.com/warband-pro/addon/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > Problem: Battle.net API can't see what your chars actually hold — bags, bank, warband bank, gold, currencies, lockouts fresh vs stale, vault. Altoholic + SavedInstances have it, but web doesn't.
 
 Warband.pro answers "who should I play tonight" from API — ilvl, spec, vault, lockouts summary. This addon gives it the other 60% — where stuff is, broke or not, 0 phials, spark capped.
@@ -99,14 +102,31 @@ See `docs/CONTRACT.md` + vector `docs/contract/vectors/v1-min.json`.
 - Export copy popup user decides paste — you paste to own site only, user_id only. Gold/warbank never in wb0 DNA unless opt-in "include gold".
 - Stream-safe toggle collapses gold to ••• (future checkbox).
 
-## Install (pre-CurseForge tester)
+## Install
 
-```
+Once the CurseForge project is live, install it the way you install anything
+else — CurseForge app, WowUp, or whatever manager you already run.
+
+Until then, two options. A built zip from any recent push, which is the same
+artifact a release ships:
+
+> **Actions → CI → most recent run on `main` → Artifacts → `WarbandPro-<sha>`.**
+> Unzip into `_retail_/Interface/AddOns/`.
+
+Or straight from source:
+
+```bash
 git clone https://github.com/warband-pro/addon.git WarbandPro
-mv WarbandPro _retail_/Interface/AddOns/WarbandPro
-# /reload inside game, full restart needed if .toc changed
-# /warband
 ```
+
+Move that `WarbandPro` folder into `_retail_/Interface/AddOns/`, then `/reload`
+in game — a full client restart if the `.toc` changed — and run `/warband`. The
+folder name must stay `WarbandPro` to match `WarbandPro.toc`, or the client
+skips it without saying anything.
+
+A source clone reports its version as `0.0.0-dev`: `@project-version@` is filled
+in at package time, and `Init.lua` deliberately falls back rather than showing
+the raw token.
 
 CF: Warband.pro Companion (name reserved).
 
@@ -142,9 +162,17 @@ See `docs/FLOW.md` full story, `docs/UI.md` copy pain detail.
 
 - flat root: WarbandPro.toc, Init.lua, Store.lua, Scan.lua, Instances.lua, Bundle.lua, Export.lua, UI.lua, Core.lua, Vendor/LibDeflate.lua, .pkgmeta, .luacheckrc
 - tools/vector.mjs — contract round-trip, the only test that runs without WoW
-- docs/ reference folder (trim before CF ship) — see docs/README.md read order.
+- tools/validate.mjs — .toc/.pkgmeta pre-flight, the failures WoW reports by silently not loading
+- tools/sample.mjs — a realistic bundle for the website's import UI
+- docs/ reference folder — never ships, `.pkgmeta` strips it. See docs/README.md read order.
 - No test harness inside WoW — but pure functions testable offline via luacheck + busted + vector round-trip.
-- CI workflows are not written yet. `luacheck .` and `node tools/vector.mjs` are what a ci.yml would run.
+
+Everything above runs in CI on every push, plus a dry-run package that uploads a
+working zip as an artifact. Locally the same three commands are:
+
+```bash
+luacheck . && node tools/validate.mjs && node tools/vector.mjs
+```
 
 Load order in the .toc is vendor → namespace → data → UI → dispatcher; Core.lua is
 last because it registers events the moment it loads. The installed folder must be
@@ -165,11 +193,44 @@ Template tracked Interface 120001 Lua 5.1, secret values taint apocalypse (CLEU 
 - docs/UI.md — copy pain game EditBox Multi MaxLetters(0) HighlightText Timer.After(0) + web Import modal clipboard inside click fallback paste + preview dots
 - docs/TESTING.md — layering pure vs impure offline luacheck busted vector vs 5-min manual script screenshot-parseable
 - docs/QA.md — manual checklist release 5-min copy-paste PASS/FAIL lines
-- docs/CI.md — packager, semver, tokens
+- docs/CI.md — the two workflows, cutting a release, tokens, project ids, semver
 - docs/PROMPT.md — prompt for AI coder /app+/addon
 - docs/APP-IMPORT.md — the /app side proposal: D1 tables, import route, pure decoder
+- docs/POLICY.md — CurseForge/Blizzard policy compliance, rule by rule, and which ones CI enforces
+- docs/STORE.md — the description to paste on the addon sites (this README is not it)
 
-When shipping light: keep this README + CONTRACT excerpt, nuke docs/.
+None of this ships. `.pkgmeta` strips `docs/` and `tools/` from the zip, so a
+player's download is the addon and nothing else.
+
+## Releasing
+
+Write the `## [1.0.0]` section in [CHANGELOG.md](CHANGELOG.md) first — it becomes
+the release notes on every site, and both release paths refuse a version without
+one. Then either:
+
+```bash
+git tag -a v1.0.0 -m v1.0.0 && git push origin v1.0.0
+```
+
+…or **Actions → Release → Run workflow → `1.0.0`**, which validates the version,
+the changelog, and tag uniqueness before writing the tag for you.
+
+From there it is automatic: full CI, then the packager builds the zip, cuts a
+GitHub Release, and uploads to CurseForge, Wago, and WoWInterface. Each site is
+skipped — with a warning, not a failure — until its token secret and its `.toc`
+project id both exist. Setup for those is in [docs/CI.md](docs/CI.md).
+
+The project pages themselves are hand-set once: paste
+[docs/STORE.md](docs/STORE.md) as the description, and read
+[docs/POLICY.md](docs/POLICY.md) first — CurseForge inherits Blizzard's addon
+policy, and two of its rules bite in non-obvious ways. Note that the artifact
+install instructions above are for GitHub only; a distribution site's
+description may not carry external download links.
+
+## License
+
+MIT — see [LICENSE](LICENSE). LibDeflate is vendored under the zlib license,
+notice retained in `Vendor/LibDeflate.lua`.
 
 ## Decisions locked vs open
 

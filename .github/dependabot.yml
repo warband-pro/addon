@@ -1,0 +1,15 @@
+version: 2
+
+# The addon itself has no dependencies by design — LibDeflate is vendored. The
+# only thing here that can go stale is the CI's own tooling, so that is all
+# Dependabot watches. Monthly, because a release pipeline that nags weekly gets
+# ignored.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'chore(ci)'
+    labels:
+      - ci
