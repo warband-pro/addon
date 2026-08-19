@@ -1,0 +1,56 @@
+name: Bug report
+description: Something in the addon misbehaves in game
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: reload with `/reload`, and if you just updated the addon,
+        restart the client fully — a changed `.toc` needs a real restart.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+      placeholder: |
+        Opened the warband bank on Vocnar, ran /warband, and the bundle still showed
+        "Warband Bank not seen since Aug 14".
+    validations:
+      required: true
+
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `/warband status`
+      description: >
+        Paste it verbatim. It carries the addon version, character count, bundle
+        size, per-section ages, and any API failures — which is most of what a
+        diagnosis needs. It contains character names and realms, no gold totals.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: errors
+    attributes:
+      label: Lua error, if any
+      description: >
+        The full text from BugSack, BugGrabber, or the default error frame.
+        Enable errors with `/console scriptErrors 1` if you see nothing.
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: Game version
+      description: From `/run print((select(4, GetBuildInfo())))`, or just the patch number.
+      placeholder: '12.1 / 120001'
+
+  - type: checkboxes
+    id: isolated
+    attributes:
+      label: Narrowing it down
+      options:
+        - label: It still happens with every other addon disabled
+        - label: It happens on more than one character
