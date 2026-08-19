@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Website, dashboard, and import
+    url: https://warband.pro
+    about: Anything about the site rather than the in-game addon.
+  - name: The wb1! wire format
+    url: https://github.com/warband-pro/addon/blob/main/docs/CONTRACT.md
+    about: What a bundle contains, how it is encoded, and how versions break.

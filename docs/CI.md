@@ -1,59 +1,101 @@
-# CI / packaging / release — WarbandPro
+# CI, packaging, and releases
 
-Goal: nightly nothing you do, tagged release ships to CF/Wago/WI.
+Two workflows, one packager, no manual zip. Cutting a release is one command or
+one button, and everything between that and the download page is automatic.
 
-## CI layers (GitHub Actions)
+## What runs, and when
 
-### ci.yml — on push
+### `.github/workflows/ci.yml` — every push to `main`, every PR
 
-- luacheck . — fail if >0 warnings
-- checks: validate .toc syntax Interface required, all files listed exist, folder base matches toc base
-- contract vectors round-trip test (node + pako decode vs LibDeflate encode) — we test 1-min, 1-full, 1-bundle6. Must identity decode identical.
-- optional busted pure tests `tests/spec_*.lua` if we add them (lua 5.1)
+| Job | What it proves |
+| --- | --- |
+| `luacheck` | Zero warnings under `.luacheckrc`. That file lists every global the addon may touch, so a new warning is usually a leaked global rather than a style nit. |
+| `packaging + contract` | `tools/validate.mjs` — the `.toc` and `.pkgmeta` are internally consistent. `tools/vector.mjs` — a `wb1!` payload survives encode → decode unchanged, and the committed `.wb1` fixtures still match. |
+| `package (dry run)` | The real packager builds the real zip with uploads switched off, and attaches it as a workflow artifact. |
 
-### packager.yml — on tag v*
+That artifact matters: **every push to `main` produces a downloadable, correctly
+structured zip** under the run's Artifacts. Testers install builds without anyone
+cutting a version.
 
-Uses BigWigsMods/packager per modern Midnight template: CI/CD via that tool for CF/Wago/WI.
+### `.github/workflows/release.yml` — on a `v*` tag, or on demand
 
-`.pkgmeta` at root:
+Runs `ci.yml` in full first, then hands the repo to
+[BigWigsMods/packager](https://github.com/BigWigsMods/packager), which:
+
+1. substitutes `@project-version@` in the `.toc` and `LibDeflate.lua` from the tag,
+2. builds `WarbandPro-v1.0.0.zip` with `docs/`, `tools/`, and the dotfiles stripped per `.pkgmeta`,
+3. copies `LICENSE` into the zip as `LICENSE.txt`,
+4. creates a GitHub Release with the zip attached,
+5. uploads to CurseForge, Wago, and WoWInterface, using the matching `## [x.y.z]` section of `CHANGELOG.md` as the release notes.
+
+A site is uploaded to only when **both** its token secret and its `.toc` id are
+present. Missing either one logs a warning and skips that site — which is how
+this pipeline is useful before the CurseForge project exists.
+
+## Cutting a release
+
+Write the changelog section first. Both paths refuse to release without one,
+because a version with empty release notes is what players actually see.
+
+```bash
+git tag -a v1.0.0 -m v1.0.0 && git push origin v1.0.0
 ```
-package-as: WarbandPro
-externals:
-  Libs/LibDeflate: url=https://github.com/SafeteeWoW/LibDeflate, latest
+
+Or, from the browser: **Actions → Release → Run workflow → `1.0.0`**. That path
+validates the version string, the changelog section, and tag uniqueness *before*
+writing the tag, then tags and pushes it for you.
+
+## What to configure, once
+
+### Repository secrets
+
+Settings → Secrets and variables → Actions:
+
+| Secret | Where it comes from |
+| --- | --- |
+| `CF_API_KEY` | CurseForge → account settings → API Tokens |
+| `WAGO_API_TOKEN` | Wago → account → API keys |
+| `WOWI_API_TOKEN` | WoWInterface → settings → API token |
+
+`GITHUB_TOKEN` is issued by Actions itself — nothing to add. No token belongs in
+a file in this repo, ever; `tools/validate.mjs` and `.gitignore` assume that.
+
+### Project ids in the `.toc`
+
+The packager reads them from `WarbandPro.toc`, not from `.pkgmeta`. Placeholders
+are commented out at the top of that file — uncomment and fill each one as the
+project is created:
+
+```
+## X-Curse-Project-ID: 000000
+## X-Wago-ID: 0000000
+## X-WoWI-ID: 00000
 ```
 
-But we prefer manual vendoring one-file LibDeflate to avoid external fetching flake. So .pkgmeta minimal.
+`tools/validate.mjs` prints a `NOTE` for each id still missing, so the state is
+visible in every CI run rather than discovered on release day.
 
-On tag v* push, action builds zip with `@project-version@` replaced from tag, strips .git, docs/*.md except README trimmed, compress.
+## Versioning
 
-Artifacts: WarbandPro-v1.0.0.zip visible in Releases.
+Semver, with the wire format as the thing being versioned:
 
-### Release flow
+- **MAJOR** — `wb1!` → `wb2!`. Old strings rejected with "update your addon".
+- **MINOR** — a new optional field or capture. The website still reads older bundles.
+- **PATCH** — a fix. Payload shape unchanged.
 
-- `v1.0.0` style tags, semver.org: MAJOR break (wb1! → wb2!), MINOR additive field (web still reads old), PATCH fix.
-- Changelog generated from conventional commits `fix:` `feat:` `docs:` — we follow same flat lowercased style you use outside (hooks/cm-msg no em dash → reject).
-- CI copies README trimmed for CurseForge Description (first 3000 chars).
-
-## Versioning of wire
-
-- Patch: addon Version 1.0.1 shape same, web not change.
-- Minor: new optional field added addon, web must still accept old (backcompat). Bump addon patch too.
-- Major: break — rename prefix wb2!, old string rejected with "update your addon - get v2" in web import UI.
-
-## Secrets
-
-- CF_API_TOKEN, WAGO_API_TOKEN, WOWI_API_TOKEN stored in GitHub secrets.
-- Token never in repo .env.
+The addon version and the wire version move independently: many addon minors can
+ship against `wb1!`. `docs/CONTRACT.md` is the law for the wire half.
 
 ## Branching
 
-Main only, direct push as you do for warband.pro polish lane. No PRs needed for fast iterate. Tag for release only.
+`main` only, direct push, tag to release. No PR ceremony for a one-maintainer
+repo — CI still runs on every push, so the safety net is the same.
 
-## What CI cannot catch (hence manual QA)
+## What CI cannot catch
 
-- Real game API nil returning when out of party, instance lock nil.
-- TaintLog secret value reading causing taint in session.
-- EditBox copy limit on real client vs Classic difference.
-- Warband Bank C_Bank returning nil when not at banker vs sometimes temporary failure.
+Everything that needs a live client. These stay manual, in `docs/QA.md`:
 
-Cover those in docs/QA.md checklist.
+- Game APIs returning nil out of party, or an instance lock reading empty.
+- Taint from reading a secret value mid-session.
+- `EditBox` copy limits on the real client.
+- `C_Bank` returning nil when you are not at a banker, versus a genuine transient failure.

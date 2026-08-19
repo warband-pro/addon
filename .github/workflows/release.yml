@@ -1,0 +1,116 @@
+name: Release
+
+# Two ways in, one path out.
+#
+#   git tag -a v1.0.0 -m v1.0.0 && git push origin v1.0.0
+#   — or — Actions → Release → Run workflow → 1.0.0
+#
+# Either way this runs the full CI suite first, then hands the repo to
+# BigWigsMods/packager, which substitutes @project-version@ from the tag, builds
+# WarbandPro-v1.0.0.zip, attaches it to a GitHub Release, and uploads it to
+# every distribution site whose token is configured. Sites without a token are
+# skipped with a warning rather than failing the run — which is how this stays
+# useful before the CurseForge project exists.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the leading v (e.g. 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: package and publish
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Manual runs tag the commit themselves, so a release from the Actions tab
+      # and a release from a pushed tag reach the packager in the same state.
+      # Everything that could be wrong is checked before the tag is written,
+      # because an unwanted tag is the one part of this that is annoying to undo.
+      - name: Tag this commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::'$VERSION' is not a semantic version — expected 1.0.0 or 1.0.0-beta1"
+            exit 1
+          fi
+
+          if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::tag v$VERSION already exists"
+            exit 1
+          fi
+
+          # The packager sends this section to CurseForge as the release notes.
+          # Shipping without it means players get an empty changelog.
+          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section — write the release notes first"
+            exit 1
+          fi
+
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+
+      # On a pushed tag, the same changelog rule applies — it is just checked
+      # after the fact, since the tag already exists by the time we run.
+      - name: Changelog has a section for this tag
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section — the release notes would be empty"
+            exit 1
+          fi
+
+      - name: Package and publish
+        uses: BigWigsMods/packager@v2
+        env:
+          # Absent secrets skip that site rather than failing the release.
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+          WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}
+          # Creates the GitHub Release and attaches the zip. This one is issued
+          # by Actions itself, so there is nothing to configure.
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '### Release'
+            echo
+            if compgen -G '.release/*.zip' > /dev/null; then
+              for zip in .release/*.zip; do
+                echo "- \`$(basename "$zip")\` — $(du -h "$zip" | cut -f1)"
+              done
+            else
+              echo '- no zip produced'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
