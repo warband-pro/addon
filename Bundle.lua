@@ -130,12 +130,18 @@ function Bundle.Build(opts)
     if not oldest or seen < oldest then oldest = seen end
   end
 
+  -- Both halves of this need truncating before they reach tonumber. select(4, ...)
+  -- returns everything from the fourth value on, not the fourth alone, and ns.safe
+  -- passes up to three values back. Left to splat, the interface number lands in
+  -- tonumber's base argument as a string and the export dies on the way out.
+  local toc = ns.safe(function() return (select(4, GetBuildInfo())) end)
+
   return {
     v = ns.WIRE_V,
     addon = ns.VERSION,
     exportedAt = ns.now(),
     gameVersion = ns.safe(function() return (GetBuildInfo()) end),
-    interface = tonumber(ns.safe(function() return select(4, GetBuildInfo()) end)),
+    interface = tonumber(toc),
     bundle = {
       count = #chars,
       freshestSeenAt = freshest,
