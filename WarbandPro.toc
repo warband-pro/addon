@@ -15,7 +15,7 @@
 ## X-Site: https://warband.pro
 ## X-License: MIT
 ## X-Curse-Project-ID: 1660174
-## X-Wago-ID: 0000000
+## X-Wago-ID: RNLkzbGo
 ## X-WoWI-ID: 00000
 
 # Distribution ids — uncommented now so packager warns if tokens missing instead of silently skipping.

@@ -68,7 +68,7 @@ project is created:
 
 ```
 ## X-Curse-Project-ID: 000000
-## X-Wago-ID: 0000000
+## X-Wago-ID: RNLkzbGo  (warband-pro-companion)
 ## X-WoWI-ID: 00000
 ```
 
