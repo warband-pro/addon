@@ -15,6 +15,19 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-08-20 — fix the empty export box
+
+**If `/warband` gave you an empty box on 1.0.0 or 1.0.1, this is the fix.** Update and it works.
+
+- **Empty export box fixed.** The panel would say "Could not build the bundle" and hand you nothing, no matter how many characters were stored. The addon vendors LibDeflate to compress your bundle, and on any client where another addon had already registered LibDeflate first, ours never reached the addon and compression could not run. That is the common case, not the rare one — LibDeflate ships inside a lot of addons. We now fall back to the copy already loaded.
+- **`/warband status` says why a build failed.** The panel points at `status` for the detail, and `status` was not showing it. A failed bundle now prints its reason on its own line.
+- **WoWInterface placeholder removed from the `.toc`.** It was set to `00000`. Harmless while no WoWInterface token exists, but the moment one was added the packager would have attempted an upload to a project that does not exist and failed the release instead of skipping the site.
+- **Docs.** `/warband dump` was documented in the README and wiki but has never existed. Removed. Wiki troubleshooting also gave the wrong cause for an empty string and now leads with `/warband status`.
+
+No wire format change. Still `wb1!`, still `v: 1`, and warband.pro reads 1.0.0 and 1.0.1 bundles exactly as before.
+
+One correction to the 1.0.0 notes: this addon still ships no LibStub and registers nothing with it, but it will now *read* one that another addon provides, which is what the fix above does.
+
 ## [1.0.1] — 2026-08-19 — wire CurseForge auto packaging
 
 - Set `## X-Curse-Project-ID: 1660174` so BigWigs packager targets the real CurseForge project instead of placeholder 000000. Enables CurseForge automatic packaging via org secret `CF_API_KEY`.
