@@ -22,7 +22,10 @@ read_globals = {
   -- Lua aliases WoW exposes globally
   "format", "tinsert", "strsplit", "select", "unpack", "time", "date",
 
-  -- addon + frame plumbing
+  -- addon + frame plumbing. LibStub is read, never created: this addon ships no
+  -- LibStub and registers nothing with it, but other addons put it in _G and we
+  -- fall back to their LibDeflate when upstream's early return skips ours.
+  "LibStub",
   "C_AddOns", "GetAddOnMetadata", "CreateFrame", "UIParent", "UISpecialFrames",
   "ChatFontNormal", "DEFAULT_CHAT_FRAME", "C_Timer", "GetServerTime",
   "GetBuildInfo", "InCombatLockdown",

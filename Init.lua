@@ -16,6 +16,16 @@ local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 ns.VERSION = (getMeta and getMeta(ADDON, "Version")) or "0.0.0-dev"
 if ns.VERSION:find("@") then ns.VERSION = "0.0.0-dev" end   -- unbuilt @project-version@
 
+-- LibDeflate hands itself out with `return`, which WoW discards for a file loaded
+-- from a .toc, so Vendor/LibDeflate.lua assigns ns.LibDeflate at its foot. That
+-- assignment is unreachable on most real clients: when LibStub already holds an
+-- equal or newer LibDeflate, upstream returns from the main chunk long before it,
+-- and LibStub is a global the moment any addon that bundles it loads first. The
+-- vendored copy is still the one we ship and the one that runs on a bare client;
+-- this is the fallback for when someone else got there first. The 1.0.x
+-- CompressDeflate signature is what we depend on, and it is stable across them.
+ns.LibDeflate = ns.LibDeflate or (LibStub and LibStub:GetLibrary("LibDeflate", true))
+
 -- Freshness thresholds, in seconds. The web draws the same dots from the same
 -- numbers; if these move, warband.pro's importer moves with them.
 ns.FRESH_GREEN  = 6 * 3600
