@@ -26,28 +26,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Measured: `luacheck .` takes 0s, installing it took 17s of a 23s job.
-      # The interpreter still comes from apt every run because it lives in
-      # /usr/bin and is cheap; only the luarocks tree is worth carrying over.
-      - name: Cache luacheck
-        id: luacheck-cache
-        uses: actions/cache@v6
-        with:
-          path: |
-            /usr/local/bin/luacheck
-            /usr/local/share/lua/5.1
-            /usr/local/lib/luarocks
-          key: luacheck-${{ runner.os }}-lua5.1-v1
-
-      - name: Install Lua
+      # This takes ~17s and stays that way on purpose. Caching the luarocks tree
+      # was tried and reverted: apt is ~10s of it and cannot be cached away
+      # since luacheck needs an interpreter, leaving an 8s ceiling, and tag runs
+      # do not reliably see caches created on main, so releases never benefited.
+      # Two extra steps for an unreliable 8s was the worse trade.
+      - name: Install luacheck
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends lua5.1
-
-      - name: Install luacheck
-        if: steps.luacheck-cache.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get install -y --no-install-recommends luarocks
+          sudo apt-get install -y --no-install-recommends lua5.1 luarocks
           sudo luarocks install luacheck
 
       # .luacheckrc lists every global this addon is allowed to touch, so a new
