@@ -152,6 +152,12 @@ local function status()
   ns.print(format("bundle: %s %d bytes from %d of JSON%s",
     str and ns.WIRE or "|cffff5555failed|r", bytes or 0, rawBytes or 0,
     lastExport > 0 and (", last copied " .. ns.ago(lastExport)) or ""))
+  -- The panel sends people here with "status has the detail", so a failed build
+  -- has to say why. Not every reason is a failed API call, and the errorCount
+  -- line below only fires for those, so this one is separate on purpose.
+  if not str and ns.lastError then
+    ns.print("|cffff5555bundle error|r: " .. tostring(ns.lastError))
+  end
   local c = Store.Char()
   if c then
     local parts = {}
