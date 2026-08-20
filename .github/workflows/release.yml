@@ -108,7 +108,7 @@ jobs:
             echo
             if compgen -G '.release/*.zip' > /dev/null; then
               for zip in .release/*.zip; do
-                echo "- \`$(basename \"$zip\")\` — $(du -h \"$zip\" | cut -f1)"
+                echo "- \`$(basename "$zip")\` — $(du -h "$zip" | cut -f1)"
               done
             else
               echo '- no zip produced'

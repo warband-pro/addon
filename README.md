@@ -89,7 +89,6 @@ In-game `/reload` (full restart needed if .toc changed), then `/warband`.
 /warband                panel + bundle freshness
 /warband copy           bundle wb1! to clipboard
 /warband copy current   single-char only
-/warband dump           raw json (debug, /console)
 /warband clear <name>   prune from DB
 /warband status         debug counts/len/lastSeen
 /warband optimize       prune chars not seen 90d
