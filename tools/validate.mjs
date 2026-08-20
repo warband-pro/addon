@@ -203,8 +203,14 @@ for (const [key, site] of [
   ['X-Wago-ID', 'Wago'],
   ['X-WoWI-ID', 'WoWInterface'],
 ]) {
-  if (!directive(key)) {
+  const id = directive(key);
+  if (!id) {
     note(`no "## ${key}:" in ${tocName} — releases skip ${site} until it is added`);
+  } else if (/^0+$/.test(id)) {
+    // A placeholder is worse than an absent id. With no id the packager skips
+    // the site; with 00000 and a token it attempts a real upload to a project
+    // that does not exist, and takes the whole release down with it.
+    fail(`${tocName} has "## ${key}: ${id}" — a placeholder id fails the ${site} upload instead of skipping it. Comment it out until the project exists.`);
   }
 }
 

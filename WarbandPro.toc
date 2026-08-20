@@ -16,10 +16,15 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 1660174
 ## X-Wago-ID: RNLkzbGo
-## X-WoWI-ID: 00000
 
-# Distribution ids — uncommented now so packager warns if tokens missing instead of silently skipping.
-# Fill these once CurseForge / Wago / WoWI projects exist. The release workflow skips a site whose token isn't set, with a warning.
+# Distribution ids. The packager reads them from here, and uploads to a site only
+# when its id and its token are both present, so a missing one skips with a
+# warning rather than failing the release.
+#
+# WoWInterface stays commented until that project exists. A placeholder id is
+# worse than none: with a token set, the packager would attempt an upload to
+# project 00000 and fail the release rather than skip it.
+# ## X-WoWI-ID: 00000
 
 # Load order: vendor, then namespace, then data, then UI, then the dispatcher that wires them together. Core is last because it registers events at load.
 Vendor\LibDeflate.lua
