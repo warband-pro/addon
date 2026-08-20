@@ -94,8 +94,8 @@ jobs:
         env:
           # Absent secrets skip that site rather than failing the release.
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
-          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
-          WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN || secrets.WAGO_API_KEY }}
+          WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN || secrets.WOWI_API_KEY }}
           # Creates the GitHub Release and attaches the zip. This one is issued
           # by Actions itself, so there is nothing to configure.
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
@@ -108,7 +108,7 @@ jobs:
             echo
             if compgen -G '.release/*.zip' > /dev/null; then
               for zip in .release/*.zip; do
-                echo "- \`$(basename "$zip")\` — $(du -h "$zip" | cut -f1)"
+                echo "- \`$(basename \"$zip\")\` — $(du -h \"$zip\" | cut -f1)"
               done
             else
               echo '- no zip produced'
