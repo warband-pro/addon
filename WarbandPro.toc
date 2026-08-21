@@ -1,8 +1,8 @@
 ## Interface: 120100
 ## Title: Warband.pro Companion
 ## Title-enUS: Warband.pro Companion
-## Notes: Companion for warband.pro — gathers bags, bank, warband bank, currencies, lockouts from every alt | warband.pro
-## Notes-enUS: Companion addon for warband.pro — collects bags, bank, warband bank, currencies, lockouts from every alt to answer "who should I play tonight" | warband.pro
+## Notes: Companion for warband.pro — gathers bags, bank, warband bank, gear, talents, currencies, lockouts from every alt | warband.pro
+## Notes-enUS: Companion addon for warband.pro — collects bags, bank, warband bank, gear, talents, currencies, lockouts from every alt to answer "who should I play tonight" | warband.pro
 ## Author: warband.pro
 ## Version: @project-version@
 ## SavedVariables: WarbandProDB
@@ -10,7 +10,7 @@
 ## AddonCompartmentFunc: WarbandPro_OnAddonCompartmentClick
 ## Category-enUS: warband.pro
 ## X-DisplayName: Warband.pro Companion
-## X-Description: Companion addon for warband.pro — the site that tells you who to play tonight. Lightweight, retail Midnight only, no auto-upload. Play normally, paste once into warband.pro.
+## X-Description: Companion addon for warband.pro — the site that tells you who to play tonight. Gear, talents, bags, bank, warband bank, currencies, lockouts. Lightweight, retail Midnight only, no auto-upload. Play normally, paste once into warband.pro.
 ## X-Website: https://warband.pro
 ## X-Site: https://warband.pro
 ## X-License: MIT
@@ -32,6 +32,7 @@ Init.lua
 Store.lua
 Scan.lua
 Instances.lua
+Gear.lua
 Bundle.lua
 Export.lua
 UI.lua

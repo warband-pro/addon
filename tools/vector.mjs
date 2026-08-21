@@ -42,7 +42,10 @@ export function encode(payload) {
 export function decode(str) {
   if (!str.startsWith(PREFIX)) throw new Error(`expected ${PREFIX} prefix`);
   const raw = inflateRawSync(unb64url(str.slice(PREFIX.length)));
-  if (raw.length > 25 * 1024) throw new Error('payload over 25KB');
+  // CONTRACT.md: the real cap is 1MB decoded, not 25KB — a single character
+  // with full bags and bank is already ~39KB of JSON. Matches the web
+  // decoder's MAX_DECODED_BYTES in src/lib/warband-import.ts.
+  if (raw.length > 1024 * 1024) throw new Error('payload over 1MB');
   const payload = JSON.parse(raw.toString('utf8'));
   if (payload.v !== 1) throw new Error(`unsupported wire version ${payload.v}`);
   if (!Array.isArray(payload.characters)) throw new Error('characters is not an array');

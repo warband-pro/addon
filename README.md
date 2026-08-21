@@ -5,7 +5,7 @@
 
 > **Companion addon for [warband.pro](https://warband.pro)** — the site that answers "who should I play tonight."
 
-**What it is:** warband.pro reads your Battle.net roster — ilvl, spec, vault progress, lockout summary. The Blizzard API can't see where your stuff actually lives. This companion fills that gap: bags, bank, warband bank, gold, currencies, professions, mail, auctions, instance lockouts, keystone, weekly vault — from every alt you log.
+**What it is:** warband.pro reads your Battle.net roster — ilvl, spec, vault progress, lockout summary, and (via the Profile API) your equipped gear and active talent loadout. The Blizzard API can't see where your stuff actually lives. This companion fills that gap: bags, bank, warband bank, gold, currencies, professions, mail, auctions, instance lockouts, keystone, weekly vault, and — since 1.1.0 — the item strings for anything in a bag or bank that could be equipped, plus every spec's talent loadout as you play it — from every alt you log.
 
 **What it's not:** Not a data broker, not an auto-uploader, not a UI overhaul. No network calls. Ever. You play normally, hit `/warband`, paste once into warband.pro.
 
@@ -13,9 +13,9 @@ Retail Midnight 12.1 only, super lightweight, works with whatever UI you run.
 
 ## Why you need a companion
 
-The Battle.net Profile API exposes 14 fields per character (name, realm, guid, class, level, ilvl, spec, role, 2 profs, guild, faction). Zero paths for gold, bank, bags, currencies, vault capping, mail. The Warbandeer OpenAPI confirms 0 paths for those.
+The Battle.net Profile API exposes 14 fields per character (name, realm, guid, class, level, ilvl, spec, role, 2 profs, guild, faction), plus — through the equipment and specializations documents — full equipped gear (bonus IDs, sockets, enchants) and the active talent loadout. Zero paths for gold, bank, bags, currencies, vault capping, mail, or anything sitting unequipped in an alt's inventory. The Warbandeer OpenAPI confirms 0 paths for those.
 
-If you want warband.pro to know "Vocnar has 120 phials in Warband Bank" or "Voctara's warbank hasn't been seen in 5 days, open it to refresh," you need this addon.
+If you want warband.pro to know "Vocnar has 120 phials in Warband Bank" or "Voctara's warbank hasn't been seen in 5 days, open it to refresh," or "that Mythic helm is still sitting in Vocgrim's bank," you need this addon.
 
 It's the same problem Altoholic + SavedInstances solve locally — we make it web-readable in one `wb1!` string so warband.pro's Tonight Plan isn't guessing.
 
@@ -41,16 +41,18 @@ Default is multi-char bundle so you don't remember per-char exports. Single-char
 
 Midnight-relevant only, mounts/pets/toys/recipes full 10k list skipped (counts only):
 
-- Identity: guid, name, realmSlug, faction, class, level, xp, restXP, guild+rank, lastZone, hearth, playtime, ilvl avg/equipped
+- Identity: guid, name, realmSlug, faction, class, race, level, xp, restXP, guild+rank, lastZone, hearth, playtime, ilvl avg/equipped
 - Money+banks: gold, bags[{bagID,size,free,items[{id,count,quality}]} implicitly via Scan.lua], bank+bankBags, reagentBank, warbandBank{seenAt,seenByGuid,tabs}, mail{countItems,goldPending,soonestExpiry}, auctions{countActive,goldHeld}
 - Currencies: [{id,name,quantity,maxQty,weeklyMax,isAccountWide}] — Crests, Flightstones, Tender etc
 - Professions: [{id,name,skill,max}], cooldowns ready-time later
 - Lockouts: instances[{name,instanceID,difficulty LFR/N/H/M,locked,resetTime,extended,bosses[{name,killed}]}], worldBosses[{name,killed,resetTime}]
 - Mythic+/Vault: keystone{level,dungeonID}, runs[{mapID,level,timed}], score, weeklyVault{raid,mplus,world progress/threshold/unlocked}
 - Consumables rollup for Tonight Plan: {phial,healthPotion,tempPotion,foodFeast,weaponRune}
-- Per-section seenAt: lastSeen,bag,bank,warbank,currency,instance,vault — for 🟢<6h 🟡<3d 🔴>3d ⚪never dots.
+- Gear (1.1.0+): gear[{slot,where equipped/bag/bank/warbank,id,ilvl,s item string}] — equipped items plus anything in a bag or bank that could be equipped. `/warband gear off` drops this from the export without losing what was captured.
+- Talents (1.1.0+): talents{activeSpecID,specs[{specID,name,role,heroSpecID,loadout,seenAt}]} — accumulates across a spec switch rather than replacing.
+- Per-section seenAt: lastSeen,bag,bank,warbank,currency,instance,vault,gear,talents — for 🟢<6h 🟡<3d 🔴>3d ⚪never dots.
 
-Skipped v1: full equipment (API has it), mounts/pets/toys/achieves, recipe full list, guild bank (only personal warbank), chat, auction listings.
+Skipped v1.1: mounts/pets/toys/achieves, recipe full list, guild bank (only personal warbank), chat, auction listings, best-in-bags ranking (site-side work, not built).
 
 ## Staleness — trust but verify
 

@@ -31,7 +31,7 @@ read_globals = {
   "GetBuildInfo", "InCombatLockdown",
 
   -- character
-  "UnitGUID", "UnitName", "UnitClass", "UnitLevel", "UnitXP", "UnitFactionGroup",
+  "UnitGUID", "UnitName", "UnitClass", "UnitRace", "UnitLevel", "UnitXP", "UnitFactionGroup",
   "GetXPExhaustion", "GetRealmName", "GetZoneText", "GetBindLocation",
   "GetAverageItemLevel", "GetGuildInfo", "GetMoney",
 
@@ -39,6 +39,10 @@ read_globals = {
   "C_Container", "C_Item", "GetItemInfoInstant", "Enum", "C_Bank",
   "C_CurrencyInfo", "GetProfessions", "GetProfessionInfo",
   "GetInboxNumItems", "GetInboxHeaderInfo", "C_AuctionHouse",
+
+  -- gear and talents
+  "GetInventoryItemLink", "GetInventoryItemID", "ItemLocation",
+  "C_ClassTalents", "C_Traits", "GetSpecialization", "GetSpecializationInfo",
 
   -- lockouts, keystone, vault
   "GetNumSavedInstances", "GetSavedInstanceInfo", "GetSavedInstanceEncounterInfo",

@@ -5,8 +5,12 @@ This file is the law for both addon Lua and web app D1. Any change bumps version
 ## Prefix versioning
 
 - `wb0!` — Camp DNA share URLs you already have (existing)
-- `wb1!` — Inventory + lockouts bundle (this repo v1)
-- `wb2!` — future (talents, hero talents, maybe weekly quests)
+- `wb1!` — Inventory + lockouts bundle (this repo v1). Gear and talents (see
+  below) landed here too, additively, rather than waiting on `wb2!` — the
+  website's own research found equipped gear needs no addon at all, so what
+  was left to add (bag/bank gear, spec loadouts) was small enough to stay on
+  the existing prefix.
+- `wb2!` — future, still reserved. Nothing in this repo produces it yet.
 
 Format = `{versionPrefix}{base64url(deflate(jsonPayload))}`
 
@@ -43,6 +47,7 @@ Top-level:
   "faction": "Horde",
   "class": "DRUID",
   "classId": 11,
+  "race": "Tauren",
   "level": 80,
   "xp": 123456,
   "restXP": 234567,
@@ -62,6 +67,18 @@ Top-level:
   "bankBags": [{"bagID":6,"size":28,"free":28,"items":[]}],
   "reagentBank": {"size":98,"free":12,"items":[…]},
   "warbandBank": {"seenAt":1723999000,"seenByGuid":"...","tabs":[[{id, count}]]},
+
+  "gear": [
+    {"slot":1,"where":"equipped","id":212018,"ilvl":639,
+     "s":"item:212018::::::::80:250::9:6:12053:10390:1520:10255:1:28:2462:::"}
+  ],
+  "talents": {
+    "activeSpecID": 103,
+    "specs": [
+      {"specID":103,"name":"Feral","role":"DAMAGER","heroSpecID":31,
+       "loadout":"C0PAAA…","seenAt":1723999000}
+    ]
+  },
 
   "mail": {"countItems":2,"goldPending":120000,"soonestExpiryHours":12,"seenAt":null},
   "auctions": {"countActive":3,"goldHeld":500000,"seenAt":1723998000},
@@ -104,7 +121,9 @@ Top-level:
     "instance":1723998000,
     "vault":1723997000,
     "mail":null,
-    "auctions":null
+    "auctions":null,
+    "gear":1724001000,
+    "talents":1723999000
   }
 }
 ```
@@ -112,7 +131,7 @@ Top-level:
 ### Field rules
 
 - All *_at times = unix seconds UTC from `time()`, not milliseconds. Web converts. Null if never seen.
-- `items` limited to inventory — no full equipment (API already). link optional but include for debug quality.
+- `items` limited to inventory stacks — no bonus IDs, no enchant, no sockets. `gear[]` (below) is where that detail lives, for equipped items and for anything in a bag or bank that could be equipped. link optional but include for debug quality.
 - For bank sections never opened, `free` = null and items = [] so we know "unknown" vs empty.
 - Warband bank `seenByGuid` lets web show "Warband Bank updated 1h ago (by Vocnar)" valid across alts.
 - `currencies.maxQuantity` 0 = no cap, `weeklyMax` 0 = not weekly-capped.
@@ -120,6 +139,125 @@ Top-level:
 - `instances.bosses` bool order matches in-game encounter order, but name included for human search.
 - Mail goldPending in copper.
 - Any field unknown on old version must be treated as optional by web. New fields additive, bumps minor patch but safe.
+
+## `gear[]` and `talents` — added in addon 1.1.0
+
+The equipped-gear profile itself needs no addon at all: Blizzard's Profile API
+(`/profile/wow/character/{realm}/{name}/equipment`) already returns
+`bonus_list`, `sockets`, `enchantments`, `modified_crafting_stat` and real
+per-item `level.value`. What the API cannot see is inventory — a bag or bank
+holding a better piece than what's equipped — and that gap is what `gear[]`
+closes. Equipped items ride along too, so best-in-bags compares gear captured
+in the same moment from the same source, rather than a fresh addon snapshot
+against an equipment document that only refreshes at the wearer's last logout.
+
+### `gear[]` — one flat array per character
+
+```json
+{"slot":1,"where":"equipped","id":212018,"ilvl":639,
+ "s":"item:212018::::::::80:250::9:6:12053:10390:1520:10255:1:28:2462:::"}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `slot` | Canonical inventory slot number (1-19, see below). For a bag or bank item this is the slot it *would* occupy if equipped, not a container slot. |
+| `where` | `"equipped"` \| `"bag"` \| `"bank"` \| `"warbank"`. Never `"reagent"` — the reagent bank cannot hold gear. |
+| `id` | The item's numeric id. Redundant with the id embedded in `s`; kept so the website can resolve name/icon/filter without parsing the string. Deflate folds the duplication. |
+| `ilvl` | `C_Item.GetCurrentItemLevel` at capture time — upgrade track, crest investment and all, which a bare item id cannot tell you. Optional; omitted if the client could not answer. |
+| `s` | The item string, **verbatim**: everything between `\|H` and `\|h` in the hyperlink. Not decomposed — see below. |
+
+**Cosmetic slots are excluded everywhere**: shirt (4) and tabard (19) never
+appear, matching the website's `SLOTS` table in `gear.ts`.
+
+**Slot numbers, standard WoW inventory IDs:**
+
+| # | Slot | # | Slot | # | Slot |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Head | 8 | Feet | 15 | Back |
+| 2 | Neck | 9 | Wrist | 16 | Main hand |
+| 3 | Shoulder | 10 | Hands | 17 | Off hand / shield / held |
+| 5 | Chest | 11 | Finger 1 | | |
+| 6 | Waist | 12 | Finger 2 | | |
+| 7 | Legs | 13 | Trinket 1 | | |
+| | | 14 | Trinket 2 | | |
+
+For an equipped item this is the real slot Blizzard reports. For a bag or bank
+item, the addon derives it from the item's equip location and **collapses
+paired slots to one representative**: any ring lands on 11, any trinket on 13,
+any off-hand-family item (shield, held item, off-hand weapon) on 17 — the
+addon cannot know which of the two ring slots a bagged ring would go in, so it
+does not guess. A character can therefore have more than one `gear[]` entry at
+`slot: 11`, one `where: "equipped"` and others `where: "bag"` or `"bank"`.
+
+**Duplication with `bags[].items[]` is deliberate.** A gear piece sitting in a
+bag appears twice in the payload: once as a plain `{id, count}` stack in the
+existing `bags[]`/`bank[]` arrays (which back item search), and once here with
+full detail. This keeps both consumers simple rather than teaching the search
+feature to read `gear[]` or vice versa; deflate absorbs the cost.
+
+### Parsing `s` — the item string
+
+`s` is not addon-specific. It is the same substring SimulationCraft's own
+in-game addon exports, and the same thing an `/itemname` chat link carries
+between the `\|H` and `\|h` markers. Comma-separated position, left to right:
+
+```
+item:itemID:enchantID:gem1:gem2:gem3:gem4:suffixID:uniqueID:linkLevel:specializationID:reforgeID:numBonusIDs:bonusID1:bonusID2:...:numModifiers:modType1:modValue1:modType2:modValue2:...:upgradeValue
+```
+
+The fields that matter for a SimC render or a gear audit:
+
+- **`enchantID`** (position 2) — the permanent enchant on the item, 0 or empty
+  if none.
+- **`gem1..gem4`** (positions 3-6) — socketed gem item ids, 0 or empty for an
+  empty socket. Socket *count* is implied by which positions are present, not
+  stated separately.
+- **`numBonusIDs` + the bonus ID list right after it** (positions 12+) — this
+  is what tells apart a Normal, Heroic and Mythic copy of the same base item
+  id, and what encodes tier-set pieces, Warbound trackers, and crafted-item
+  quality tiers. Read the count first, then take exactly that many following
+  colon-separated fields as the bonus IDs.
+- **The modifier list, immediately after the bonus IDs** — pairs of
+  `(modifierType, modifierValue)`. Crafted items' chosen stat allocation
+  (`modified_crafting_stat` on the Profile API) lives here as one or more
+  modifier pairs; a plain drop has an empty list.
+- **`upgradeValue`** (final field) — the item's position within its current
+  upgrade track, where present.
+
+An empty position between colons means "not set", not zero — `item:212018::::::::80:250::9:...`
+has no enchant and no gems. Treat a missing trailing section as absent rather
+than defaulting it to a number.
+
+The addon does not decompose this string into named fields before sending it.
+Doing so would couple this repo to whatever item model the website settles on
+and to SimC's own positional format changing out from under a hand-rolled
+parser here; the raw string is both lossless and exactly what the existing
+SimC exporter (`simc.ts`) already knows how to consume for equipped gear.
+
+### `talents`
+
+```json
+{
+  "activeSpecID": 103,
+  "specs": [
+    {"specID":103,"name":"Feral","role":"DAMAGER","heroSpecID":31,
+     "loadout":"C0PAAA…","seenAt":1723999000}
+  ]
+}
+```
+
+`specs` is an **array, not a map keyed by spec id** — `Bundle.JSON` only
+encodes string keys, so a numeric key would silently vanish. `loadout` is the
+same string `C_Traits.GenerateImportString` produces and the in-game talent
+UI's own Copy button exports; it is what the website's `talent_loadout_code`
+field already reads from the Blizzard Profile API, so this is a freshness and
+independence improvement, not new information the site lacked.
+
+Only the **active** spec's loadout is readable at any moment, so a character's
+`specs` list **accumulates** across visits rather than being replaced each
+scan: switch to a second spec and back, and both entries persist, each
+carrying its own `seenAt`. A spec entry the addon has never seen active simply
+never appears — absence means "not yet observed on this spec", not "empty".
 
 ## Encoding steps — must be identical both sides
 
@@ -239,6 +377,26 @@ importer's real caps must be **1MB decoded and 20 characters**, with the
 paste-box guard at ~150KB of wire. A 26KB paste is unremarkable — WeakAuras
 strings routinely run larger — and `SetMaxLetters(0)` on the export EditBox is
 what makes it copyable.
+
+### What `gear[]` and `talents` add, measured
+
+`tools/sample.mjs` before and after 1.1.0, same six-character roster, same bag
+fill:
+
+| | JSON | wire |
+|---|---|---|
+| before (bags/bank/currencies only) | 70.9KB | 13.1KB |
+| after (+ `gear[]`, `talents`) | 82.3KB | 16.4KB |
+| delta for 6 characters | +11.4KB | +3.3KB |
+| delta per character | ~+1.9KB | ~+0.55KB |
+
+`gear[]` costs roughly a fixed amount per character — about 18 entries (16-17
+equipped slots plus whatever unequipped pieces are worth sending), regardless
+of how full the character's bags are — so the per-character delta above should
+carry over to the heavier synthetic warband the 1/6/20 table used: **~512KB
+JSON / ~84KB wire at the 20-character cap**, still well inside the 1MB decoded
+limit. `talents` costs one loadout string per known spec and is small relative
+to gear.
 
 ## Sample vectors
 

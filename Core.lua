@@ -7,7 +7,7 @@
 
 local _, ns = ...
 
-local Store, Scan, Instances, UI = ns.Store, ns.Scan, ns.Instances, ns.UI
+local Store, Scan, Instances, Gear, UI = ns.Store, ns.Scan, ns.Instances, ns.Gear, ns.UI
 
 local frame = CreateFrame("Frame", "WarbandProEventFrame")
 
@@ -23,6 +23,8 @@ local EVENTS = {
   "WEEKLY_REWARDS_UPDATE", "CHALLENGE_MODE_COMPLETED",
   "MAIL_INBOX_UPDATE", "OWNED_AUCTIONS_UPDATED",
   "SKILL_LINES_CHANGED",
+  "PLAYER_EQUIPMENT_CHANGED", "PLAYER_AVG_ITEM_LEVEL_UPDATE",
+  "TRAIT_CONFIG_UPDATED", "ACTIVE_COMBAT_CONFIG_CHANGED", "PLAYER_SPECIALIZATION_CHANGED",
 }
 
 local registered = {}
@@ -62,6 +64,7 @@ local function bags()
   ns.throttle("bags", 0.5, function()
     Scan.Bags()
     Instances.Keystone()   -- the key is an item; it moves when bags move
+    Gear.All()              -- bag gear moves when bags move too
   end)
 end
 handlers.BAG_UPDATE = bags
@@ -79,6 +82,7 @@ local function banks()
   ns.throttle("bank", 0.5, function()
     Scan.Bank()
     Scan.WarbandBank()
+    Gear.All()              -- bank and warband bank gear live in these too
   end)
 end
 handlers.BANKFRAME_OPENED = banks
@@ -119,6 +123,19 @@ end
 handlers.SKILL_LINES_CHANGED = function()
   ns.throttle("professions", 2, Scan.Professions)
 end
+
+local function gear()
+  ns.throttle("gear", 1, Gear.All)
+end
+handlers.PLAYER_EQUIPMENT_CHANGED = gear
+handlers.PLAYER_AVG_ITEM_LEVEL_UPDATE = gear
+
+local function talents()
+  ns.throttle("talents", 1, Gear.Talents)
+end
+handlers.TRAIT_CONFIG_UPDATED = talents
+handlers.ACTIVE_COMBAT_CONFIG_CHANGED = talents
+handlers.PLAYER_SPECIALIZATION_CHANGED = talents
 
 -- The one thing we defer: a panel asked for during a fight.
 handlers.PLAYER_REGEN_ENABLED = function()
@@ -165,6 +182,16 @@ local function status()
       parts[#parts + 1] = section .. " " .. ns.ago(c.seenAt[section])
     end
     ns.print((c.name or "this character") .. ": " .. table.concat(parts, ", "))
+    local gearCount = c.gear and #c.gear or 0
+    local specNames = {}
+    if c.talents and c.talents.specs then
+      for _, sp in ipairs(c.talents.specs) do
+        specNames[#specNames + 1] = sp.name or ("spec " .. tostring(sp.specID))
+      end
+    end
+    ns.print(format("gear: %d piece%s%s%s", gearCount, gearCount == 1 and "" or "s",
+      db.opts.includeGear and "" or "  |cfff1fa8c(off — /warband gear on)|r",
+      #specNames > 0 and ("  ·  talents known: " .. table.concat(specNames, ", ")) or ""))
   end
   local wb = db.warbandBank
   ns.print(format("warband bank: %s%s", ns.ago(wb.seenAt),
@@ -192,7 +219,21 @@ SlashCmdList.WARBANDPRO = function(msg)
     local name = cmd:match("^clear%s+(.+)$")
     local n = Store.Forget(name)
     ns.print(n > 0 and format("removed %s", name) or format("no stored character called %s", name))
+  elseif cmd == "gear on" or cmd == "gear off" then
+    local on = cmd == "gear on"
+    if Store.Ready() then
+      Store.db.opts.includeGear = on
+      if on then
+        Gear.All()
+        ns.print("gear capture on — captured now")
+      else
+        ns.print("gear capture off — stored gear kept, just left out of the next bundle")
+      end
+    else
+      ns.print("saved data not loaded yet")
+    end
   else
-    ns.print("/warband · /warband copy current · /warband status · /warband optimize · /warband clear <name>")
+    ns.print("/warband · /warband copy current · /warband status · /warband optimize · "
+      .. "/warband clear <name> · /warband gear on|off")
   end
 end

@@ -44,6 +44,56 @@ const rnd = (n) => {
 const REAGENT = Array.from({ length: 40 }, () => 190000 + rnd(20000));
 const pick = () => (rnd(10) < 6 ? REAGENT[rnd(REAGENT.length)] : 210000 + rnd(20000));
 
+// A structurally plausible item string, same liberty the ids above take: not a
+// real bonus-ID encoding, just something shaped like one so the import preview
+// has something to render for gear[].s.
+function itemString(id, spec) {
+  return `item:${id}::::::::80:${spec.id}::1:${1000 + rnd(9000)}:::`;
+}
+
+// Slots 1-19 minus 4 (shirt) and 19 (tabard) — matches Gear.lua's EQUIPPED_SLOTS.
+const EQUIP_SLOTS = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
+
+function gear(spec, ilvlBase) {
+  const equipped = EQUIP_SLOTS.map((slot) => {
+    const id = 210000 + rnd(20000);
+    return { slot, where: 'equipped', id, ilvl: ilvlBase + rnd(15), s: itemString(id, spec) };
+  });
+  // A couple of unequipped pieces so a preview of best-in-bags has something to
+  // compare against — a spare ring and a spare trinket.
+  const spare = [11, 13].map((slot) => {
+    const id = 210000 + rnd(20000);
+    return { slot, where: 'bag', id, ilvl: ilvlBase - 10 + rnd(20), s: itemString(id, spec) };
+  });
+  return [...equipped, ...spare];
+}
+
+const LOADOUT_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+function loadoutCode() {
+  let s = 'C';
+  for (let i = 0; i < 40; i++) s += LOADOUT_ALPHABET[rnd(LOADOUT_ALPHABET.length)];
+  return s;
+}
+
+// One plausible spec per class in the cast. Real spec ids, made-up loadouts.
+const SPEC_BY_CLASS = {
+  DRUID: { specID: 103, name: 'Feral', role: 'DAMAGER' },
+  PALADIN: { specID: 66, name: 'Protection', role: 'TANK' },
+  MAGE: { specID: 63, name: 'Fire', role: 'DAMAGER' },
+  PRIEST: { specID: 257, name: 'Holy', role: 'HEALER' },
+  WARRIOR: { specID: 71, name: 'Arms', role: 'DAMAGER' },
+  ROGUE: { specID: 259, name: 'Assassination', role: 'DAMAGER' },
+};
+
+function talents(spec, seen) {
+  const sp = SPEC_BY_CLASS[spec.cls];
+  if (!sp) return undefined;
+  return {
+    activeSpecID: sp.specID,
+    specs: [{ specID: sp.specID, name: sp.name, role: sp.role, heroSpecID: 30 + rnd(10), loadout: loadoutCode(), seenAt: seen }],
+  };
+}
+
 function bags(count, fill) {
   return Array.from({ length: count }, (_, b) => {
     const size = b === 0 ? 32 : 34;
@@ -87,6 +137,7 @@ function character(spec, index) {
     faction: spec.slug === 'moon-guard' ? 'Alliance' : 'Horde',
     class: spec.cls,
     classId: spec.id,
+    race: spec.slug === 'moon-guard' ? 'NightElf' : 'Tauren',
     level: 80,
     itemLevelAvg: 610 + rnd(30),
     itemLevelEquipped: 608 + rnd(28),
@@ -95,6 +146,8 @@ function character(spec, index) {
     hearthZone: 'Dornogal',
     gold: spec.gold,
     bags: bags(6, spec.fill),
+    gear: gear(spec, 608 + rnd(28)),
+    talents: talents(spec, seen),
     currencies: Array.from({ length: 12 }, (_, k) => ({
       id: 2800 + k,
       name: `Currency ${k + 1}`,
@@ -139,6 +192,8 @@ function character(spec, index) {
       currency: seen,
       instance: seen - 20 * MIN,
       vault: seen - 40 * MIN,
+      gear: seen,
+      talents: seen,
     },
   };
 

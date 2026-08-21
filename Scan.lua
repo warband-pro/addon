@@ -43,6 +43,12 @@ local function warbandTabs()
   return ids
 end
 
+-- Exposed so Gear.lua walks the same containers rather than re-deriving the
+-- Midnight Enum.BagIndex hedging above.
+Scan.CARRIED = CARRIED
+Scan.BANK = BANK
+Scan.WarbandTabs = warbandTabs
+
 -- Items carry id, count, quality and a bound flag. Name, icon, class and link
 -- are all derivable from the id through Game Data on the website, and carrying
 -- them would multiply the bundle for nothing. Links stay available behind
@@ -114,6 +120,7 @@ function Scan.Identity()
   local c = Store.Char()
   if not c then return end
   local class, classFile, classID = UnitClass("player")
+  local raceName, raceFile = UnitRace("player")
   local realm = GetRealmName()
   c.name = UnitName("player")
   c.realm = realm
@@ -121,6 +128,7 @@ function Scan.Identity()
   c.faction = UnitFactionGroup("player")
   c.class = classFile or class
   c.classId = classID
+  c.race = raceFile or raceName
   c.level = UnitLevel("player")
   c.xp = UnitXP("player")
   c.restXP = ns.safe(GetXPExhaustion)
@@ -300,4 +308,6 @@ function Scan.All()
   Scan.Bags()
   Scan.Currencies()
   Scan.Professions()
+  ns.Gear.All()
+  ns.Gear.Talents()
 end

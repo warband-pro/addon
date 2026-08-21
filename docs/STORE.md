@@ -15,8 +15,8 @@ carries development planning a moderator would (fairly) read as unfinished.
 ## Summary
 
 > Snapshots what each of your characters actually holds — bags, banks, warband
-> bank, gold, currencies, lockouts, and vault progress — and copies all of them
-> to your clipboard as one string.
+> bank, gear, talents, gold, currencies, lockouts, and vault progress — and
+> copies all of them to your clipboard as one string.
 
 ---
 
@@ -43,6 +43,11 @@ For every character you log in on:
   active auction count
 - **Currencies** — quantity, cap, and weekly cap for each, so crest and
   flightstone limits are visible at a glance
+- **Gear** — equipped items plus anything in a bag or bank that could be
+  equipped, as the same item string SimulationCraft's own addon exports —
+  bonus IDs, enchant, gems, crafted stats, item level, all included
+- **Talents** — the active spec's talent loadout string, and every spec you
+  have played on that character
 - **Professions** — profession, current skill, and cap
 - **Lockouts** — saved instances by difficulty, per-boss kill state, reset
   times, and world boss kills
@@ -70,6 +75,7 @@ Commands:
 | `/warband status` | Character count, size, per-section ages, and any API failures |
 | `/warband clear <name>` | Remove a character from the database |
 | `/warband optimize` | Drop characters not seen in 90 days |
+| `/warband gear on` \| `off` | Toggle whether gear is included in the copied string — captured data is kept either way |
 
 ### What it does not do
 

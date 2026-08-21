@@ -1,0 +1,44 @@
+{
+  "v": 1,
+  "addon": "1.1.0-test",
+  "exportedAt": 1724000000,
+  "gameVersion": "12.1.0",
+  "interface": 120100,
+  "bundle": {"count":1,"freshestSeenAt":1724000000,"oldestSeenAt":1724000000},
+  "characters": [{
+    "guid":"Player-1-TEST",
+    "name":"Vocnar",
+    "realm":"Wyrmrest Accord",
+    "realmSlug":"wyrmrest-accord",
+    "faction":"Horde","class":"DRUID","classId":11,"race":"Tauren","level":80,
+    "gold":100000,
+    "bags":[{"bagID":0,"size":30,"free":3,"items":[{"id":211493,"count":20,"quality":2}]}],
+    "bank":[{"bagID":-1,"size":28,"free":26,"items":[{"id":222446,"count":1,"quality":4}]}],
+    "gear": [
+      {"slot":1,"where":"equipped","id":212018,"ilvl":639,
+       "s":"item:212018::::::::80:250::9:6:12053:10390:1520:10255:1:28:2462:::"},
+      {"slot":5,"where":"equipped","id":212022,"ilvl":639,
+       "s":"item:212022::::::::80:250::6:6:12053:10390:1520:1:28:2462:::"},
+      {"slot":16,"where":"equipped","id":212050,"ilvl":645,
+       "s":"item:212050:7228::::::80:251::7:6:12053:10390:1520:10255:9:1:28:::"},
+      {"slot":11,"where":"bag","id":215135,"ilvl":626,
+       "s":"item:215135::::::::80:250::4:6:12053:1:28:::"},
+      {"slot":16,"where":"bank","id":222446,"ilvl":619,
+       "s":"item:222446::::::::80:250::3:6:12053:1:::"}
+    ],
+    "talents": {
+      "activeSpecID": 103,
+      "specs": [
+        {"specID":103,"name":"Feral","role":"DAMAGER","heroSpecID":31,
+         "loadout":"C0PAAAAAAAAAAAAAAAAAAAAAAAAAAYSyMzMDGZmZmYGM2MmzMwsYmYWs2Y2M2YAAAAAAAAAAAAAAAAAmZWZmYmZWY2Y2YWMzM",
+         "seenAt":1723999000},
+        {"specID":102,"name":"Balance","role":"DAMAGER","heroSpecID":33,
+         "loadout":"C0PAAAAAAAAAAAAAAAAAAAAAAAAAAYSyMzMDGZmZmYGM2MmzMwsYmYWs2Y2M2YAAAAAAAAAAAAAAAAAmZWZmYmZWY2Y2YWMzN",
+         "seenAt":1723990000}
+      ]
+    },
+    "currencies":[{"id":2815,"quantity":100}],
+    "instances":[],
+    "seenAt":{"lastSeen":1724000000,"bag":1724000000,"bank":1723998000,"gear":1724000000,"talents":1723999000}
+  }]
+}

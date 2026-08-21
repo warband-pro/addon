@@ -114,6 +114,19 @@ function Bundle.Build(opts)
     chars = one and { one } or {}
   end
 
+  -- Turning gear off must not destroy what was already captured — only the
+  -- export omits it, on a shallow copy, so turning it back on needs no rescan.
+  if db.opts and db.opts.includeGear == false then
+    local stripped = {}
+    for i = 1, #chars do
+      local copy = {}
+      for k, v in pairs(chars[i]) do copy[k] = v end
+      copy.gear = nil
+      stripped[i] = copy
+    end
+    chars = stripped
+  end
+
   -- CONTRACT.md rejects more than MAX_CHARS, and Store.Characters() is already
   -- newest-first, so the ones that fall off the end are the ones you have not
   -- played in longest.

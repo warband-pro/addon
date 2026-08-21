@@ -15,6 +15,10 @@ Pass 1 — single char fresh
 - [ ] Move item between bags — wait .5s — /dump seenAt.bag increments vs earlier (write previous timestamp down)
 - [ ] Open bank formerly null after — bank items appear in dump and panel secondary line shows "Bank 2m ago"
 - [ ] Open Warband Bank — panel Warband Bank line updates shared SeenBy Vocnar
+- [ ] /dump WarbandProDB.chars[guid].gear — one entry per equipped slot, each with a non-empty s and a plausible ilvl
+- [ ] Spot-check one s string against the item's tooltip — bonus IDs differ between two copies of the same base item at different difficulties
+- [ ] Equip a different item — wait 1s — /dump seenAt.gear moved
+- [ ] Switch spec then switch back — /dump WarbandProDB.chars[guid].talents.specs has 2 entries, not 1 replaced
 - [ ] /warband copy — big EditBox appears wb1! prefix, len ~600-4000, Ctrl-A Ctrl-C highlights all
 - [ ] Paste into /app import preview → 1 char green dot, gold matches, bags count, currencies >=1, consumables numbers, vault matches in-game Weekly Rewards UI visual comparison (1/3 etc)
 - [ ] /console taintLog 0 — /reload — check Logs/taint.log no line WarbandPro
@@ -30,6 +34,7 @@ Pass 3 — edge + combat
 - [ ] Close banker reopen warbank — see warbankSeenAt updated now
 - [ ] Auctions — if have active, auctions.count >0 and panel line up
 - [ ] Mail — if have mail and you opened mailbox, count etc
+- [ ] /warband gear off — /warband copy — gear absent from bundle, byte count drops. /warband gear on — /warband copy — gear back, no rescan needed
 - [ ] Memory — /script print mem: after `UpdateAddOnMemoryUsage(); print(GetAddOnMemoryUsage("WarbandPro"))` should be <2MB for 6 chars
 - [ ] Export round-trip size: /script print string length of export box — <7KB bundle 6 target, 20KB hard cap
 
@@ -47,6 +52,9 @@ PASS dots 6 green
 PASS web preview 6 green 0 stale
 PASS mem 1240 KB
 PASS vault matches (4/8 vs 4/8)
+PASS gear 18 pieces, bonus IDs distinct
+PASS talents 2 specs known, loadout non-empty
+PASS gear toggle off/on
 FAIL? notes...
 ```
 

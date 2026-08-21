@@ -14,7 +14,10 @@ ns.Store = Store
 -- Sections that carry their own freshness stamp. The website turns each into a
 -- dot, so a section that is scanned must stamp and a section that is stamped
 -- must be scanned.
-local SECTIONS = { "bag", "bank", "warbank", "currency", "instance", "vault", "mail", "auctions", "profession" }
+local SECTIONS = {
+  "bag", "bank", "warbank", "currency", "instance", "vault", "mail", "auctions",
+  "profession", "gear", "talents",
+}
 
 function Store.Init()
   local db = _G.WarbandProDB
@@ -37,6 +40,7 @@ function Store.Init()
   db.lastExport = db.lastExport or 0
   db.opts = db.opts or {}
   if db.opts.includeLinks == nil then db.opts.includeLinks = false end
+  if db.opts.includeGear == nil then db.opts.includeGear = true end
 
   _G.WarbandProDB = db
   Store.db = db

@@ -23,6 +23,39 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-08-20 — gear and talents on the wire
+
+**warband.pro's gear profile and SimC exporter shipped reading only the
+Blizzard API, which already covers everything equipped.** What it cannot see
+is inventory — a bag or bank holding a better piece than what you're
+wearing — and that is what this release sends.
+
+- **`gear[]`, per character.** Every equipped item, plus anything in a bag,
+  personal bank, or warband bank that could be equipped. Each entry carries
+  the item string verbatim — the same substring SimulationCraft's own addon
+  exports, and the same one the in-game item link uses between `|H` and
+  `|h` — so bonus IDs, enchant, gems, and crafted-stat choices all make the
+  trip losslessly, along with the item level Blizzard's API cannot see for
+  anything you are not wearing. Shirt and tabard are skipped everywhere, same
+  as the website's own gear model.
+- **`talents`, per character.** The active spec's talent loadout string, plus
+  every other spec you have played on that character — only the spec you are
+  standing in is readable at any moment, so the list fills in over time rather
+  than replacing itself.
+- **`race`, per character.** The last field the SimC exporter needed that
+  this addon was not already sending.
+- **`/warband gear on` / `off`.** Gear capture is on by default. Turning it
+  off leaves what was already captured in place and just leaves it out of the
+  next copied string — turn it back on and it is there again, no rescan
+  required. `/warband status` now reports gear piece count and known specs.
+- **Wire stays `wb1!`.** Both fields are additive and optional; warband.pro
+  reads bundles from every earlier version exactly as before, and a bundle
+  from this version still imports on a site that has not added support for
+  the new fields yet.
+
+No breaking change, no migration. `docs/CONTRACT.md` documents the item-string
+parse rules for anyone building against this.
+
 ## [1.0.2] — 2026-08-20 — fix the empty export box
 
 **If `/warband` gave you an empty box on 1.0.0 or 1.0.1, this is the fix.** Update and it works.
@@ -63,7 +96,8 @@ Retail Midnight 12.1 only. Works with whatever UI you run.
 
 Then future tags auto-upload via BigWigs packager once Project IDs are set.
 
-[Unreleased]: https://github.com/warband-pro/addon/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/warband-pro/addon/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/warband-pro/addon/releases/tag/v1.1.0
 [1.0.2]: https://github.com/warband-pro/addon/releases/tag/v1.0.2
 [1.0.1]: https://github.com/warband-pro/addon/releases/tag/v1.0.1
 [1.0.0]: https://github.com/warband-pro/addon/releases/tag/v1.0.0
