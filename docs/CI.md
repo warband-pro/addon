@@ -10,7 +10,7 @@ one button, and everything between that and the download page is automatic.
 | Job | What it proves |
 | --- | --- |
 | `luacheck` | Zero warnings under `.luacheckrc`. That file lists every global the addon may touch, so a new warning is usually a leaked global rather than a style nit. |
-| `packaging + contract` | `tools/validate.mjs` — the `.toc` and `.pkgmeta` are internally consistent. `tools/vector.mjs` — a `wb1!` payload survives encode → decode unchanged, and the committed `.wb1` fixtures still match. |
+| `packaging + contract` | `tools/validate.mjs` — the `.toc` and `.pkgmeta` are internally consistent. `tools/vector.mjs` — a `wb1!` payload survives encode → decode unchanged, and the committed `.wb1` fixtures still match. `tools/slop.mjs --unreleased` — the notes accumulating under `## [Unreleased]` read like a person wrote them. |
 | `package (dry run)` | The real packager builds the real zip with uploads switched off, and attaches it as a workflow artifact. |
 
 That artifact matters: **every push to `main` produces a downloadable, correctly
@@ -19,7 +19,8 @@ cutting a version.
 
 ### `.github/workflows/release.yml` — on a `v*` tag, or on demand
 
-Runs `ci.yml` in full first, then hands the repo to
+Runs `ci.yml` in full first, then runs the slop pass on the section being
+released (see below), then hands the repo to
 [BigWigsMods/packager](https://github.com/BigWigsMods/packager), which:
 
 1. substitutes `@project-version@` in the `.toc` and `LibDeflate.lua` from the tag,
@@ -32,10 +33,57 @@ A site is uploaded to only when **both** its token secret and its `.toc` id are
 present. Missing either one logs a warning and skips that site — which is how
 this pipeline is useful before the CurseForge project exists.
 
+Then it reads the release back with `gh release view` and posts it into Discord
+with [SethCohen/github-releases-to-discord](https://github.com/SethCohen/github-releases-to-discord).
+No `DISCORD_WEBHOOK` secret means that step is skipped, same as any other site.
+
+## Why the Discord post is a step and not its own workflow
+
+The action's README shows a standalone workflow on `release: published`. That
+does not work here, and it fails *silently*, so it is worth knowing why.
+
+The packager creates the GitHub Release using `GITHUB_TOKEN`. GitHub will not
+start a workflow run from an event that token caused — a deliberate guard
+against a workflow triggering itself in a loop, and one no permission setting
+waives. A `release: published` workflow would sit there and never fire, which
+looks exactly like a misconfigured webhook.
+
+So the announcement runs inside the release job, right after packaging, and
+passes `release_name` / `release_body` / `release_html_url` explicitly instead
+of reading `github.event.release` — that context is empty on a tag push. It also
+means Discord shows the release body verbatim rather than a second, separately
+rendered copy of the changelog.
+
+## The slop pass
+
+`tools/slop.mjs` reads a changelog section the way a stranger scrolling Discord
+will. That section is the release in four places at once — the GitHub Release
+body, three distribution sites, and now a Discord embed — so it gets proofread
+before any of them see it.
+
+```bash
+node tools/slop.mjs 1.0.2      # the section for one version
+node tools/slop.mjs --unreleased
+```
+
+It fails on borrowed marketing vocabulary, keynote voice, essay filler,
+adjectives standing in for numbers, the constructions that only ever come out of
+a language model, emoji leading a bullet or heading, and a section long enough
+that Discord will cut it off mid-sentence at 4096 characters. It deliberately
+does **not** flag this project's own voice: em dashes, bold sentence leads,
+fragments, and dense technical paragraphs all pass.
+
+The release workflow runs it before tagging, so a finding stops the release. CI
+runs it on `## [Unreleased]` every push, so the notes are clean well before tag
+day. If a rule is wrong and the release should not wait on a fix, `SLOP_OK=1`
+downgrades findings to warnings — but the better move is usually to delete the
+rule, because a rule that fires on good writing will keep doing it.
+
 ## Cutting a release
 
-Write the changelog section first. Both paths refuse to release without one,
-because a version with empty release notes is what players actually see.
+Write the changelog section first, and run the slop pass on it. Both paths
+refuse to release without a section, because a version with empty release notes
+is what players actually see.
 
 ```bash
 git tag -a v1.0.0 -m v1.0.0 && git push origin v1.0.0
@@ -56,6 +104,7 @@ Settings → Secrets and variables → Actions:
 | `CF_API_KEY` | CurseForge → account settings → API Tokens |
 | `WAGO_API_TOKEN` | Wago → account → API keys |
 | `WOWI_API_TOKEN` | WoWInterface → settings → API token |
+| `DISCORD_WEBHOOK` | Discord → channel → Edit Channel → Integrations → Webhooks → Copy Webhook URL |
 
 `GITHUB_TOKEN` is issued by Actions itself — nothing to add. No token belongs in
 a file in this repo, ever; `tools/validate.mjs` and `.gitignore` assume that.

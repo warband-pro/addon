@@ -2,7 +2,15 @@
 
 Release notes for Warband.pro Companion. The packager sends the section matching the tag to CurseForge, Wago, and WoWInterface verbatim, so this is what players read — not the commit log.
 
-**The release workflow greps for `## [1.0.1]` exactly.** A tag without a matching heading here fails the release before anything is published. Write the section first, then tag.
+**The release workflow looks for `## [1.0.1]` exactly.** A tag without a matching heading here fails the release before anything is published. Write the section first, then tag.
+
+It also reads the section for machine-written marketing voice and fails on that — same check, so run it yourself before you tag:
+
+```
+node tools/slop.mjs 1.0.2
+```
+
+CI runs it against `## [Unreleased]` on every push, so notes written as you go are already clean at tag time. The rules are in [tools/slop.mjs](tools/slop.mjs) and they only flag borrowed phrasing, keynote voice, and adjectives standing in for numbers — the terse fragments and em dashes here are the house style and stay.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [semver](https://semver.org/), with the wire format as the thing being versioned:
@@ -55,6 +63,7 @@ Retail Midnight 12.1 only. Works with whatever UI you run.
 
 Then future tags auto-upload via BigWigs packager once Project IDs are set.
 
-[Unreleased]: https://github.com/warband-pro/addon/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/warband-pro/addon/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/warband-pro/addon/releases/tag/v1.0.2
 [1.0.1]: https://github.com/warband-pro/addon/releases/tag/v1.0.1
 [1.0.0]: https://github.com/warband-pro/addon/releases/tag/v1.0.0

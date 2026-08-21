@@ -5,12 +5,13 @@ name: Release
 #   git tag -a v1.0.0 -m v1.0.0 && git push origin v1.0.0
 #   — or — Actions → Release → Run workflow → 1.0.0
 #
-# Either way this runs the full CI suite first, then hands the repo to
-# BigWigsMods/packager, which substitutes @project-version@ from the tag, builds
-# WarbandPro-v1.0.0.zip, attaches it to a GitHub Release, and uploads it to
-# every distribution site whose token is configured. Sites without a token are
-# skipped with a warning rather than failing the run — which is how this stays
-# useful before the CurseForge project exists.
+# Either way this runs the full CI suite first, checks the release notes read
+# like a person wrote them, then hands the repo to BigWigsMods/packager, which
+# substitutes @project-version@ from the tag, builds WarbandPro-v1.0.0.zip,
+# attaches it to a GitHub Release, and uploads it to every distribution site
+# whose token is configured. Sites without a token are skipped with a warning
+# rather than failing the run — which is how this stays useful before the
+# CurseForge project exists. Last step announces the release in Discord.
 
 on:
   push:
@@ -39,55 +40,79 @@ jobs:
     name: package and publish
     needs: verify
     runs-on: ubuntu-latest
+    env:
+      # Hoisted because `secrets` is not readable from a step-level `if:`, and
+      # the announcement should skip rather than fail when it is not configured.
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      # Manual runs tag the commit themselves, so a release from the Actions tab
-      # and a release from a pushed tag reach the packager in the same state.
-      # Everything that could be wrong is checked before the tag is written,
-      # because an unwanted tag is the one part of this that is annoying to undo.
-      - name: Tag this commit
-        if: github.event_name == 'workflow_dispatch'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # One place decides what is being released, so the tag step, the slop
+      # pass, and the Discord announcement cannot disagree about it.
+      - name: Resolve version
+        id: version
         env:
-          VERSION: ${{ inputs.version }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          if [ "${{ github.event_name }}" = 'workflow_dispatch' ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION"    >> "$GITHUB_OUTPUT"
+          echo "releasing v$VERSION"
 
+      # Checked before anything is written, because an unwanted tag is the one
+      # part of this that is annoying to undo.
+      - name: Validate the version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
           if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
             echo "::error::'$VERSION' is not a semantic version — expected 1.0.0 or 1.0.0-beta1"
             exit 1
           fi
-
           if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
             echo "::error::tag v$VERSION already exists"
             exit 1
           fi
 
-          # The packager sends this section to CurseForge as the release notes.
-          # Shipping without it means players get an empty changelog.
-          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## [$VERSION]' section — write the release notes first"
-            exit 1
-          fi
+      # This section is the release. The packager sends it to CurseForge, Wago,
+      # and WoWInterface, GitHub shows it on the Releases page, and the last
+      # step in this job posts it into Discord — same words, four audiences. So
+      # it gets read for machine-written marketing voice before any of that
+      # happens, and a missing or empty section still fails the way it used to.
+      #
+      # On a pushed tag this runs after the tag exists, same as the changelog
+      # check it replaces; on a manual run it gates the tag entirely.
+      - name: Slop pass on the release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node tools/slop.mjs "$VERSION"
 
+      # Manual runs tag the commit themselves, so a release from the Actions tab
+      # and a release from a pushed tag reach the packager in the same state.
+      - name: Tag this commit
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
           git config user.name  'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git tag -a "v$VERSION" -m "v$VERSION"
           git push origin "v$VERSION"
-
-      # On a pushed tag, the same changelog rule applies — it is just checked
-      # after the fact, since the tag already exists by the time we run.
-      - name: Changelog has a section for this tag
-        if: github.event_name == 'push'
-        run: |
-          set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
-          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## [$VERSION]' section — the release notes would be empty"
-            exit 1
-          fi
 
       - name: Package and publish
         uses: BigWigsMods/packager@v2
@@ -99,6 +124,50 @@ jobs:
           # Creates the GitHub Release and attaches the zip. This one is issued
           # by Actions itself, so there is nothing to configure.
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+
+      # Why the announcement lives here instead of in its own workflow on
+      # `release: published` the way the action's README shows:
+      #
+      # The packager creates the release using GITHUB_TOKEN, and GitHub does not
+      # start workflow runs from events that token caused. That is a deliberate
+      # loop guard, and it cannot be waived with a permission. A separate
+      # `on: release: published` workflow would sit there and never fire, which
+      # looks identical to a broken webhook. Reading the release back in the job
+      # that made it has no such hole, and it also means the embed shows the
+      # release body verbatim rather than a second rendering of the changelog.
+      - name: Read the published release
+        id: release
+        if: env.DISCORD_WEBHOOK != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" --json name,body,url > release.json
+          {
+            echo "name=$(jq -r '.name // env.TAG' release.json)"
+            echo "url=$(jq -r '.url' release.json)"
+            echo 'body<<SLOPPASS_EOF_9f3a'
+            jq -r '.body // ""' release.json
+            echo 'SLOPPASS_EOF_9f3a'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Announce in Discord
+        if: env.DISCORD_WEBHOOK != ''
+        uses: SethCohen/github-releases-to-discord@v1
+        with:
+          webhook_url: ${{ env.DISCORD_WEBHOOK }}
+          username: 'Warband.pro Companion'
+          # Passed explicitly rather than read from github.event.release, which
+          # is empty here — this job runs on a tag push, not a release event.
+          release_name: ${{ steps.release.outputs.name }}
+          release_body: ${{ steps.release.outputs.body }}
+          release_html_url: ${{ steps.release.outputs.url }}
+          color: '3066993'
+          footer_title: 'Changelog'
+          footer_timestamp: true
+          reduce_headings: true
+          remove_github_reference_links: true
 
       - name: Summary
         if: always()
@@ -112,5 +181,10 @@ jobs:
               done
             else
               echo '- no zip produced'
+            fi
+            if [ -n "${DISCORD_WEBHOOK:-}" ]; then
+              echo '- announced in Discord'
+            else
+              echo '- Discord skipped — no `DISCORD_WEBHOOK` secret'
             fi
           } >> "$GITHUB_STEP_SUMMARY"

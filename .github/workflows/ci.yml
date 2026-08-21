@@ -56,6 +56,14 @@ jobs:
       - name: Validate .toc and .pkgmeta
         run: node tools/validate.mjs
 
+      # The release workflow runs this same tool against the section it is about
+      # to ship, where a finding fails the release. Running it on ## [Unreleased]
+      # every push means the notes are already clean by the time a tag is cut,
+      # instead of the pass being something discovered on release day. A section
+      # with nothing under it yet is not a failure.
+      - name: Slop pass on unreleased notes
+        run: node tools/slop.mjs --unreleased
+
       # The half of the wb1! contract that can be tested without a game client:
       # encode a vector the way Export.lua does, decode it the way the website
       # will, and require the payload to survive the trip unchanged.
