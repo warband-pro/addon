@@ -131,6 +131,11 @@ Top-level:
 ### Field rules
 
 - All *_at times = unix seconds UTC from `time()`, not milliseconds. Web converts. Null if never seen.
+- `race` is `UnitRace("player")`'s second return — the race **file token**,
+  not the localized display name. The example above (`"Tauren"`) hides this
+  because file token and display name happen to coincide for that race:
+  `NightElf` carries no space where "Night Elf" does, and `Scourge` is the
+  file token behind the localized "Undead". Decode against the token.
 - `items` limited to inventory stacks — no bonus IDs, no enchant, no sockets. `gear[]` (below) is where that detail lives, for equipped items and for anything in a bag or bank that could be equipped. link optional but include for debug quality.
 - For bank sections never opened, `free` = null and items = [] so we know "unknown" vs empty.
 - Warband bank `seenByGuid` lets web show "Warband Bank updated 1h ago (by Vocnar)" valid across alts.
@@ -139,6 +144,18 @@ Top-level:
 - `instances.bosses` bool order matches in-game encounter order, but name included for human search.
 - Mail goldPending in copper.
 - Any field unknown on old version must be treated as optional by web. New fields additive, bumps minor patch but safe.
+
+**Fields shown above that no code in this repo currently produces —
+aspirational, not a current promise:** `bankBags`, `bindZone`, `playtimeSec`,
+`professionCooldowns`, `auctions.goldHeld`, `mail.seenAt`,
+`professions.expansionTier`/`knownRecipes`/`totalRecipes`,
+`instances.lfgID`. The CharacterObject example above is this file's stated
+target shape, not a report of what `Scan.lua` actually walks — grep this
+repo's Lua before decoding against any field in this section that a website
+does not already read successfully from a real paste. `playtimeSec`
+specifically needs `RequestTimePlayed()`, which prints to the player's own
+chat frame — "silent on load" is the louder promise, so it stays unbuilt on
+purpose, not by oversight.
 
 ## `gear[]` and `talents` — added in addon 1.1.0
 
@@ -199,11 +216,18 @@ feature to read `gear[]` or vice versa; deflate absorbs the cost.
 
 `s` is not addon-specific. It is the same substring SimulationCraft's own
 in-game addon exports, and the same thing an `/itemname` chat link carries
-between the `\|H` and `\|h` markers. Comma-separated position, left to right:
+between the `\|H` and `\|h` markers. Colon-separated position, left to right:
 
 ```
-item:itemID:enchantID:gem1:gem2:gem3:gem4:suffixID:uniqueID:linkLevel:specializationID:reforgeID:numBonusIDs:bonusID1:bonusID2:...:numModifiers:modType1:modValue1:modType2:modValue2:...:upgradeValue
+item:itemID:enchantID:gem1:gem2:gem3:gem4:suffixID:uniqueID:linkLevel:specializationID:modifiersMask:itemContext:numBonusIDs:bonusID1:bonusID2:...:numModifiers:modType1:modValue1:modType2:modValue2:...:upgradeValue
 ```
+
+**Correction:** this table named the field at position 11 `reforgeID` through
+1.0.x. Reforging left the game in Warlords of Draenor; the modern layout
+carries `modifiersMask` there and `itemContext` at 12, pushing `numBonusIDs`
+to position 13. The wire itself never carried a `reforgeID` value — only this
+document's description of it was wrong, and only for a field nothing in this
+repo or the website ever read positionally before now.
 
 The fields that matter for a SimC render or a gear audit:
 
@@ -212,7 +236,7 @@ The fields that matter for a SimC render or a gear audit:
 - **`gem1..gem4`** (positions 3-6) — socketed gem item ids, 0 or empty for an
   empty socket. Socket *count* is implied by which positions are present, not
   stated separately.
-- **`numBonusIDs` + the bonus ID list right after it** (positions 12+) — this
+- **`numBonusIDs` + the bonus ID list right after it** (position 13+) — this
   is what tells apart a Normal, Heroic and Mythic copy of the same base item
   id, and what encodes tier-set pieces, Warbound trackers, and crafted-item
   quality tiers. Read the count first, then take exactly that many following
@@ -223,6 +247,23 @@ The fields that matter for a SimC render or a gear audit:
   modifier pairs; a plain drop has an empty list.
 - **`upgradeValue`** (final field) — the item's position within its current
   upgrade track, where present.
+
+**None of the above has been checked against a real captured string.** Every
+item string in this repo — both sample vectors and `tools/sample.mjs`'s
+generated ones — is synthetic. `sample.mjs` says so outright ("not a real
+bonus-ID encoding, just something shaped like one"), and the two strings in
+`vectors/v1-gear.json` disagree with each other on field count. The website's
+`parseItemString()` (`gear.ts`) is written defensively as a result: it trusts
+only the first ten fields (id through specialization, stable across every
+modern expansion by community consensus) and treats the bonus-ID list as a
+validated guess — a count, then that many positive integers, accepted only
+when the shape holds all the way through. A wrong guess here costs
+enrichment on an *owned* item (sockets, enchant, bonus IDs), never a
+best-in-bags call, which reads only `slot` and `ilvl`. **Confirm this table
+against a real `/warband copy` capture before trusting it anywhere the
+defensive parser does not already guard against being wrong**, and
+regenerate the vectors from that capture rather than continuing to hand-write
+them.
 
 An empty position between colons means "not set", not zero — `item:212018::::::::80:250::9:...`
 has no enchant and no gems. Treat a missing trailing section as absent rather
@@ -283,6 +324,14 @@ reject if over the decoded size cap (see below) or >20 chars
 Test vectors live in `docs/contract/vectors/`. `node tools/vector.mjs` round-trips
 every `.json` there and writes the matching `.wb1` fixture with `--write`; the
 web decoder tests read those fixtures.
+
+**The vectors verify the envelope, not the item-string contents.** They round-trip
+correctly — deflate, base64url, the `wb1!` prefix — and are real proof that
+encode/decode agree on the outer format. But every `gear[].s` value inside
+them is hand-written, not captured from the game, and the two vectors
+disagree with each other on field count (see the item-string correction
+above). The web decoder's own tests pin these vectors for structure and
+counts only, deliberately not for what `s` decodes to.
 
 ### Two corrections the code made to this section
 
@@ -401,5 +450,8 @@ to gear.
 ## Sample vectors
 
 `vectors/v1-min.json` is one minimal character, and `v1-min.wb1` beside it is
-that vector encoded — the fixture the web decoder tests against. Regenerate both
-with `node tools/vector.mjs --write`.
+that vector encoded — the fixture the web decoder tests against.
+`vectors/v1-gear.json`/`v1-gear.wb1` add `gear[]` and `talents`. Regenerate
+all four with `node tools/vector.mjs --write`. All four are hand-written, not
+captured from the game — see the item-string correction above for what that
+means for `v1-gear`'s `s` values specifically.
