@@ -51,6 +51,14 @@ function Store.Ready()
   return type(Store.db) == "table" and not Store.readOnly
 end
 
+-- Bumped on every write below, so Export.Build (Export.lua) can skip
+-- re-encoding and re-deflating the whole bundle when nothing has moved since
+-- the last call — status() used to pay that cost just to print a byte count.
+Store.rev = 0
+function Store.Touch()
+  Store.rev = Store.rev + 1
+end
+
 -- The current character's entry, created on first touch.
 function Store.Char()
   if not Store.Ready() then return nil end
@@ -78,6 +86,7 @@ function Store.Put(section, key, value)
   local now = ns.now()
   c.seenAt.lastSeen = now
   if section then c.seenAt[section] = now end
+  Store.Touch()
 end
 
 -- The warband bank is one shared vault seen through whichever character
@@ -94,6 +103,7 @@ function Store.PutWarbandBank(tabs, gold)
   wb.seenByName = UnitName("player")
   local c = Store.Char()
   if c then c.seenAt.warbank = wb.seenAt end
+  Store.Touch()
 end
 
 function Store.Count()
@@ -135,6 +145,7 @@ function Store.Forget(name)
       wb.seenByGuid = nil
       wb.seenByName = nil
     end
+    Store.Touch()
   end
   return removed
 end
@@ -161,6 +172,7 @@ function Store.Prune()
       wb.seenByGuid = nil
       wb.seenByName = nil
     end
+    Store.Touch()
   end
   return removed
 end

@@ -17,8 +17,6 @@ local Gear = {}
 ns.Gear = Gear
 
 local Store = ns.Store
-local C = C_Container or {}
-local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 
 -- Equipped slots worth sending. 4 (shirt) and 19 (tabard) are cosmetic and
 -- excluded everywhere gear appears, matching the website's SLOTS table.
@@ -49,16 +47,22 @@ local function itemString(link)
   return link:match("|H(item[^|]+)|h")
 end
 
+-- Stable top-level functions rather than a closure built per item: these ran
+-- once per equipped slot and once per occupied bag/bank/warbank slot, and a
+-- fresh closure for each call was pure allocation for something ns.safe's
+-- existing (fn, a, b) arity already covers.
+local function getEquippedItemLevel(slot)
+  return C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slot))
+end
 local function equippedItemLevel(slot)
-  return ns.safe(function()
-    return C_Item.GetCurrentItemLevel(ItemLocation:CreateFromEquipmentSlot(slot))
-  end)
+  return ns.safe(getEquippedItemLevel, slot)
 end
 
+local function getContainerItemLevel(bagID, slot)
+  return C_Item.GetCurrentItemLevel(ItemLocation:CreateFromBagAndSlot(bagID, slot))
+end
 local function containerItemLevel(bagID, slot)
-  return ns.safe(function()
-    return C_Item.GetCurrentItemLevel(ItemLocation:CreateFromBagAndSlot(bagID, slot))
-  end)
+  return ns.safe(getContainerItemLevel, bagID, slot)
 end
 
 function Gear.Equipped()
@@ -79,59 +83,86 @@ function Gear.Equipped()
   return out
 end
 
--- The equip location a stack of items in a bag or bank slot would use if worn.
--- nil for anything that is not gear at all — reagents, consumables, quest items.
-local function equipLoc(itemID)
-  return ns.safe(function()
-    local _, _, _, _, loc = GetInstant(itemID)
-    return loc
-  end)
+-- Called from inside Scan.lua's container walk (Scan.Walk / combinedVisitor)
+-- for every occupied slot, so a bag/bank/warband-tab item is classified as
+-- gear during the pass Scan.lua already makes rather than a second walk of
+-- the same containers. `where` is nil for the reagent bank, which never
+-- holds gear — ns.itemInfo's equipLoc simply will not match anything there,
+-- but Scan.lua skips the call entirely (gearEligible = false) to save the
+-- lookup.
+function Gear.Visit(where, bagID, slot, info, out)
+  local itemInfo = ns.itemInfo(info.itemID)
+  local canonicalSlot = itemInfo and EQUIPLOC_SLOT[itemInfo.equipLoc or ""]
+  if not canonicalSlot then return end
+  local s = itemString(info.hyperlink)
+  if not s then return end
+  out[#out + 1] = {
+    slot = canonicalSlot,
+    where = where,
+    id = info.itemID,
+    ilvl = containerItemLevel(bagID, slot),
+    s = s,
+  }
 end
 
-local function scanForGear(ids, where, out)
-  for i = 1, #ids do
-    local bagID = ids[i]
-    local size = ns.safe(C.GetContainerNumSlots, bagID) or 0
-    for slot = 1, size do
-      local info = ns.safe(C.GetContainerItemInfo, bagID, slot)
-      if info and info.itemID then
-        local canonicalSlot = EQUIPLOC_SLOT[equipLoc(info.itemID) or ""]
-        if canonicalSlot then
-          local s = itemString(info.hyperlink)
-          if s then
-            out[#out + 1] = {
-              slot = canonicalSlot,
-              where = where,
-              id = info.itemID,
-              ilvl = containerItemLevel(bagID, slot),
-              s = s,
-            }
-          end
-        end
-      end
-    end
+-- The gear list held in four scopes rather than rebuilt wholesale on every
+-- scan: Gear.All() used to walk carried bags + bank bags + every warband tab
+-- on a plain bag move, because it had no way to know only the bag scope had
+-- changed. Each scope now updates only when Scan.lua actually rescans it, and
+-- a scope that was not touched this session keeps whatever Gear.Seed loaded
+-- from storage instead of going blank.
+Gear.parts = { equipped = {}, bag = {}, bank = {}, warbank = {} }
+local SCOPE_ORDER = { "equipped", "bag", "bank", "warbank" }
+
+-- Rebuilds Gear.parts from the character's last stored c.gear, before any
+-- scan runs this session. Without this, the first bag move after login would
+-- commit a gear list missing whatever bank/warbank gear was captured last
+-- time, since neither has been rescanned yet this session.
+function Gear.Seed()
+  Gear.parts = { equipped = {}, bag = {}, bank = {}, warbank = {} }
+  local c = Store.Char()
+  if not c or not c.gear then return end
+  for i = 1, #c.gear do
+    local row = c.gear[i]
+    local part = Gear.parts[row.where]
+    if part then part[#part + 1] = row end
   end
 end
 
--- The reagent bank never holds gear, so it is the one container Scan.lua walks
--- that this does not.
-function Gear.Containers()
+function Gear.Commit()
+  if Store.db and Store.db.opts and Store.db.opts.includeGear == false then return end
   local out = {}
-  scanForGear(ns.Scan.CARRIED, "bag", out)
-  scanForGear(ns.Scan.BANK, "bank", out)
-  scanForGear(ns.Scan.WarbandTabs(), "warbank", out)
-  return out
+  for _, scope in ipairs(SCOPE_ORDER) do
+    local part = Gear.parts[scope]
+    for i = 1, #part do out[#out + 1] = part[i] end
+  end
+  if #out == 0 then return end
+  Store.Put("gear", "gear", out)
+end
+
+-- Replaces one scope's rows with a freshly walked result and commits. `rows`
+-- is only ever what Scan.lua just found for that scope — a scope Scan.lua
+-- has not rescanned this session is never passed here, so it is never
+-- cleared. A no-op while gear capture is off: Scan.lua's walk already skips
+-- building rows in that case, but this also stops the empty result from
+-- overwriting Gear.parts, so turning capture back on has real data to commit
+-- instead of the equipped scope alone.
+function Gear.SetScope(where, rows)
+  if Store.db and Store.db.opts and Store.db.opts.includeGear == false then return end
+  Gear.parts[where] = rows
+  Gear.Commit()
 end
 
 -- opts.includeGear is the release valve if a 20-character bundle gets
--- uncomfortable — /warband gear off, which includeLinks never got.
+-- uncomfortable — /warband gear off, which includeLinks never got. Bag,
+-- bank and warband-tab scopes come from Scan.lua's own walks (Gear.SetScope);
+-- this handles the one scope Scan.lua does not touch — equipped items — and
+-- commits, so a bare login or /warband copy with no prior activity this
+-- session still has something to show.
 function Gear.All()
   if Store.db and Store.db.opts and Store.db.opts.includeGear == false then return end
-  local out = Gear.Equipped()
-  local bags = Gear.Containers()
-  for i = 1, #bags do out[#out + 1] = bags[i] end
-  if #out == 0 then return end
-  Store.Put("gear", "gear", out)
+  Gear.parts.equipped = Gear.Equipped()
+  Gear.Commit()
 end
 
 -- Only the active spec's loadout is readable at any moment, so entries

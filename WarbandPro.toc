@@ -27,12 +27,16 @@
 # ## X-WoWI-ID: 00000
 
 # Load order: vendor, then namespace, then data, then UI, then the dispatcher that wires them together. Core is last because it registers events at load.
+# Perf.lua loads after Scan.lua and Gear.lua so it can wrap their functions in
+# place, and before Core.lua so /warband perf exists when the slash command
+# is registered.
 Vendor\LibDeflate.lua
 Init.lua
 Store.lua
 Scan.lua
 Instances.lua
 Gear.lua
+Perf.lua
 Bundle.lua
 Export.lua
 UI.lua

@@ -43,6 +43,7 @@ end
 
 handlers.PLAYER_LOGIN = function()
   Store.Init()
+  Gear.Seed()   -- before any scan: rebuilds this session's scope tables from storage
   Scan.All()
   Instances.Request()
   Instances.Vault()
@@ -60,15 +61,18 @@ handlers.PLAYER_MONEY = function()
   ns.throttle("money", 1, Scan.Money)
 end
 
-local function bags()
-  ns.throttle("bags", 0.5, function()
-    Scan.Bags()
-    Instances.Keystone()   -- the key is an item; it moves when bags move
-    Gear.All()              -- bag gear moves when bags move too
-  end)
-end
-handlers.BAG_UPDATE = bags
-handlers.BAG_UPDATE_DELAYED = bags
+-- Container and gear/talent work is coalesced through the dirty-set scheduler
+-- (ns.dirty / ns.onDirty, Init.lua) instead of a throttle key per scope: a
+-- loot mid-equip-swap used to schedule a bag walk and a gear walk separately
+-- even though Scan.lua now reads bag gear during the same pass it reads bag
+-- items. It also fails closed in combat, same as the export panel below —
+-- a full-bag loot mid-pull must not cost a container walk mid-frame.
+ns.onDirty("bag", function()
+  Scan.Bags()
+  Instances.Keystone()   -- the key is an item; it moves when bags move
+end)
+handlers.BAG_UPDATE = function() ns.dirty("bag") end
+handlers.BAG_UPDATE_DELAYED = function() ns.dirty("bag") end
 
 local function currencies()
   ns.throttle("currency", 1, Scan.Currencies)
@@ -76,15 +80,13 @@ end
 handlers.CURRENCY_DISPLAY_UPDATE = currencies
 handlers.CURRENCY_TRANSFER_LOG_UPDATE = currencies
 
--- Bank contents are readable only while the frame is open, and the warband tabs
--- populate a beat after it opens.
-local function banks()
-  ns.throttle("bank", 0.5, function()
-    Scan.Bank()
-    Scan.WarbandBank()
-    Gear.All()              -- bank and warband bank gear live in these too
-  end)
-end
+-- Bank contents are readable only while the frame is open, and the warband
+-- tabs populate a beat after it opens — walked together, same as before.
+ns.onDirty("bank", function()
+  Scan.Bank()
+  Scan.WarbandBank()
+end)
+local function banks() ns.dirty("bank") end
 handlers.BANKFRAME_OPENED = banks
 handlers.PLAYERBANKSLOTS_CHANGED = banks
 handlers.PLAYERREAGENTBANKSLOTS_CHANGED = banks
@@ -124,21 +126,20 @@ handlers.SKILL_LINES_CHANGED = function()
   ns.throttle("professions", 2, Scan.Professions)
 end
 
-local function gear()
-  ns.throttle("gear", 1, Gear.All)
-end
-handlers.PLAYER_EQUIPMENT_CHANGED = gear
-handlers.PLAYER_AVG_ITEM_LEVEL_UPDATE = gear
+ns.onDirty("equipped", Gear.All)
+handlers.PLAYER_EQUIPMENT_CHANGED = function() ns.dirty("equipped") end
+handlers.PLAYER_AVG_ITEM_LEVEL_UPDATE = function() ns.dirty("equipped") end
 
-local function talents()
-  ns.throttle("talents", 1, Gear.Talents)
-end
-handlers.TRAIT_CONFIG_UPDATED = talents
-handlers.ACTIVE_COMBAT_CONFIG_CHANGED = talents
-handlers.PLAYER_SPECIALIZATION_CHANGED = talents
+ns.onDirty("talents", Gear.Talents)
+handlers.TRAIT_CONFIG_UPDATED = function() ns.dirty("talents") end
+handlers.ACTIVE_COMBAT_CONFIG_CHANGED = function() ns.dirty("talents") end
+handlers.PLAYER_SPECIALIZATION_CHANGED = function() ns.dirty("talents") end
 
--- The one thing we defer: a panel asked for during a fight.
+-- The two things we defer: a panel asked for during a fight, and any
+-- container/gear/talent scope the dirty scheduler held back for the same
+-- reason (ns.dirty in Init.lua).
 handlers.PLAYER_REGEN_ENABLED = function()
+  ns.flushDirty()
   if UI.pending then
     local mode = UI.pending
     UI.pending = nil
@@ -223,7 +224,9 @@ SlashCmdList.WARBANDPRO = function(msg)
     local on = cmd == "gear on"
     if Store.Ready() then
       Store.db.opts.includeGear = on
+      Store.Touch()
       if on then
+        Scan.Bags()   -- current bag contents; equipped and the rest follow
         Gear.All()
         ns.print("gear capture on — captured now")
       else
@@ -232,8 +235,13 @@ SlashCmdList.WARBANDPRO = function(msg)
     else
       ns.print("saved data not loaded yet")
     end
+  elseif cmd == "perf" then
+    ns.Perf.Report()
+  elseif cmd == "perf reset" then
+    ns.Perf.Reset()
+    ns.print("perf counters reset")
   else
     ns.print("/warband · /warband copy current · /warband status · /warband optimize · "
-      .. "/warband clear <name> · /warband gear on|off")
+      .. "/warband clear <name> · /warband gear on|off · /warband perf")
   end
 end

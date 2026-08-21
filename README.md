@@ -60,7 +60,7 @@ Site shows per-char dot, hover "Bags 2h ago, Bank 5d ago (open bank to refresh),
 
 ## Format — `wb1!`
 
-Single-line hash, not human-readable on purpose: `wb1!<base64url(deflate(json))>` — compact (~8.6KB 1 char, ~26KB 6 chars full), no chat linkify, harder accidental inject. `wb0!` reserved for Camp DNA. `wb2!` future talents. Site decodes with `pako.inflateRaw` / `DecompressionStream('deflate-raw')` inverse of LibDeflate raw deflate lvl9. Validated v==1, len 1..20 chars, size <25KB decoded. See [CONTRACT.md](docs/CONTRACT.md) + vector `docs/contract/vectors/v1-min.json`.
+Single-line hash, not human-readable on purpose: `wb1!<base64url(deflate(json))>` — compact (~8.6KB 1 char, ~26KB 6 chars full), no chat linkify, harder accidental inject. `wb0!` reserved for Camp DNA. `wb2!` future talents. Site decodes with `pako.inflateRaw` / `DecompressionStream('deflate-raw')` inverse of LibDeflate raw deflate lvl9. Validated v==1, len 1..20 chars, size <1MB decoded (measured: 1 char ≈39KB JSON/8.6KB wire, 20 chars ≈474KB/73KB — the old <25KB figure predates gear/talents). See [CONTRACT.md](docs/CONTRACT.md) + vector `docs/contract/vectors/v1-min.json`.
 
 ## Companion trust
 
@@ -94,6 +94,8 @@ In-game `/reload` (full restart needed if .toc changed), then `/warband`.
 /warband clear <name>   prune from DB
 /warband status         debug counts/len/lastSeen
 /warband optimize       prune chars not seen 90d
+/warband gear on|off    toggle gear capture, keeps what's already stored
+/warband perf           scan timing, slot counts, item-info cache, memory
 ```
 
 On [warband.pro](https://warband.pro): `/settings/import` or top-right Import (`i`) → auto-clipboard grab if `wb1!` present → preview → Confirm → Tonight Plan re-evaluates.

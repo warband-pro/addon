@@ -23,6 +23,20 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+- **Fixed** — a bag move rebuilt `gear[]` from a fresh walk of every container,
+  closed bank and warband tabs included. A closed bank reports no slots, so
+  bank and warband-tab gear could vanish from the next bundle until you stood
+  at a banker again. Bag, bank, and warband-tab gear are now tracked
+  separately and only replaced when that scope is actually rescanned.
+- **Added** `/warband perf` — scan timing per section, container and slot
+  counts, item-info cache hit rate, and addon memory.
+- Moving one item no longer walks the bank and every warband tab checking for
+  gear and consumables — each scope now walks only its own containers.
+- Container, gear, and talent scans hold off during combat and run the moment
+  it ends, the same way the export panel already does.
+- `/warband status` and a repeat `/warband copy` no longer rebuild and
+  recompress the whole bundle when nothing has changed since the last call.
+
 ## [1.1.0] — 2026-08-20 — gear and talents on the wire
 
 **warband.pro's gear profile and SimC exporter shipped reading only the

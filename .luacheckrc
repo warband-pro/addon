@@ -30,6 +30,10 @@ read_globals = {
   "ChatFontNormal", "DEFAULT_CHAT_FRAME", "C_Timer", "GetServerTime",
   "GetBuildInfo", "InCombatLockdown",
 
+  -- /warband perf (Perf.lua)
+  "debugprofilestop", "UpdateAddOnMemoryUsage", "GetAddOnMemoryUsage",
+  "UpdateAddOnCPUUsage", "GetAddOnCPUUsage", "GetCVar",
+
   -- character
   "UnitGUID", "UnitName", "UnitClass", "UnitRace", "UnitLevel", "UnitXP", "UnitFactionGroup",
   "GetXPExhaustion", "GetRealmName", "GetZoneText", "GetBindLocation",

@@ -65,6 +65,97 @@ function ns.throttle(key, delay, fn)
   end)
 end
 
+-- Immutable per-item facts: equip location, item class, item subclass. All
+-- three come from GetItemInfoInstant and none of them can change for a given
+-- item id in this session, so asking again on every scan is pure waste — the
+-- same reasoning as the accountWide memo Scan.lua keeps for currencies.
+-- Cached here, not in Gear.lua or Scan.lua, because both read it.
+local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
+local itemInfoCache = {}
+ns.itemInfoStats = { hits = 0, misses = 0 }
+
+-- Field order matches how the two existing call sites already destructure
+-- GetItemInfoInstant's return list (Gear.lua reads position 5, Scan.lua reads
+-- 6 and 7) — this only caches that result, it does not relitigate it. Routed
+-- through ns.safe, not a bare pcall: a bad id must cost this one lookup, not
+-- (as Scan.lua's old unprotected rollup could) the whole scan it is part of.
+local function rawItemInfo(id)
+  local _, _, _, _, equipLoc, classID, subclassID = GetInstant(id)
+  return { equipLoc = equipLoc, classID = classID, subclassID = subclassID }
+end
+
+function ns.itemInfo(id)
+  if type(id) ~= "number" or type(GetInstant) ~= "function" then return nil end
+  local cached = itemInfoCache[id]
+  if cached then
+    ns.itemInfoStats.hits = ns.itemInfoStats.hits + 1
+    return cached
+  end
+  ns.itemInfoStats.misses = ns.itemInfoStats.misses + 1
+  local info = ns.safe(rawItemInfo, id)
+  if not info then return nil end
+  itemInfoCache[id] = info
+  return info
+end
+
+function ns.itemInfoCount()
+  local n = 0
+  for _ in pairs(itemInfoCache) do n = n + 1 end
+  return n
+end
+
+-- Coalesced dirty-set flush for container/gear/talent work: an event marks a
+-- scope dirty, one timer flushes every scope marked since the last flush in
+-- one pass. A loot mid-equip-swap used to schedule a bag walk and a gear walk
+-- as two unrelated throttle keys even though they read the same slots; this
+-- collapses that to one flush, and fails closed in combat the same way the
+-- export panel already does (see Core.lua's PLAYER_REGEN_ENABLED handler) —
+-- a full-bag loot mid-pull must not cost a container walk mid-frame.
+local dirtyScopes = {}
+local dirtyPending = false
+local dirtyHandlers = {}
+local DIRTY_DELAY = 0.5
+ns.combatDeferred = 0
+
+function ns.onDirty(scope, fn)
+  dirtyHandlers[scope] = fn
+end
+
+local function flushDirty()
+  dirtyPending = false
+  if next(dirtyScopes) == nil then return end
+  if InCombatLockdown and InCombatLockdown() then
+    -- Leave the scopes marked; PLAYER_REGEN_ENABLED flushes them once the
+    -- fight ends.
+    ns.combatDeferred = ns.combatDeferred + 1
+    return
+  end
+  local scopes = dirtyScopes
+  dirtyScopes = {}
+  for scope in pairs(scopes) do
+    local fn = dirtyHandlers[scope]
+    if fn then ns.safe(fn) end
+  end
+end
+
+function ns.dirty(scope)
+  dirtyScopes[scope] = true
+  if dirtyPending then return end
+  dirtyPending = true
+  C_Timer.After(DIRTY_DELAY, flushDirty)
+end
+
+-- Exposed so PLAYER_REGEN_ENABLED can drain anything combat deferred the
+-- moment the fight ends, without waiting another DIRTY_DELAY. A no-op call
+-- when nothing is pending.
+ns.flushDirty = flushDirty
+
+function ns.dirtyCount()
+  local n = 0
+  for _ in pairs(dirtyScopes) do n = n + 1 end
+  return n
+end
+
 function ns.print(msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cff8be9fdwarband.pro|r " .. tostring(msg))
 end

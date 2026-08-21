@@ -11,7 +11,6 @@ ns.Scan = Scan
 
 local Store = ns.Store
 local C = C_Container or {}
-local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 
 -- Bag ids: read from Enum where the client offers it, fall back to the numbers,
 -- so a Midnight rename costs us one section rather than the whole scan.
@@ -49,37 +48,22 @@ Scan.CARRIED = CARRIED
 Scan.BANK = BANK
 Scan.WarbandTabs = warbandTabs
 
--- Items carry id, count, quality and a bound flag. Name, icon, class and link
--- are all derivable from the id through Game Data on the website, and carrying
--- them would multiply the bundle for nothing. Links stay available behind
--- WarbandProDB.opts.includeLinks for debugging one specific item.
-local function scanContainer(id)
-  if id == nil then return nil end
+-- One pass over a container, handing each occupied slot to `visit(bagID, slot,
+-- info)`. Bags, gear and the consumables rollup all used to walk the same
+-- slots separately — a bag move cost three full passes over the same six
+-- containers. Returns size, free; both 0 for an empty or unusable container
+-- so callers never need a nil check on the numbers.
+function Scan.Walk(id, visit)
+  if id == nil then return 0, 0 end
   local size = ns.safe(C.GetContainerNumSlots, id) or 0
-  if size <= 0 then return nil end
-  local links = Store.db and Store.db.opts and Store.db.opts.includeLinks
-  local items = {}
+  if size <= 0 then return 0, 0 end
   for slot = 1, size do
     local info = ns.safe(C.GetContainerItemInfo, id, slot)
     if info and info.itemID then
-      local item = { id = info.itemID, count = info.stackCount or 1 }
-      if info.quality then item.quality = info.quality end
-      if info.isBound then item.isBound = true end
-      if links and info.hyperlink then item.link = info.hyperlink end
-      items[#items + 1] = item
+      visit(id, slot, info)
     end
   end
-  return { bagID = id, size = size, free = ns.safe(C.GetContainerNumFreeSlots, id) or 0, items = items }
-end
-
-local function scanList(ids)
-  local out = {}
-  for i = 1, #ids do
-    local bag = scanContainer(ids[i])
-    if bag then out[#out + 1] = bag end
-  end
-  if #out == 0 then return nil end
-  return out
+  return size, ns.safe(C.GetContainerNumFreeSlots, id) or 0
 end
 
 -- Consumables rollup, derived so the Tonight Plan does not walk every bag on the
@@ -95,25 +79,73 @@ end
 local SUBCLASS = { [1] = "potion", [3] = "phial", [5] = "foodFeast", [6] = "weaponRune" }
 local POTION_IDS = {}   -- [itemID] = "healthPotion" | "tempPotion"
 
-local function rollup(bagLists)
-  local out = { phial = 0, potion = 0, foodFeast = 0, weaponRune = 0 }
-  -- Checked once rather than per item: this runs over every slot the character
-  -- owns, and ns.safe on each lookup would cost more than the rollup is worth.
-  if type(GetInstant) ~= "function" then return out end
-  for _, list in ipairs(bagLists) do
-    for _, bag in ipairs(list) do
-      for _, item in ipairs(bag.items) do
-        local named = POTION_IDS[item.id]
-        if named then out[named] = (out[named] or 0) + item.count end
-        local _, _, _, _, _, classID, subclassID = GetInstant(item.id)
-        if classID == 0 then
-          local bucket = SUBCLASS[subclassID]
-          if bucket then out[bucket] = out[bucket] + item.count end
-        end
-      end
+local function newCounts()
+  return { phial = 0, potion = 0, foodFeast = 0, weaponRune = 0 }
+end
+
+local function addCounts(into, id, count)
+  local named = POTION_IDS[id]
+  if named then into[named] = (into[named] or 0) + count end
+  local info = ns.itemInfo(id)
+  if info and info.classID == 0 then
+    local bucket = SUBCLASS[info.subclassID]
+    if bucket then into[bucket] = into[bucket] + count end
+  end
+end
+
+-- One visitor per container walk, feeding the item list, the consumables
+-- rollup and (when gear capture is on) Gear.lua's classification from the
+-- single pass Scan.Walk already makes. `where` is the wire's gear scope —
+-- "bag" | "bank" | "warbank" — or nil for the reagent bank, which never holds
+-- gear (Gear.lua skips a lookup that could only ever come back empty).
+local function combinedVisitor(where, links, wantGear, items, gearOut, counts)
+  return function(id, slot, info)
+    local item = { id = info.itemID, count = info.stackCount or 1 }
+    if info.quality then item.quality = info.quality end
+    if info.isBound then item.isBound = true end
+    if links and info.hyperlink then item.link = info.hyperlink end
+    items[#items + 1] = item
+
+    if wantGear then ns.Gear.Visit(where, id, slot, info, gearOut) end
+    addCounts(counts, info.itemID, item.count)
+  end
+end
+
+-- Items carry id, count, quality and a bound flag. Name, icon, class and link
+-- are all derivable from the id through Game Data on the website, and carrying
+-- them would multiply the bundle for nothing. Links stay available behind
+-- WarbandProDB.opts.includeLinks for debugging one specific item.
+--
+-- `where` gates gear classification; pass false explicitly (reagent bank) to
+-- skip it. Returns nil for an empty or closed container, else
+-- {bag, gear, consumables} from the one walk.
+local function scanContainer(id, where, gearEligible)
+  if id == nil then return nil end
+  if gearEligible == nil then gearEligible = true end
+  local links = Store.db and Store.db.opts and Store.db.opts.includeLinks
+  local wantGear = gearEligible and not (Store.db and Store.db.opts and Store.db.opts.includeGear == false)
+  local items, gearOut, counts = {}, {}, newCounts()
+  local visit = combinedVisitor(where, links, wantGear, items, gearOut, counts)
+  local size, free = Scan.Walk(id, visit)
+  if size <= 0 then return nil end
+  return { bag = { bagID = id, size = size, free = free, items = items }, gear = gearOut, consumables = counts }
+end
+
+-- Aggregates scanContainer across every bag in one scope (carried, bank, or
+-- warband tabs), so Scan.Bags/Bank/WarbandBank each do exactly one walk of
+-- their own containers and nobody else's.
+local function scanList(ids, where)
+  local bags, gearOut, counts = {}, {}, newCounts()
+  for i = 1, #ids do
+    local result = scanContainer(ids[i], where)
+    if result then
+      bags[#bags + 1] = result.bag
+      for j = 1, #result.gear do gearOut[#gearOut + 1] = result.gear[j] end
+      for key, n in pairs(result.consumables) do counts[key] = (counts[key] or 0) + n end
     end
   end
-  return out
+  if #bags == 0 then return nil end
+  return { bags = bags, gear = gearOut, consumables = counts }
 end
 
 function Scan.Identity()
@@ -148,36 +180,55 @@ function Scan.Money()
   Store.Put(nil, "gold", ns.safe(GetMoney))
 end
 
+-- Consumables are kept per scope and summed at Scan.Consumables() rather than
+-- re-walked from stored items on every bag or bank change — a bag move used
+-- to re-derive bank and reagent-bank counts too, for nothing.
+Scan.consumableParts = { bag = nil, bank = nil, reagentBank = nil }
+
 function Scan.Bags()
-  local bags = scanList(CARRIED)
-  if not bags then return end
-  Store.Put("bag", "bags", bags)
+  local result = scanList(CARRIED, "bag")
+  if not result then return end
+  Store.Put("bag", "bags", result.bags)
+  ns.Gear.SetScope("bag", result.gear)
+  Scan.consumableParts.bag = result.consumables
   Scan.Consumables()
 end
 
 -- Bank contents exist only while the frame is open. Until it has been opened
 -- once the field stays absent, which the website shows as "open your bank"
--- rather than as an empty bank.
+-- rather than as an empty bank. Only touches the parts it actually read: a
+-- closed reagent bank must not blank out bank gear that was captured earlier,
+-- and vice versa.
 function Scan.Bank()
-  local bank = scanList(BANK)
-  local reagent = scanContainer(REAGENT_BANK)
-  if not bank and not reagent then return end
+  local bankResult = scanList(BANK, "bank")
+  local reagentResult = scanContainer(REAGENT_BANK, "bank", false)  -- reagent bank never holds gear
+  if not bankResult and not reagentResult then return end
   local c = Store.Char()
   if not c then return end
-  if bank then c.bank = bank end
-  if reagent then c.reagentBank = reagent end
+  if bankResult then
+    c.bank = bankResult.bags
+    ns.Gear.SetScope("bank", bankResult.gear)
+    Scan.consumableParts.bank = bankResult.consumables
+  end
+  if reagentResult then
+    c.reagentBank = reagentResult.bag
+    Scan.consumableParts.reagentBank = reagentResult.consumables
+  end
   local now = ns.now()
   c.seenAt.bank, c.seenAt.lastSeen = now, now
   Scan.Consumables()
 end
 
+-- Not part of the consumables rollup — the original rollup only ever read
+-- c.bags/c.bank/c.reagentBank, and this keeps that scope.
 function Scan.WarbandBank()
-  local tabs, any = {}, false
+  local tabs, gearOut, any = {}, {}, false
   for _, id in ipairs(warbandTabs()) do
-    local tab = scanContainer(id)
-    if tab then
+    local result = scanContainer(id, "warbank")
+    if result then
       any = true
-      tabs[#tabs + 1] = tab
+      tabs[#tabs + 1] = result.bag
+      for j = 1, #result.gear do gearOut[#gearOut + 1] = result.gear[j] end
     end
   end
   if not any then return end
@@ -187,17 +238,21 @@ function Scan.WarbandBank()
     return C_Bank.FetchDepositedMoney(Enum.BankType.Account)
   end)
   Store.PutWarbandBank(tabs, gold)
+  ns.Gear.SetScope("warbank", gearOut)
 end
 
 function Scan.Consumables()
   local c = Store.Char()
   if not c then return end
-  local lists = {}
-  if c.bags then lists[#lists + 1] = c.bags end
-  if c.bank then lists[#lists + 1] = c.bank end
-  if c.reagentBank then lists[#lists + 1] = { c.reagentBank } end
-  if #lists == 0 then return end
-  c.consumables = rollup(lists)
+  local parts = Scan.consumableParts
+  if not parts.bag and not parts.bank and not parts.reagentBank then return end
+  local out = newCounts()
+  for _, part in pairs(parts) do
+    if part then
+      for key, n in pairs(part) do out[key] = (out[key] or 0) + n end
+    end
+  end
+  c.consumables = out
 end
 
 -- isAccountWide never changes for a currency and the list is walked on every
