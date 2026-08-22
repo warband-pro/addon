@@ -6,8 +6,8 @@ Source research: frikkern midnight template, themizeguy wow-addon-dev skill, war
 
 ## Target
 
-- Retail only, Midnight 12.0+ / 12.1
-- Interface: `120001` for Midnight (verified in midnight template repo). Single comma-delimited Interface line if we support Classic later, but v1 retail only.
+- Retail only, Midnight 12.1
+- Interface: `120100` for Midnight 12.1 (verified). Single comma-delimited Interface line if we support Classic later, but v1 retail only.
 - Lua 5.1 (WoW retail)
 - Zero deps except vendored LibDeflate (MIT, one file) for wb1! strings. No Ace3, no LibStub.
 
@@ -18,7 +18,7 @@ Midnight template is explicit: complete addon template with modern Blizzard API 
 ## TOC — minimal that works now
 
 ```
-## Interface: 120001
+## Interface: 120100
 ## Title: Warband.pro
 ## Notes: Lightweight warband bundle — bags, bank, currencies, lockouts from all alts
 ## Author: warband.pro

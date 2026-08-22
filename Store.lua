@@ -141,7 +141,7 @@ function Store.Forget(name)
   end
   if removed > 0 then
     local wb = Store.db.warbandBank
-    if wb and wb.seenByGuid and removedGuids[wb.seenByGuid] then
+    if wb and wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
       wb.seenByGuid = nil
       wb.seenByName = nil
     end
@@ -152,7 +152,9 @@ end
 
 -- /warband optimize — drop characters not logged in 90 days.
 -- Same orphan rule as Forget: keep the vault, drop the ghost attribution when
--- its owner is pruned or already missing.
+-- its owner is pruned or already missing. The orphan check runs even when no
+-- characters were pruned this pass, so a dangling seenByGuid from a prior
+-- manual edit or a missed Forget does not persist.
 function Store.Prune()
   if not Store.Ready() then return 0 end
   local cutoff, removed = ns.now() - ns.STALE_PRUNE, 0
@@ -166,12 +168,14 @@ function Store.Prune()
       removed = removed + 1
     end
   end
-  if removed > 0 then
-    local wb = Store.db.warbandBank
-    if wb and wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
-      wb.seenByGuid = nil
-      wb.seenByName = nil
-    end
+  local wb = Store.db.warbandBank
+  local cleared = false
+  if wb and wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
+    wb.seenByGuid = nil
+    wb.seenByName = nil
+    cleared = true
+  end
+  if removed > 0 or cleared then
     Store.Touch()
   end
   return removed
