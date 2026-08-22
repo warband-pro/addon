@@ -23,6 +23,15 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- A ding is noticed when it happens. `Scan.Identity` — the pass that reads your
+  level, XP, rested XP, zone and item level — only ran at login and on a loading
+  screen. Level in the open world, type `/warband copy`, and the string carried
+  the level you were an hour ago; it corrected itself the next time you zoned or
+  logged out. `PLAYER_LEVEL_UP` and `PLAYER_LEVEL_CHANGED` now run the same pass,
+  one second later so `UnitLevel` has caught up.
+
 ## [1.2.0] — 2026-08-21 — every vault slot, not only the summary
 
 **The Great Vault has two axes and this addon was sending one.** A raid slot

@@ -15,6 +15,7 @@ local frame = CreateFrame("Frame", "WarbandProEventFrame")
 -- so ask for each one on its own and let the ones that exist stick.
 local EVENTS = {
   "ADDON_LOADED", "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED",
+  "PLAYER_LEVEL_UP", "PLAYER_LEVEL_CHANGED",
   "PLAYER_MONEY", "BAG_UPDATE", "BAG_UPDATE_DELAYED",
   "CURRENCY_DISPLAY_UPDATE", "CURRENCY_TRANSFER_LOG_UPDATE",
   "BANKFRAME_OPENED", "PLAYERBANKSLOTS_CHANGED", "PLAYERREAGENTBANKSLOTS_CHANGED",
@@ -56,6 +57,27 @@ handlers.PLAYER_ENTERING_WORLD = function()
     Instances.Request()
   end)
 end
+
+-- A ding is the one identity fact that used to need a loading screen to be
+-- noticed. `Scan.Identity` was reachable only from PLAYER_LOGIN and
+-- PLAYER_ENTERING_WORLD, so levelling in the open world left the stored level
+-- one behind until the next zone or relog — and `/warband copy` in between
+-- exported the old number as if it were current.
+--
+-- Its own throttle key rather than "identity": sharing PLAYER_ENTERING_WORLD's
+-- would let a ding taken a second before a loading screen swallow that
+-- handler's Money and Instances.Request too.
+--
+-- One second, because UnitLevel("player") is what Scan.Identity reads and both
+-- events can arrive a frame before the unit itself reports the new value.
+-- Registered as a pair: PLAYER_LEVEL_UP is the ding, PLAYER_LEVEL_CHANGED also
+-- covers the level moving for any other reason, and the loop above drops
+-- whichever name this client does not have.
+local function dinged()
+  ns.throttle("levelup", 1, Scan.Identity)
+end
+handlers.PLAYER_LEVEL_UP = dinged
+handlers.PLAYER_LEVEL_CHANGED = dinged
 
 handlers.PLAYER_MONEY = function()
   ns.throttle("money", 1, Scan.Money)
