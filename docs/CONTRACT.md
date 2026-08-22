@@ -84,7 +84,7 @@ Top-level:
   "auctions": {"countActive":3,"goldHeld":500000,"seenAt":1723998000},
 
   "currencies": [
-    {"id":2815,"name":"Resonance Crystals","quantity":4500,"maxQuantity":20000,"weeklyMax":0,"isAccountWide":false,"discovered":true}
+    {"id":2815,"name":"Resonance Crystals","quantity":4500,"maxQuantity":20000,"weeklyMax":0,"earnedThisWeek":320,"isAccountWide":false,"discovered":true}
   ],
 
   "professions": [
@@ -122,6 +122,7 @@ Top-level:
     "vault":1723997000,
     "mail":null,
     "auctions":null,
+    "profession":1724001000,
     "gear":1724001000,
     "talents":1723999000
   }
@@ -140,6 +141,9 @@ Top-level:
 - For bank sections never opened, `free` = null and items = [] so we know "unknown" vs empty.
 - Warband bank `seenByGuid` lets web show "Warband Bank updated 1h ago (by Vocnar)" valid across alts.
 - `currencies.maxQuantity` 0 = no cap, `weeklyMax` 0 = not weekly-capped.
+  `earnedThisWeek` is how much of `weeklyMax` this reset period has earned so
+  far; web gates it on its own weekly-reset clock (`lastResetMs`) before
+  trusting it for a cap warning, the same way it gates the vault.
 - `consumables` is derived cache to make Tonight Plan fast: count by regex on known consumable itemIDs, not name match.
 - `instances.bosses` bool order matches in-game encounter order, but name included for human search.
 - Mail goldPending in copper.
