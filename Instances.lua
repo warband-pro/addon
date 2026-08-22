@@ -117,6 +117,20 @@ local function vaultBuckets()
   return map
 end
 
+-- The difficulty a raid vault slot will pay at, or nil when the client will not
+-- say. Asked on the raid row and nowhere else: `level` means something different
+-- on every row -- a keystone level on mythic+, a difficulty id on raid -- and
+-- GetDifficultyInfo(14) answers "Normal" whether that 14 arrived as a difficulty
+-- or as a +14 key. A plausible wrong answer is worse here than no answer, and
+-- the website reads a missing `d` as the client declining rather than as a
+-- difficulty it has to guess at.
+local function raidDifficulty(level)
+  if type(level) ~= "number" or level <= 0 then return nil end
+  local name = ns.safe(GetDifficultyInfo, level)
+  if type(name) ~= "string" or name == "" then return nil end
+  return name
+end
+
 function Instances.Vault()
   local wr = C_WeeklyRewards
   if not wr then return end
@@ -140,12 +154,34 @@ function Instances.Vault()
         -- The next reward you can still reach, which is the number worth showing.
         slot.threshold = a.threshold
       end
-      if a.level and a.level > (slot.level or 0) then slot.level = a.level end
+
+      -- The rows the fields above are a summary OF. The summary alone cost the
+      -- website a sentence it needed: a bucket carries only the NEXT threshold,
+      -- so the thresholds of slots already earned were gone, and "one more
+      -- heroic boss raises the slot you already have" could not be said from it
+      -- at all. Three small tables per bucket, and deflate folds the repeated
+      -- keys to nearly nothing across a warband.
+      slot.rows = slot.rows or {}
+      tinsert(slot.rows, {
+        t = a.threshold,
+        p = a.progress or 0,
+        l = a.level,
+        d = (key == "raid") and raidDifficulty(a.level) or nil,
+      })
+
+      -- `level` is a max across rows whose ordering it does not own, which is
+      -- fine where the field is a keystone level and wrong where it is a
+      -- difficulty id: raid ids sort LFR (17) above Mythic (16), so the "best"
+      -- slot it named could be the worst one. It is left off the raid bucket
+      -- rather than reordered from a remembered table of ids -- `rows[].d` is
+      -- the answer anyone reaching for it actually wanted.
+      if key ~= "raid" and a.level and a.level > (slot.level or 0) then slot.level = a.level end
     end
   end
 
   -- Every bucket ends up with progress, the next threshold to chase (absent
-  -- once all three are earned) and how many of its slots are already unlocked.
+  -- once all three are earned), how many of its slots are already unlocked, and
+  -- `rows` -- the per-slot detail none of those three can reconstruct.
   -- An empty result means the client had nothing to say yet, not "no vault", so
   -- leave the previous answer and its stamp alone.
   if next(vault) == nil then return end

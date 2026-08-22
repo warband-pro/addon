@@ -398,13 +398,45 @@ blocks a raid on that difference.
 ### 4. `weeklyVault` buckets carry counts, not a single boolean
 
 ```json
-"weeklyVault": { "raid": {"progress":4,"threshold":6,"unlocked":1,"slots":3,"level":626} }
+"weeklyVault": { "raid": {"progress":2,"threshold":4,"unlocked":1,"slots":3,
+                          "rows":[{"t":2,"p":2,"l":14,"d":"Normal"},{"t":4,"p":2,"l":0},{"t":6,"p":2,"l":0}]} }
 ```
 
 `unlocked` is how many of that row's three slots are earned, `threshold` is the
 next one still reachable and is **absent once all three are earned**. Bucket keys
 come from `Enum.WeeklyRewardChestThresholdType` as the client shipped it, so a
 type the addon does not recognise is dropped rather than guessed at.
+
+#### `rows[]` — per slot, since 1.1.0
+
+Additive on `wb1!`: absent from every bundle exported before 1.1.0, and a
+consumer that ignores it behaves exactly as it did. `{t}`hreshold, `{p}`rogress,
+`{l}`evel raw, `{d}`ifficulty resolved — three per bucket, ~90 bytes before
+deflate folds the repeated keys.
+
+The summary fields are a summary **of** these rows, and the collapse was lossy in
+a way that cost the website a sentence. A bucket carries only the *next*
+threshold, so the thresholds of slots already earned were gone, and "one more
+heroic boss raises the slot you already have" could not be said from it at all —
+the site had to reason from a hardcoded `[2,4,6]` that goes stale at an
+expansion.
+
+Two rules a consumer must not soften:
+
+- **`l` means something different on every row** — a keystone level on `mplus`, a
+  difficulty id on `raid`. Do not compare it across buckets, and do not resolve
+  it yourself.
+- **`d` is sent for `raid` only, and only when `GetDifficultyInfo` answered.** A
+  missing `d` is the client declining, never "unknown, assume LFR". It is not
+  sent on `mplus` on purpose: `GetDifficultyInfo(14)` returns "Normal" whether
+  that 14 arrived as a raid difficulty or as a +14 key, and a plausible wrong
+  answer is worse than none.
+
+`level` on the **bucket** is a max across rows whose ordering it does not own.
+That is fine where the field is a keystone level and wrong where it is a
+difficulty id — raid ids sort LFR (17) above Mythic (16), so the "best" slot it
+named could be the worst one — so **`level` is no longer sent on the `raid`
+bucket**. It was never read. `rows[].d` is what anyone reaching for it wanted.
 
 ## Security / DoS
 

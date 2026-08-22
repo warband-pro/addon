@@ -51,7 +51,7 @@ read_globals = {
   -- lockouts, keystone, vault
   "GetNumSavedInstances", "GetSavedInstanceInfo", "GetSavedInstanceEncounterInfo",
   "GetNumSavedWorldBosses", "GetSavedWorldBossInfo", "RequestRaidInfo",
-  "C_MythicPlus", "C_ChallengeMode", "C_WeeklyRewards",
+  "C_MythicPlus", "C_ChallengeMode", "C_WeeklyRewards", "GetDifficultyInfo",
 }
 
 ignore = {
