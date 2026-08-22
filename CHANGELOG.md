@@ -23,6 +23,40 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-08-21 — every vault slot, not only the summary
+
+**The Great Vault has two axes and this addon was sending one.** A raid slot
+has a threshold *and* a difficulty it will pay at, and the difficulty is not
+chosen — the game pays each slot at the difficulty of the kill sitting at that
+slot's threshold, so slot 1 pays your second best kill and slot 2 your fourth.
+What went on the wire was one collapsed summary per row: the furthest any slot
+had got, and the *next* threshold still reachable. The thresholds of slots
+already earned were gone with it, so warband.pro could not say the most useful
+sentence there is about a raid night — that the slot you already own goes up a
+difficulty if you kill one more boss — and told a live camp `2 more for vault
+slot 2` when slot 1 was already theirs at normal, one heroic kill from paying
+heroic.
+
+- **`weeklyVault.rows[]`, per bucket.** One entry per slot: its own threshold,
+  its own progress, the client's raw `level`, and — on the raid row — the
+  difficulty that level resolves to. About 90 bytes per bucket before deflate
+  folds the repeated keys; the new `v1-vault` contract vector round-trips 705
+  bytes of JSON to 476 on the wire.
+- **The difficulty is resolved here rather than guessed at by the website.**
+  `level` means a different thing on every row — a keystone level on mythic+, a
+  difficulty id on raid — so it is looked up against the client's own
+  difficulty table, on the raid row only, and left out entirely when that
+  lookup declines to answer. `GetDifficultyInfo(14)` returns "Normal" whether
+  the 14 arrived as a raid difficulty or as a +14 key, and a plausible wrong
+  answer is worse than none at all.
+- **`level` is no longer sent on the raid bucket.** It was a max across slots,
+  which is fine for a keystone level and wrong for a difficulty id: raid ids
+  sort LFR (17) above Mythic (16), so the "best" slot it named could be the
+  worst one. Nothing ever read it, and `rows[].d` is what it was reaching for.
+- **Wire stays `wb1!`.** `rows` is additive and optional. A site that ignores
+  it reads this bundle exactly as it read the last one, and warband.pro still
+  reads bundles from every earlier version.
+
 - **Fixed** — a bag move rebuilt `gear[]` from a fresh walk of every container,
   closed bank and warband tabs included. A closed bank reports no slots, so
   bank and warband-tab gear could vanish from the next bundle until you stood
@@ -110,7 +144,8 @@ Retail Midnight 12.1 only. Works with whatever UI you run.
 
 Then future tags auto-upload via BigWigs packager once Project IDs are set.
 
-[Unreleased]: https://github.com/warband-pro/addon/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/warband-pro/addon/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/warband-pro/addon/releases/tag/v1.2.0
 [1.1.0]: https://github.com/warband-pro/addon/releases/tag/v1.1.0
 [1.0.2]: https://github.com/warband-pro/addon/releases/tag/v1.0.2
 [1.0.1]: https://github.com/warband-pro/addon/releases/tag/v1.0.1

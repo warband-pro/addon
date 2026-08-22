@@ -407,9 +407,9 @@ next one still reachable and is **absent once all three are earned**. Bucket key
 come from `Enum.WeeklyRewardChestThresholdType` as the client shipped it, so a
 type the addon does not recognise is dropped rather than guessed at.
 
-#### `rows[]` — per slot, since 1.1.0
+#### `rows[]` — per slot, since 1.2.0
 
-Additive on `wb1!`: absent from every bundle exported before 1.1.0, and a
+Additive on `wb1!`: absent from every bundle exported before 1.2.0, and a
 consumer that ignores it behaves exactly as it did. `{t}`hreshold, `{p}`rogress,
 `{l}`evel raw, `{d}`ifficulty resolved — three per bucket, ~90 bytes before
 deflate folds the repeated keys.
