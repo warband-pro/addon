@@ -192,7 +192,17 @@ against an equipment document that only refreshes at the wearer's last logout.
 | `q` | Numeric quality, 0 Poor … 5 Legendary, from the container item info. Added in 1.3.0; bag/bank/warbank entries only. |
 | `b` | Soulbound. **Emitted only when true** — absence means NOT bound, never "unknown", matching `items[].isBound`. The website's BoE guard depends on that reading. Added in 1.3.0; bag/bank/warbank entries only. |
 | `cls` | Item class id (2 Weapon, 4 Armor), `GetItemInfoInstant` position 6. Added in 1.3.0; bag/bank/warbank entries only. |
-| `sub` | Item subclass id — for armor, 1 Cloth … 4 Plate — position 7. With `cls`, what lets the website call an item unwearable by this class. Added in 1.3.0; bag/bank/warbank entries only. |
+| `sub` | Item subclass id, `GetItemInfoInstant` position 7, **verbatim and uninterpreted**. For armor it is 1 Cloth … 4 Plate *on the eight slots that have an armor weight* — and **a cloak reports 1 as well**, which is not a weight and not a claim that only cloth wearers may equip it. Necks, rings and trinkets report 0. With `cls` this is what lets the website call an item unwearable by this class, and the slot is what says whether the question is answerable at all — see the note below. Added in 1.3.0; bag/bank/warbank entries only. |
+
+**`sub` is a subclass, not an armor weight, and `slot` is what tells them
+apart.** Subclass 1 means Cloth on head, shoulders, chest, waist, legs, feet,
+wrists and hands. On `slot` 15 it means *cloak*, an item every class wears.
+The addon sends what `GetItemInfoInstant` returned and interprets neither; a
+consumer that tests the subclass against a class's armor proficiency must
+first check that the slot is one of the eight, or it will call every cloak in
+a plate wearer's bags unwearable. warband.pro did exactly that until
+2026-08-23, and the verdict rides `wbc1!` back here as a disenchant, so the
+cost of the misreading is a destroyed item rather than a wrong row.
 
 **The 1.3.0 fields never appear on `where:"equipped"` entries.** The website
 resolves an equipped item through the Profile API, which already carries name,

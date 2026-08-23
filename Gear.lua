@@ -116,7 +116,11 @@ function Gear.Visit(where, bagID, slot, info, out)
   --   b    soulbound, emitted only when true — absence means NOT bound,
   --        which is the reading the website's BoE guard depends on
   --   cls  item class id  (2 weapon, 4 armor)
-  --   sub  item subclass id (for armor, 1 cloth … 4 plate)
+  --   sub  item subclass id, verbatim — for armor 1 cloth … 4 plate, but
+  --        ONLY on the eight slots that have an armor weight. A cloak
+  --        reports 1 as well and every class wears one, so a consumer
+  --        testing sub against a class proficiency has to check the slot
+  --        first. See docs/CONTRACT.md; this is sent, never interpreted.
   local entry = {
     slot = canonicalSlot,
     where = where,
