@@ -16,27 +16,23 @@ package.path = "./?.lua;" .. package.path
 
 local DIR = "docs/contract/vectors/"
 
--- Enough of the namespace for the pure half to load. Inflate is not
--- re-implemented: the harness reads the already-inflated JSON that Node wrote,
--- so what is under test is our base64url, our JSON and our validation.
-local ns = {
-  WIRE = "wb1!",
-  CLEANUP_WIRE = "wbc1!",
-  safe = function(fn, a, b, c)
-    local ok, r = pcall(fn, a, b, c)
-    if ok then return r end
-    return nil
-  end,
-}
+-- The namespace comes from the shipped Init.lua rather than being restated
+-- here. It used to be restated, and that masked a real defect: this fixture
+-- defined ns.CLEANUP_WIRE while no shipped file did, so the decoder passed
+-- every test and errored on the first real paste. A fixture that restates the
+-- contract cannot catch the shipped file failing to meet it. Inflate is still
+-- not re-implemented — the harness reads the already-inflated JSON that Node
+-- wrote, so what is under test is our base64url, our JSON and our validation.
+-- Init.lua keeps a pre-set ns.LibDeflate, so the stub goes in first.
+local ns = {}
 local inflated = nil
 ns.LibDeflate = {
   DecompressDeflate = function(_, _)
     return inflated
   end,
 }
-
-local chunk = assert(loadfile("Import.lua"))
-chunk("WarbandPro", ns) -- WoW's `local _, ns = ...`
+assert(loadfile("Init.lua"))("WarbandPro", ns)   -- WoW's `local _, ns = ...`
+assert(loadfile("Import.lua"))("WarbandPro", ns)
 local Import = ns.Import
 
 local pass, fail = 0, 0
