@@ -23,6 +23,47 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-08-23 — item names on the wire
+
+**warband.pro cannot look up an item name.** It never could: resolving one
+means a Game Data call per item id, which is the cost its item search avoids
+by resolving your *query* instead of your inventory. That was fine while the
+only question asked of `gear[]` was "is this a bigger number than what I am
+wearing" — a slot and an item level answer it. It stops being fine the moment
+the site wants to show you a list of items and ask which ones to get rid of,
+because a list of `item_212018` is not a list anyone can read.
+
+The name was in the addon's hands the whole time. Every gear entry is built
+from a hyperlink, the item string comes out of it with a `match`, and the name
+sits in the same link one `match` further on. It now rides along, with four
+other facts that were equally already in hand:
+
+### Added
+
+- `gear[].n` — the item's name, read from the hyperlink the item string already
+  came from. Not `GetItemInfo`, which is asynchronous and may not have answered
+  yet when a scan runs.
+- `gear[].q` — quality, 0 through 5, for bag, bank and warband-bank items.
+- `gear[].b` — `true` when the item is soulbound. Sent only when true, the same
+  way `bags[].items[]` has always carried it.
+- `gear[].cls` and `gear[].sub` — item class and subclass, from the
+  `GetItemInfoInstant` lookup that was already being made to work out which slot
+  the item belongs to. These say "this is plate" so the website can work out
+  that your druid is carrying a helm they cannot wear.
+
+All five are optional and additive on `wb1!`. An older warband.pro reading a
+newer string does not see them; a newer one reading an older string treats them
+as not looked at, which is not the same as empty.
+
+Measured on the six-character sample: **+0.85KB of JSON and +0.15KB of wire per
+character**, or about +3KB of wire at the 20-character cap. Names repeat their
+words across a warband and deflate folds the repeats.
+
+Nothing was removed from what gets sent, and nothing started being filtered.
+`gear[]` has always carried items the character cannot equip — it sorts by
+where an item goes, not by who can wear it — and until now the website had no
+way to tell.
+
 ### Fixed
 
 - A ding is noticed when it happens. `Scan.Identity` — the pass that reads your

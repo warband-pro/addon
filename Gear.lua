@@ -47,6 +47,18 @@ local function itemString(link)
   return link:match("|H(item[^|]+)|h")
 end
 
+-- The display name out of the same hyperlink the item string came from. The
+-- website has no item-id-to-name lookup of its own — resolving one would be a
+-- Game Data call per item — and the link is already in hand here, so the name
+-- rides along for the cost of a second match rather than an async
+-- GetItemInfo that may not have loaded yet.
+local function itemName(link)
+  if type(link) ~= "string" then return nil end
+  local name = link:match("|h%[(.-)%]|h")
+  if name == "" then return nil end
+  return name
+end
+
 -- Stable top-level functions rather than a closure built per item: these ran
 -- once per equipped slot and once per occupied bag/bank/warbank slot, and a
 -- fresh closure for each call was pure allocation for something ns.safe's
@@ -71,12 +83,17 @@ function Gear.Equipped()
     local link = ns.safe(GetInventoryItemLink, "player", slot)
     local s = itemString(link)
     if s then
+      local id = ns.safe(GetInventoryItemID, "player", slot)
+      local itemInfo = id and ns.itemInfo(id)
       out[#out + 1] = {
         slot = slot,
         where = "equipped",
-        id = ns.safe(GetInventoryItemID, "player", slot),
+        id = id,
         ilvl = equippedItemLevel(slot),
         s = s,
+        n = itemName(link),
+        cls = itemInfo and itemInfo.classID or nil,
+        sub = itemInfo and itemInfo.subclassID or nil,
       }
     end
   end
@@ -102,6 +119,14 @@ function Gear.Visit(where, bagID, slot, info, out)
     id = info.itemID,
     ilvl = containerItemLevel(bagID, slot),
     s = s,
+    n = itemName(info.hyperlink),
+    q = info.quality,
+    -- Emitted only when true, matching how bags[].items carries isBound: an
+    -- absent flag is "not bound", and a false on every unbound item in the
+    -- bundle is bytes spent saying nothing.
+    b = info.isBound and true or nil,
+    cls = itemInfo.classID,
+    sub = itemInfo.subclassID,
   }
 end
 

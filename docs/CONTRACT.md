@@ -175,7 +175,8 @@ against an equipment document that only refreshes at the wearer's last logout.
 ### `gear[]` — one flat array per character
 
 ```json
-{"slot":1,"where":"equipped","id":212018,"ilvl":639,
+{"slot":1,"where":"equipped","id":212018,"ilvl":639,"n":"Aureate Sentry's Greathelm",
+ "cls":4,"sub":4,
  "s":"item:212018::::::::80:250::9:6:12053:10390:1520:10255:1:28:2462:::"}
 ```
 
@@ -186,6 +187,11 @@ against an equipment document that only refreshes at the wearer's last logout.
 | `id` | The item's numeric id. Redundant with the id embedded in `s`; kept so the website can resolve name/icon/filter without parsing the string. Deflate folds the duplication. |
 | `ilvl` | `C_Item.GetCurrentItemLevel` at capture time — upgrade track, crest investment and all, which a bare item id cannot tell you. Optional; omitted if the client could not answer. |
 | `s` | The item string, **verbatim**: everything between `\|H` and `\|h` in the hyperlink. Not decomposed — see below. |
+| `n` | Display name, read out of the same hyperlink (`\|h[Name]\|h`). Added 1.3.0. Optional — omitted when the link carried none. |
+| `q` | Numeric quality, 0 Poor … 5 Legendary, straight off `C_Container.GetContainerItemInfo`. Added 1.3.0. Bag/bank/warbank only — an equipped item’s quality is not sent, since nothing judges what is already worn. |
+| `b` | `true` when the item is soulbound. Added 1.3.0. **Emitted only when true**, matching `bags[].items[]` — an absent flag means not bound. Bag/bank/warbank only. |
+| `cls` | Item class id (`GetItemInfoInstant` position 6; 2 = Weapon, 4 = Armor). Added 1.3.0. |
+| `sub` | Item subclass id (position 7; for armor, 1 = Cloth … 4 = Plate). Added 1.3.0. |
 
 **Cosmetic slots are excluded everywhere**: shirt (4) and tabard (19) never
 appear, matching the website's `SLOTS` table in `gear.ts`.
@@ -209,6 +215,29 @@ any off-hand-family item (shield, held item, off-hand weapon) on 17 — the
 addon cannot know which of the two ring slots a bagged ring would go in, so it
 does not guess. A character can therefore have more than one `gear[]` entry at
 `slot: 11`, one `where: "equipped"` and others `where: "bag"` or `"bank"`.
+
+**`n`, `q`, `b`, `cls` and `sub` were added in 1.3.0 for the cleanup feature**
+(`wbc1!`, below). All five are additive on `wb1!` and optional: an older
+website reading a newer bundle simply does not see them, and a newer website
+reading an older bundle must treat their absence as "not looked at" rather
+than as a value — the same rule every other optional field carries.
+
+The name is the load-bearing one. The website has no item-id-to-name lookup at
+all: resolving one means a Game Data call per item id, which is exactly the
+cost item search avoids by resolving the *query* instead. A cleanup list is the
+opposite shape — it starts from inventory — so a name already sitting in the
+hyperlink here saves a call per row there. It is read with a second `match` on
+the link the item string already came from, not from `GetItemInfo`, which is
+async and may not have loaded when the scan runs.
+
+`cls`/`sub` come from `ns.itemInfo`, which memoizes `GetItemInfoInstant` per
+item id for the session and was already being called to classify the slot — so
+both fields cost nothing beyond the bytes. They exist so the website can judge
+whether *this* character can wear an item without shipping an armor-class table
+or an equippable-items dump: **the addon does not filter gear by what the
+character can use**, it never has, and `EQUIPLOC_SLOT` gates on equip location
+only. A plate chest in a druid’s bag has always been on the wire; until 1.3.0
+the website had no way to know it was plate.
 
 **Duplication with `bags[].items[]` is deliberate.** A gear piece sitting in a
 bag appears twice in the payload: once as a plain `{id, count}` stack in the
@@ -482,6 +511,27 @@ carry over to the heavier synthetic warband the 1/6/20 table used: **~512KB
 JSON / ~84KB wire at the 20-character cap**, still well inside the 1MB decoded
 limit. `talents` costs one loadout string per known spec and is small relative
 to gear.
+
+### What 1.3.0's five fields add, measured
+
+Same six-character roster again, `tools/sample.mjs` before and after. The
+sample also grew two deliberately-junk bag entries per character in 1.3.0 — a
+list of nothing tests nothing — so the two effects are separated here rather
+than reported as one number:
+
+| | JSON | wire |
+|---|---|---|
+| 1.2.0 | 82.3KB | 16.4KB |
+| + `n`/`q`/`b`/`cls`/`sub` on the same entries | 87.4KB | 17.3KB |
+| + two junk bag entries per character | 89.2KB | 17.7KB |
+| **field delta for 6 characters** | **+5.1KB** | **+0.9KB** |
+| **field delta per character** | **~+0.85KB** | **~+0.15KB** |
+
+The name is nearly all of it, and it still deflates well — names repeat their
+vocabulary across a warband, which is exactly what a 32KB window is good at.
+Carried to the 20-character cap the five fields cost roughly **+3KB wire**,
+landing near ~87KB against the same 1MB decoded ceiling. Nothing here moves a
+cap.
 
 ## Sample vectors
 
