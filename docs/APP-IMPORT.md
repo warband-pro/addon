@@ -118,3 +118,33 @@ labelled with `seenByName`: "Warband Bank 1h ago (by Vocnar)".
 Staleness lowers confidence, it never deletes. The Tonight Plan reads the same
 stamps: zero phials on a fresh snapshot is a hard block, zero phials on a
 five-day-old snapshot is grey text asking you to verify.
+
+## The return direction — `wbc1!`
+
+Everything above is `/app` receiving. Cleanup makes it also *send*, and the
+website side of that is small because the shape is the reverse of what it
+already had:
+
+| Piece | Where |
+| --- | --- |
+| `src/lib/cleanup.ts` | `cleanupAudit()` — the verdicts, pure. `encodeCleanupString()` — canonical JSON, raw deflate, base64url, `wbc1!`. |
+| `src/lib/warband-import.ts` | Recognises a `wbc1!` paste and rejects it with `is_cleanup_string`, pointing at `/warband junk`. |
+| `docs/contract/vectors/wbc1-min.wbc1` | The golden vector both encoders are tested against. |
+
+Three things worth stating for whoever writes the next consumer, all of them
+recorded in full in [CONTRACT.md](CONTRACT.md):
+
+1. **Verdicts are computed in the browser, not on the server.** The `/gear`
+   page already fetches full `CharacterGear` documents and already runs
+   `auditGear()` over them client-side, so cleanup is another pure function
+   over data that is on the page — and a threshold change recomputes with no
+   round trip. The "ask the question server-side" precedent from item search
+   does not apply here: that exists because search needed Game Data to resolve
+   *names*, and names now ride the wire.
+2. **No migration, and none is needed.** Options and per-item exclusions are
+   preferences, not facts, and persist in `localStorage` beside the existing
+   `/gear` filter state. Nothing about cleanup is stored in D1.
+3. **The `guid` is the key, not `char_key`.** `char_key` is this app's own
+   `realm-slug:name` convention; the addon's SavedVariables are keyed by
+   `UnitGUID`. The bundle already carries it, so the return string uses it and
+   neither side has to translate.
