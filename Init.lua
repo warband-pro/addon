@@ -9,6 +9,11 @@ _G.WarbandPro = ns          -- one deliberate global, for /dump and QA macros
 ns.ADDON      = ADDON
 ns.WIRE       = "wb1!"      -- wb0! is Camp DNA. Gear and talents also live on wb1!, additively; wb2! stays reserved.
 ns.WIRE_V     = 1
+-- The return direction: what warband.pro hands back for /warband junk. Its own
+-- namespace rather than the reserved wb2!, which is for a breaking bump of the
+-- wire above — this is a different channel and versions on its own schedule.
+ns.CLEANUP_WIRE   = "wbc1!"
+ns.CLEANUP_WIRE_V = 1
 ns.MAX_CHARS  = 20          -- CONTRACT.md rejects a bundle larger than this
 ns.SOFT_BYTES = 20480       -- past this the panel warns instead of pretending
 

@@ -15,6 +15,7 @@ local frame = CreateFrame("Frame", "WarbandProEventFrame")
 -- so ask for each one on its own and let the ones that exist stick.
 local EVENTS = {
   "ADDON_LOADED", "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED",
+  "PLAYER_REGEN_DISABLED", "MERCHANT_SHOW", "MERCHANT_CLOSED",
   "PLAYER_LEVEL_UP", "PLAYER_LEVEL_CHANGED",
   "PLAYER_MONEY", "BAG_UPDATE", "BAG_UPDATE_DELAYED",
   "CURRENCY_DISPLAY_UPDATE", "CURRENCY_TRANSFER_LOG_UPDATE",
@@ -94,7 +95,12 @@ ns.onDirty("bag", function()
   Instances.Keystone()   -- the key is an item; it moves when bags move
 end)
 handlers.BAG_UPDATE = function() ns.dirty("bag") end
-handlers.BAG_UPDATE_DELAYED = function() ns.dirty("bag") end
+handlers.BAG_UPDATE_DELAYED = function()
+  ns.dirty("bag")
+  -- Only while the panel is up: this is a re-render of something on screen,
+  -- not a scan, and it must not become a fourth walk that runs all session.
+  if UI.JunkIsShown() then ns.throttle("junk", 0.3, UI.RenderJunk) end
+end
 
 local function currencies()
   ns.throttle("currency", 1, Scan.Currencies)
@@ -167,6 +173,33 @@ handlers.PLAYER_REGEN_ENABLED = function()
     UI.pending = nil
     UI.Show(mode)
   end
+  -- Reopened either because the fight interrupted it or because it was asked
+  -- for mid-pull. Both land here so the panel comes back exactly once.
+  if UI.reopenJunk or UI.pendingJunk then
+    UI.reopenJunk, UI.pendingJunk = nil, nil
+    UI.ShowJunk()
+  end
+end
+
+-- Secure attributes cannot be written in combat, so the clear-out panel closes
+-- rather than going stale behind the player — the same fail-closed posture the
+-- export panel takes, for a sharper reason: a stale row holds a bag slot, and a
+-- bag slot that moved is the wrong item.
+handlers.PLAYER_REGEN_DISABLED = function()
+  UI.JunkCombatLockdown()
+end
+
+-- Selling is the one thing this addon does that changes the game, and it is
+-- possible only while a merchant window is open. The flag is set from the
+-- event rather than read from a frame, so nothing has to guess.
+handlers.MERCHANT_SHOW = function()
+  ns.Junk.merchantOpen = true
+  if UI.JunkIsShown() then UI.RenderJunk() end
+end
+
+handlers.MERCHANT_CLOSED = function()
+  ns.Junk.merchantOpen = false
+  if UI.JunkIsShown() then UI.RenderJunk() end
 end
 
 frame:SetScript("OnEvent", function(_, event, arg1)
@@ -257,13 +290,15 @@ SlashCmdList.WARBANDPRO = function(msg)
     else
       ns.print("saved data not loaded yet")
     end
+  elseif cmd == "junk" or cmd == "clean" then
+    UI.ToggleJunk()
   elseif cmd == "perf" then
     ns.Perf.Report()
   elseif cmd == "perf reset" then
     ns.Perf.Reset()
     ns.print("perf counters reset")
   else
-    ns.print("/warband · /warband copy current · /warband status · /warband optimize · "
-      .. "/warband clear <name> · /warband gear on|off · /warband perf")
+    ns.print("/warband · /warband copy current · /warband junk · /warband status · "
+      .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband perf")
   end
 end

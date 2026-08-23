@@ -40,7 +40,7 @@ read_globals = {
   "GetAverageItemLevel", "GetGuildInfo", "GetMoney",
 
   -- inventory, currency, professions, mail, auctions
-  "C_Container", "C_Item", "GetItemInfoInstant", "Enum", "C_Bank",
+  "C_Container", "C_Item", "GetItemInfoInstant", "Enum", "C_Bank", "C_Spell",
   "C_CurrencyInfo", "GetProfessions", "GetProfessionInfo",
   "GetInboxNumItems", "GetInboxHeaderInfo", "C_AuctionHouse",
 

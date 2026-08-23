@@ -128,6 +128,20 @@ end
 -- Account-wide orphan guard: if the forgotten character was the one who last
 -- saw the warbank, clear the attribution — the vault tabs are account-wide
 -- and remain, but "by Vocnar" must not point at a deleted GUID.
+--- Drop stored cleanup lists for characters that no longer exist.
+---
+--- A junk list is keyed by guid like everything else, so forgetting a character
+--- without this leaves a list nothing can ever render and nothing can ever
+--- clear — the same orphan the warband bank's attribution would become, handled
+--- in the same two places for the same reason.
+function Store.DropJunk(removedGuids)
+  local junk = Store.db and Store.db.junk
+  if not junk then return end
+  for guid in pairs(removedGuids) do
+    junk[guid] = nil
+  end
+end
+
 function Store.Forget(name)
   if not Store.Ready() or type(name) ~= "string" or name == "" then return 0 end
   local want, removed = name:lower(), 0
@@ -145,6 +159,7 @@ function Store.Forget(name)
       wb.seenByGuid = nil
       wb.seenByName = nil
     end
+    Store.DropJunk(removedGuids)
     Store.Touch()
   end
   return removed
@@ -175,6 +190,7 @@ function Store.Prune()
     wb.seenByName = nil
     cleared = true
   end
+  Store.DropJunk(removedGuids)
   if removed > 0 or cleared then
     Store.Touch()
   end
