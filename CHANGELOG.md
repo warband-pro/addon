@@ -23,6 +23,35 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+### Changed
+
+- One window instead of two. `/warband` opens a tabbed panel now — Export,
+  Import, Options along the bottom, the way the game's own panels do it. It
+  is built from Blizzard's frame templates, so it follows your UI scale and
+  font settings without a scale option of its own.
+- `/warband junk` goes to the Import tab; the clear-out list, its paste box,
+  Sell and Disenchant all live there and work as before. Esc still closes,
+  the export string still selects itself.
+- Combat now closes only the Import tab (its buttons cannot be rewritten
+  mid-fight). An export string left open through a ready-check stays open.
+
+### Added
+
+- An Options tab. Gear capture and item links were slash-and-SavedVariables
+  toggles before; they are checkboxes now, and `/warband gear on|off` still
+  works.
+- Open the clear-out list at merchants — off by default. When a merchant
+  window opens and the list has something in your bags, the Import tab opens
+  by itself and closes when you leave the merchant.
+- `/warband options` opens the window on that tab.
+
+### Fixed
+
+- Pasting a cleanup string into the clear-out panel errored before the
+  decoder ever ran: the `wbc1!` prefix constant was defined in the test
+  fixture but not in the addon. The tests now load the shipped file instead
+  of restating it.
+
 ## [1.4.0] — 2026-08-23 — the clear-out panel
 
 **The first thing warband.pro has ever sent back.** Until now this addon only

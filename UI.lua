@@ -1,109 +1,117 @@
 -- WarbandPro / UI.lua
--- One panel. Blizzard widgets only, no XML, no templates beyond the three
--- Blizzard has shipped for a decade, no tooltip hooks, no minimap button.
+-- One window, three tabs: Export, Import, Options. Built entirely from the
+-- templates Blizzard's own panels use — ButtonFrameTemplate for the chrome,
+-- PanelTabButtonTemplate for the tabs, InputBoxTemplate and InsetFrameTemplate
+-- inside — so the window looks like the game and inherits whatever the player
+-- has set: UI scale, font scale, colorblind text. No hand-rolled backdrop, no
+-- pixel skin of our own.
 --
--- The whole job is: show what the bundle contains and how stale it is, then put
--- the string somewhere Ctrl+C can reach it. WoW has no SetClipboard, so an
--- auto-highlighted multiline EditBox is the only path that works.
+-- The two jobs have not changed. Export: show what the bundle contains and how
+-- stale it is, then put the string somewhere Ctrl+C can reach it — WoW has no
+-- SetClipboard, so an auto-highlighted multiline EditBox is the only path that
+-- works. Import: take the string warband.pro sends back and turn it into a
+-- clear-out list with live Sell and Disenchant buttons.
+--
+-- The two paste rules survive the merge into one window because they belong to
+-- widgets, not frames. The export box is copied FROM and reverts anything
+-- typed into it, so a broken paste never reaches the website; the import box
+-- is pasted INTO and its text is the player's. Two widgets on two tabs, each
+-- carrying its own rule unconditionally.
 
 local _, ns = ...
 
 local UI = {}
 ns.UI = UI
 
+-- Native text colors, not the website's: this window lives inside the game's
+-- own chrome now, so the freshness dots use the client's traffic-light palette
+-- and the muted lines use its gray.
 local DOT = {
-  green  = "|cff50fa7b*|r",
-  yellow = "|cfff1fa8c*|r",
-  red    = "|cffff5555*|r",
-  never  = "|cff6272a4*|r",
+  green  = "|cff00ff00*|r",
+  yellow = "|cffffd100*|r",
+  red    = "|cffff2020*|r",
+  never  = "|cff808080*|r",
 }
+local MUTED, WARN, BAD = "808080", "ffd100", "ff2020"
 
-local MAX_ROWS = 10
-local frame, editBox, scroll, header, footer, rows
-
--- The junk panel's own widgets. A second frame rather than a mode on the first:
--- the export panel exists to be copied FROM and reverts anything typed into it,
--- and this one exists to be pasted INTO. One frame doing both would need that
--- rule to be conditional, which is the kind of conditional that eventually
--- eats a paste.
+local TAB_EXPORT, TAB_IMPORT, TAB_OPTIONS = 1, 2, 3
+local MAX_ROWS = 8
 local JUNK_ROWS = 12
-local junkFrame, junkPaste, junkHeader, junkFooter, junkRows, junkScroll, junkChild
 
-local function backdrop(f)
-  local bg = f:CreateTexture(nil, "BACKGROUND")
-  bg:SetAllPoints(f)
-  bg:SetColorTexture(0.043, 0.047, 0.071, 0.96)
-  for _, edge in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
-    local line = f:CreateTexture(nil, "BORDER")
-    line:SetColorTexture(0.27, 0.28, 0.35, 1)
-    if edge == "TOP" or edge == "BOTTOM" then
-      line:SetHeight(1)
-      line:SetPoint(edge .. "LEFT")
-      line:SetPoint(edge .. "RIGHT")
-    else
-      line:SetWidth(1)
-      line:SetPoint("TOP" .. edge)
-      line:SetPoint("BOTTOM" .. edge)
-    end
+local frame, panels, tabs
+local editBox, header, footer, rows
+local junkPaste, junkHeader, junkFooter, junkRows, junkChild
+local optionChecks = {}
+
+UI.mode = "bundle"
+
+-- ── window chrome ───────────────────────────────────────────────────────────
+
+local function makeTab(i, text)
+  local tab = CreateFrame("Button", "WarbandProFrameTab" .. i, frame, "PanelTabButtonTemplate")
+  tab:SetID(i)
+  tab:SetText(text)
+  if i == 1 then
+    tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 12, 2)
+  else
+    tab:SetPoint("TOPLEFT", tabs[i - 1], "TOPRIGHT", 3, 0)
   end
+  tab:SetScript("OnClick", function(self)
+    if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB) end
+    UI.SelectTab(self:GetID())
+  end)
+  PanelTemplates_TabResize(tab, 0)
+  return tab
 end
 
-local function build()
-  if frame then return frame end
+local function makePanel()
+  local p = CreateFrame("Frame", nil, frame)
+  p:SetPoint("TOPLEFT", frame.Inset, "TOPLEFT", 10, -8)
+  p:SetPoint("BOTTOMRIGHT", frame.Inset, "BOTTOMRIGHT", -10, 8)
+  p:Hide()
+  return p
+end
 
-  frame = CreateFrame("Frame", "WarbandProExportFrame", UIParent)
-  frame:SetSize(520, 460)
-  frame:SetPoint("CENTER")
-  frame:SetFrameStrata("DIALOG")
-  frame:SetToplevel(true)
-  frame:EnableMouse(true)
-  frame:SetMovable(true)
-  frame:RegisterForDrag("LeftButton")
-  frame:SetScript("OnDragStart", frame.StartMoving)
-  frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-  frame:Hide()
-  backdrop(frame)
-  tinsert(UISpecialFrames, "WarbandProExportFrame")   -- Esc closes
+-- A recessed well for text, the same InsetFrameTemplate the character pane
+-- nests for its stats block.
+local function makeWell(parent)
+  local well = CreateFrame("Frame", nil, parent, "InsetFrameTemplate")
+  return well
+end
 
-  local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  title:SetPoint("TOPLEFT", 16, -14)
-  title:SetText("warband.pro")
+-- ── export tab ──────────────────────────────────────────────────────────────
 
-  local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -4, -4)
+local function buildExport()
+  local p = panels[TAB_EXPORT]
 
-  header = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  header:SetPoint("TOPLEFT", 16, -36)
-  header:SetPoint("TOPRIGHT", -16, -36)
+  header = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  header:SetPoint("TOPLEFT")
+  header:SetPoint("TOPRIGHT")
   header:SetJustifyH("LEFT")
 
   rows = {}
   for i = 1, MAX_ROWS do
-    local row = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row:SetPoint("TOPLEFT", 16, -54 - (i - 1) * 14)
-    row:SetPoint("TOPRIGHT", -16, -54 - (i - 1) * 14)
+    local row = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row:SetPoint("TOPLEFT", 0, -18 - (i - 1) * 14)
+    row:SetPoint("TOPRIGHT", 0, -18 - (i - 1) * 14)
     row:SetJustifyH("LEFT")
     rows[i] = row
   end
 
-  -- The well is created before the scroll frame on purpose: siblings get their
-  -- frame level from creation order, and a backdrop made afterwards would paint
-  -- over the very string this panel exists to show.
-  local well = CreateFrame("Frame", nil, frame)
-  well:SetPoint("TOPLEFT", 10, -200)
-  well:SetPoint("BOTTOMRIGHT", -28, 86)
-  backdrop(well)
+  local well = makeWell(p)
+  well:SetPoint("TOPLEFT", 0, -18 - MAX_ROWS * 14 - 6)
+  well:SetPoint("BOTTOMRIGHT", -20, 36)
 
-  scroll = CreateFrame("ScrollFrame", "WarbandProExportScroll", frame, "UIPanelScrollFrameTemplate")
-  scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 6, -6)
-  scroll:SetPoint("BOTTOMRIGHT", well, "BOTTOMRIGHT", -6, 6)
+  local scroll = CreateFrame("ScrollFrame", "WarbandProExportScroll", p, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 8, -8)
+  scroll:SetPoint("BOTTOMRIGHT", well, "BOTTOMRIGHT", -8, 8)
 
   editBox = CreateFrame("EditBox", nil, scroll)
   editBox:SetMultiLine(true)
   editBox:SetMaxLetters(0)          -- Blizzard's default cap would truncate us
   editBox:SetAutoFocus(false)
   editBox:SetFontObject(ChatFontNormal)
-  editBox:SetWidth(452)
+  editBox:SetWidth(470)
   editBox:SetScript("OnEscapePressed", function() frame:Hide() end)
   -- The string is not editable in any useful sense; if the user types into it,
   -- put it back rather than let a broken paste reach the website. SetText from
@@ -116,39 +124,81 @@ local function build()
   end)
   scroll:SetScrollChild(editBox)
 
-  local help = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  help:SetPoint("BOTTOMLEFT", 16, 48)
-  help:SetPoint("BOTTOMRIGHT", -16, 48)
+  local help = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  help:SetPoint("BOTTOMLEFT", 0, 18)
+  help:SetPoint("BOTTOMRIGHT", 0, 18)
   help:SetJustifyH("LEFT")
   help:SetText("1. Ctrl+C copies (already selected)   2. warband.pro > Import, or Ctrl+V   3. Esc closes")
 
-  footer = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  footer:SetPoint("BOTTOMLEFT", 16, 18)
+  footer = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  footer:SetPoint("BOTTOMLEFT", 0, 2)
   footer:SetJustifyH("LEFT")
 
-  local selectAll = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-  selectAll:SetSize(110, 22)
-  selectAll:SetPoint("BOTTOMRIGHT", -16, 12)
+  local selectAll = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  selectAll:SetSize(96, 22)
+  selectAll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 6)
   selectAll:SetText("Select all")
   selectAll:SetScript("OnClick", function()
     editBox:SetFocus()
     editBox:HighlightText()
   end)
-
-  frame:SetScript("OnShow", function()
-    -- Highlighting only sticks once the frame has actually drawn.
-    C_Timer.After(0, function()
-      if frame:IsShown() then
-        editBox:SetFocus()
-        editBox:HighlightText()
-      end
-    end)
-  end)
-
-  return frame
 end
 
--- ── the junk panel ──────────────────────────────────────────────────────────
+local function renderRows(summary)
+  for i = 1, MAX_ROWS do rows[i]:SetText("") end
+  if #summary == 0 then
+    rows[1]:SetText("|cff" .. MUTED .. "No characters scanned yet — log in on a character and it lands here.|r")
+    return
+  end
+  local shown = math.min(#summary, MAX_ROWS)
+  for i = 1, shown do
+    local r = summary[i]
+    local line = format("%s %s|cff%s-%s|r  %s", DOT[r.dot] or DOT.never, r.name, MUTED, r.realm or "?", r.ago)
+    if r.bankAgo ~= "never" then line = line .. format("  |cff%sbank %s|r", MUTED, r.bankAgo) end
+    rows[i]:SetText(line)
+  end
+  if #summary > MAX_ROWS then
+    rows[MAX_ROWS]:SetText(format("|cff%s+%d more in the bundle|r", MUTED, #summary - MAX_ROWS + 1))
+  end
+end
+
+local function refreshExport()
+  local str, bytes, payload, rawBytes = ns.Export.Build({ currentOnly = UI.mode == "current" })
+  UI.current = str or ""
+  editBox:SetText(UI.current)
+
+  local summary = ns.Bundle.Summary(payload)
+  renderRows(summary)
+
+  if not str then
+    header:SetText("|cff" .. BAD .. "Could not build the bundle|r — /warband status has the detail")
+    footer:SetText("")
+  else
+    local wb = ns.Store.db and ns.Store.db.warbandBank
+    local bank = (wb and wb.seenAt)
+      and format("  ·  warband bank %s (by %s)", ns.ago(wb.seenAt), wb.seenByName or "?")
+      or "  ·  warband bank never seen"
+    header:SetText(format("%d character%s  ·  freshest %s%s",
+      #summary, #summary == 1 and "" or "s",
+      #summary > 0 and ns.ago(payload.bundle.freshestSeenAt) or "never", bank))
+    local note = bytes > ns.SOFT_BYTES and format("  |cff%s(large — try /warband copy current)|r", WARN) or ""
+    footer:SetText(format("|cff%s%s  ·  %d bytes from %d of JSON|r%s", MUTED, ns.WIRE, bytes, rawBytes or 0, note))
+    -- Stamped here rather than in Export.Build, so /warband status can report
+    -- when a string was last put in front of the user instead of resetting the
+    -- answer every time it is asked.
+    if ns.Store.Ready() then ns.Store.db.lastExport = ns.now() end
+  end
+
+  -- Highlighting only sticks once the frame has actually drawn.
+  C_Timer.After(0, function()
+    if frame:IsShown() and panels[TAB_EXPORT]:IsShown() then
+      editBox:SetFocus()
+      editBox:HighlightText()
+    end
+  end)
+end
+
+-- ── import tab ──────────────────────────────────────────────────────────────
 
 local QUALITY_HEX = {
   [0] = "9d9d9d", [1] = "ffffff", [2] = "1eff00", [3] = "0070dd",
@@ -169,17 +219,17 @@ local function buildJunkRow(parent, i)
 
   row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   row.label:SetPoint("LEFT", 2, 0)
-  row.label:SetPoint("RIGHT", row, "RIGHT", -150, 0)
+  row.label:SetPoint("RIGHT", row, "RIGHT", -140, 0)
   row.label:SetJustifyH("LEFT")
   row.label:SetWordWrap(false)
 
   row.sell = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
   row.sell:SetSize(52, 16)
-  row.sell:SetPoint("RIGHT", -76, 0)
+  row.sell:SetPoint("RIGHT", -80, 0)
   row.sell:SetText("Sell")
 
   row.de = CreateFrame("Button", "WarbandProJunkDE" .. i, row, "SecureActionButtonTemplate,UIPanelButtonTemplate")
-  row.de:SetSize(72, 16)
+  row.de:SetSize(76, 16)
   row.de:SetPoint("RIGHT", -2, 0)
   row.de:SetText("Disenchant")
   row.de:RegisterForClicks("AnyUp", "AnyDown")
@@ -187,48 +237,30 @@ local function buildJunkRow(parent, i)
   return row
 end
 
-local function buildJunk()
-  if junkFrame then return junkFrame end
+local function buildImport()
+  local p = panels[TAB_IMPORT]
 
-  junkFrame = CreateFrame("Frame", "WarbandProJunkFrame", UIParent)
-  junkFrame:SetSize(520, 420)
-  junkFrame:SetPoint("CENTER", 60, -30)
-  junkFrame:SetFrameStrata("DIALOG")
-  junkFrame:SetToplevel(true)
-  junkFrame:EnableMouse(true)
-  junkFrame:SetMovable(true)
-  junkFrame:RegisterForDrag("LeftButton")
-  junkFrame:SetScript("OnDragStart", junkFrame.StartMoving)
-  junkFrame:SetScript("OnDragStop", junkFrame.StopMovingOrSizing)
-  junkFrame:Hide()
-  backdrop(junkFrame)
-  tinsert(UISpecialFrames, "WarbandProJunkFrame")
+  local intro = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  intro:SetPoint("TOPLEFT")
+  intro:SetPoint("TOPRIGHT")
+  intro:SetJustifyH("LEFT")
+  intro:SetText("Paste the cleanup string from warband.pro/gear — it reads itself.")
 
-  local title = junkFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  title:SetPoint("TOPLEFT", 16, -14)
-  title:SetText("warband.pro  ·  clear out")
-
-  local close = CreateFrame("Button", nil, junkFrame, "UIPanelCloseButton")
-  close:SetPoint("TOPRIGHT", -4, -4)
-
-  -- The paste box. No OnTextChanged revert here — that rule belongs to the
-  -- export panel, whose text is ours. This one's text is the player's.
-  local well = CreateFrame("Frame", nil, junkFrame)
-  well:SetPoint("TOPLEFT", 12, -38)
-  well:SetPoint("TOPRIGHT", -12, -38)
-  well:SetHeight(26)
-  backdrop(well)
-
-  junkPaste = CreateFrame("EditBox", nil, well)
-  junkPaste:SetPoint("TOPLEFT", 6, -5)
-  junkPaste:SetPoint("BOTTOMRIGHT", -6, 5)
+  -- The native single-line input, not a bare EditBox: InputBoxTemplate carries
+  -- the recessed border every stock text field wears.
+  junkPaste = CreateFrame("EditBox", nil, p, "InputBoxTemplate")
+  junkPaste:SetPoint("TOPLEFT", 6, -18)
+  junkPaste:SetPoint("TOPRIGHT", -2, -18)
+  junkPaste:SetHeight(20)
   junkPaste:SetAutoFocus(false)
   junkPaste:SetMaxLetters(0)
   junkPaste:SetFontObject(ChatFontNormal)
   junkPaste:SetScript("OnEscapePressed", function(self)
     self:ClearFocus()
-    junkFrame:Hide()
+    frame:Hide()
   end)
+  -- No revert here — that rule belongs to the export box, whose text is ours.
+  -- This one's text is the player's.
   junkPaste:SetScript("OnTextChanged", function(self, userInput)
     if not userInput then return end
     local text = self:GetText()
@@ -238,7 +270,7 @@ local function buildJunk()
       -- Only complain once the paste looks finished. A prefix typed one
       -- character at a time would otherwise scold on every keystroke.
       if text:sub(1, #ns.CLEANUP_WIRE) == ns.CLEANUP_WIRE or #text > 24 then
-        junkHeader:SetText("|cffff5555" .. ns.Import.Message(code) .. "|r")
+        junkHeader:SetText("|cff" .. BAD .. ns.Import.Message(code) .. "|r")
       end
       return
     end
@@ -246,52 +278,49 @@ local function buildJunk()
     self:SetText("")
     self:ClearFocus()
     if kept == 0 then
-      junkHeader:SetText("|cfff1fa8cthat list is for characters this account has not scanned yet|r")
+      junkHeader:SetText("|cff" .. WARN .. "that list is for characters this account has not scanned yet|r")
       return
     end
     UI.RenderJunk()
   end)
 
-  junkHeader = junkFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  junkHeader:SetPoint("TOPLEFT", 16, -72)
-  junkHeader:SetPoint("TOPRIGHT", -16, -72)
+  junkHeader = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  junkHeader:SetPoint("TOPLEFT", 0, -46)
+  junkHeader:SetPoint("TOPRIGHT", 0, -46)
   junkHeader:SetJustifyH("LEFT")
 
-  local list = CreateFrame("Frame", nil, junkFrame)
-  list:SetPoint("TOPLEFT", 10, -90)
-  list:SetPoint("BOTTOMRIGHT", -28, 40)
-  backdrop(list)
+  local well = makeWell(p)
+  well:SetPoint("TOPLEFT", 0, -62)
+  well:SetPoint("BOTTOMRIGHT", -20, 18)
 
-  junkScroll = CreateFrame("ScrollFrame", "WarbandProJunkScroll", junkFrame, "UIPanelScrollFrameTemplate")
-  junkScroll:SetPoint("TOPLEFT", list, "TOPLEFT", 6, -6)
-  junkScroll:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -6, 6)
+  local scroll = CreateFrame("ScrollFrame", "WarbandProJunkScroll", p, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 6, -6)
+  scroll:SetPoint("BOTTOMRIGHT", well, "BOTTOMRIGHT", -6, 6)
 
-  junkChild = CreateFrame("Frame", nil, junkScroll)
-  junkChild:SetSize(452, JUNK_ROWS * 18)
-  junkScroll:SetScrollChild(junkChild)
+  junkChild = CreateFrame("Frame", nil, scroll)
+  junkChild:SetSize(470, JUNK_ROWS * 18)
+  scroll:SetScrollChild(junkChild)
 
   junkRows = {}
   for i = 1, JUNK_ROWS do
     junkRows[i] = buildJunkRow(junkChild, i)
   end
 
-  junkFooter = junkFrame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  junkFooter:SetPoint("BOTTOMLEFT", 16, 16)
-  junkFooter:SetPoint("BOTTOMRIGHT", -16, 16)
+  junkFooter = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  junkFooter:SetPoint("BOTTOMLEFT", 0, 2)
+  junkFooter:SetPoint("BOTTOMRIGHT", 0, 2)
   junkFooter:SetJustifyH("LEFT")
-
-  return junkFrame
 end
 
 --- Redraw the junk list from the live bags.
 ---
 --- Every coordinate a button carries comes from the walk this function just
 --- made, never from storage — see Junk.lua's header for why that is the whole
---- design. Called on open, on a bag change while open, and when a merchant
---- opens or closes.
+--- design. Called on tab select, on a bag change while shown, and when a
+--- merchant opens or closes.
 function UI.RenderJunk()
-  if not junkFrame then return end
-  -- Secure attributes may not be written in combat. The panel hides itself on
+  if not frame then return end
+  -- Secure attributes may not be written in combat. The tab hides itself on
   -- PLAYER_REGEN_DISABLED, so this is the belt to that braces.
   if InCombatLockdown() then return end
 
@@ -313,8 +342,8 @@ function UI.RenderJunk()
         "|cff%s%s|r%s%s",
         hex,
         r.name or "?",
-        r.ilvl and ("  |cff6272a4" .. r.ilvl .. "|r") or "",
-        reason ~= "" and ("  |cff6272a4" .. reason .. "|r") or ""
+        r.ilvl and format("  |cff%s%d|r", MUTED, r.ilvl) or "",
+        reason ~= "" and format("  |cff%s%s|r", MUTED, reason) or ""
       ))
 
       -- Sell is only ever live at a merchant. Off it, the button says why
@@ -348,117 +377,207 @@ function UI.RenderJunk()
     parts[#parts + 1] = format("%d item%s to clear", #rowsData, #rowsData == 1 and "" or "s")
   end
   if missing and missing > 0 then
-    parts[#parts + 1] = format("|cff6272a4%d no longer in your bags|r", missing)
+    parts[#parts + 1] = format("|cff%s%d no longer in your bags|r", MUTED, missing)
   end
   if generatedAt then
-    parts[#parts + 1] = "|cff6272a4list from " .. ns.ago(generatedAt) .. "|r"
+    parts[#parts + 1] = format("|cff%slist from %s|r", MUTED, ns.ago(generatedAt))
   end
   junkHeader:SetText(table.concat(parts, "  ·  "))
 
   if #rowsData > JUNK_ROWS then
-    junkFooter:SetText(format("|cff6272a4showing %d of %d|r", JUNK_ROWS, #rowsData))
+    junkFooter:SetText(format("|cff%sshowing %d of %d|r", MUTED, JUNK_ROWS, #rowsData))
   elseif not ns.Junk.merchantOpen then
-    junkFooter:SetText("|cff6272a4open a merchant to sell  ·  paste a new list any time|r")
+    junkFooter:SetText(format("|cff%sopen a merchant to sell  ·  paste a new list any time|r", MUTED))
   else
-    junkFooter:SetText("|cff6272a4at a merchant — Sell is live|r")
+    junkFooter:SetText(format("|cff%sat a merchant — Sell is live|r", MUTED))
   end
 end
 
-function UI.ShowJunk()
+-- ── options tab ─────────────────────────────────────────────────────────────
+
+--- One native checkbox with a label beside it and a muted description under
+--- it. The label and description are our own FontStrings rather than the
+--- template's, so a template rename cannot silently drop the text.
+local function makeOption(p, y, label, desc, get, set)
+  local check = CreateFrame("CheckButton", nil, p, "UICheckButtonTemplate")
+  check:SetSize(26, 26)
+  check:SetPoint("TOPLEFT", 0, y)
+  check:SetScript("OnClick", function(self) set(self:GetChecked() and true or false) end)
+
+  local text = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  text:SetPoint("LEFT", check, "RIGHT", 4, 0)
+  text:SetText(label)
+
+  local sub = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  sub:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 30, 4)
+  sub:SetPoint("RIGHT", p, "RIGHT", -8, 0)
+  sub:SetJustifyH("LEFT")
+  sub:SetText(desc)
+
+  optionChecks[#optionChecks + 1] = { check = check, get = get }
+  return check
+end
+
+local function buildOptions()
+  local p = panels[TAB_OPTIONS]
+  local opts = function() return ns.Store.db and ns.Store.db.opts end
+
+  makeOption(p, 0,
+    "Capture gear",
+    "Equipped, bag, bank and warband-bank gear — and talents — ride the export string. "
+      .. "Turning this off keeps what is already stored; it is just left out of the next bundle.",
+    function() local o = opts() return o and o.includeGear end,
+    function(v)
+      local o = opts()
+      if not o then return end
+      o.includeGear = v
+      ns.Store.Touch()
+      if v then
+        ns.Scan.Bags()   -- current bag contents; equipped and the rest follow
+        ns.Gear.All()
+      end
+    end)
+
+  makeOption(p, -66,
+    "Include item links",
+    "Full hyperlinks for every bag stack, for debugging a specific item. "
+      .. "Costs about a third more wire.",
+    function() local o = opts() return o and o.includeLinks end,
+    function(v)
+      local o = opts()
+      if not o then return end
+      o.includeLinks = v
+      ns.Store.Touch()
+    end)
+
+  makeOption(p, -132,
+    "Open the clear-out list at merchants",
+    "When a merchant window opens and the cleanup list has something in your bags, "
+      .. "the Import tab opens by itself and closes when you leave the merchant.",
+    function() local o = opts() return o and o.autoJunk end,
+    function(v)
+      local o = opts()
+      if not o then return end
+      o.autoJunk = v
+      ns.Store.Touch()
+    end)
+
+  local version = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  version:SetPoint("BOTTOMLEFT", 0, 2)
+  version:SetPoint("BOTTOMRIGHT", 0, 2)
+  version:SetJustifyH("LEFT")
+  version:SetText(format("Warband.pro Companion v%s  ·  no network calls — the export moves only when you copy it",
+    ns.VERSION))
+end
+
+local function refreshOptions()
+  for _, o in ipairs(optionChecks) do
+    o.check:SetChecked(o.get() and true or false)
+  end
+end
+
+-- ── the window ──────────────────────────────────────────────────────────────
+
+local function build()
+  if frame then return frame end
+
+  frame = CreateFrame("Frame", "WarbandProFrame", UIParent, "ButtonFrameTemplate")
+  frame:SetSize(560, 520)
+  frame:SetPoint("CENTER")
+  frame:SetFrameStrata("DIALOG")
+  frame:SetToplevel(true)
+  frame:EnableMouse(true)
+  frame:SetMovable(true)
+  frame:SetClampedToScreen(true)
+  frame:RegisterForDrag("LeftButton")
+  frame:SetScript("OnDragStart", frame.StartMoving)
+  frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+  frame:Hide()
+  tinsert(UISpecialFrames, "WarbandProFrame")   -- Esc closes
+
+  -- Mixin methods, guarded: a client where PortraitFrame lost one of these
+  -- should cost the title or the icon, never the window.
+  if frame.SetTitle then
+    frame:SetTitle("Warband.pro Companion")
+  elseif frame.TitleContainer and frame.TitleContainer.TitleText then
+    frame.TitleContainer.TitleText:SetText("Warband.pro Companion")
+  end
+  if frame.SetPortraitToAsset then
+    frame:SetPortraitToAsset("Interface\\Icons\\INV_Misc_Bag_10")
+  end
+
+  -- Every panel anchors to the inset. ButtonFrameTemplate has shipped one for
+  -- a decade; if the parentKey ever moves, build our own rather than error.
+  if not frame.Inset then
+    frame.Inset = CreateFrame("Frame", nil, frame, "InsetFrameTemplate")
+    frame.Inset:SetPoint("TOPLEFT", 8, -60)
+    frame.Inset:SetPoint("BOTTOMRIGHT", -8, 30)
+  end
+
+  panels = { makePanel(), makePanel(), makePanel() }
+
+  tabs = {}
+  tabs[TAB_EXPORT]  = makeTab(TAB_EXPORT, "Export")
+  tabs[TAB_IMPORT]  = makeTab(TAB_IMPORT, "Import")
+  tabs[TAB_OPTIONS] = makeTab(TAB_OPTIONS, "Options")
+  frame.Tabs = tabs
+  PanelTemplates_SetNumTabs(frame, #tabs)
+
+  buildExport()
+  buildImport()
+  buildOptions()
+
+  return frame
+end
+
+function UI.SelectTab(id)
+  if not frame then return end
+  -- The import tab holds the secure disenchant rows, and secure attributes
+  -- cannot be written in combat — so the tab cannot be entered there either.
+  if id == TAB_IMPORT and InCombatLockdown() then
+    ns.print("in combat — the clear-out list opens when you drop out")
+    return
+  end
+  PanelTemplates_SetTab(frame, id)
+  for i, p in ipairs(panels) do p:SetShown(i == id) end
+  if id == TAB_EXPORT then
+    refreshExport()
+  elseif id == TAB_IMPORT then
+    UI.RenderJunk()
+    if not ns.Junk.Stored() then
+      junkHeader:SetText(format("|cff%spaste the cleanup string from warband.pro/gear above|r", MUTED))
+    end
+  else
+    refreshOptions()
+  end
+end
+
+--- Open the window on a tab. Fails closed in combat: the request is queued and
+--- honored when the fight ends, rather than fighting the taint rules mid-pull.
+function UI.Open(tab, mode)
   if InCombatLockdown() then
-    UI.pendingJunk = true
-    ns.print("in combat — the clear-out panel will open when you drop out")
+    UI.pendingOpen = { tab = tab, mode = mode }
+    ns.print("in combat — the window will open when you drop out")
     return
   end
-  UI.pendingJunk = nil
-  buildJunk()
-  UI.RenderJunk()
-  if not ns.Junk.Stored() then
-    junkHeader:SetText("|cff6272a4paste the cleanup string from warband.pro/gear above|r")
-  end
-  junkFrame:Show()
-end
-
-function UI.ToggleJunk()
-  if junkFrame and junkFrame:IsShown() then
-    junkFrame:Hide()
-    return
-  end
-  UI.ShowJunk()
-end
-
---- Hide on the way into combat. Secure attributes cannot be rewritten there, so
---- a panel left open would go stale behind the player's back and hand a click
---- to a bag slot that has since moved. Failing closed is the same posture
---- UI.Show already takes.
-function UI.JunkCombatLockdown()
-  if junkFrame and junkFrame:IsShown() then
-    UI.reopenJunk = true
-    junkFrame:Hide()
-  end
-end
-
-function UI.JunkIsShown()
-  return junkFrame and junkFrame:IsShown()
-end
-
-local function renderRows(summary)
-  for i = 1, MAX_ROWS do rows[i]:SetText("") end
-  if #summary == 0 then
-    rows[1]:SetText("|cff6272a4No characters scanned yet — log in on a character and it lands here.|r")
-    return
-  end
-  local shown = math.min(#summary, MAX_ROWS)
-  for i = 1, shown do
-    local r = summary[i]
-    local line = format("%s %s|cff6272a4-%s|r  %s", DOT[r.dot] or DOT.never, r.name, r.realm or "?", r.ago)
-    if r.bankAgo ~= "never" then line = line .. "  |cff6272a4bank " .. r.bankAgo .. "|r" end
-    rows[i]:SetText(line)
-  end
-  if #summary > MAX_ROWS then
-    rows[MAX_ROWS]:SetText(format("|cff6272a4+%d more in the bundle|r", #summary - MAX_ROWS + 1))
-  end
+  UI.pendingOpen = nil
+  if mode then UI.mode = mode end
+  build()
+  frame:Show()
+  UI.SelectTab(tab)
 end
 
 -- mode: "bundle" (default) or "current"
 function UI.Show(mode)
-  -- Fail closed in combat: queue the panel and open it when the fight ends,
-  -- rather than fighting the taint rules mid-pull.
-  if InCombatLockdown() then
-    UI.pending = mode or "bundle"
-    ns.print("in combat — the export panel will open when you drop out")
-    return
-  end
-  UI.pending = nil
-  build()
+  UI.Open(TAB_EXPORT, mode or "bundle")
+end
 
-  local str, bytes, payload, rawBytes = ns.Export.Build({ currentOnly = mode == "current" })
-  UI.current = str or ""
-  editBox:SetText(UI.current)
+function UI.ShowJunk()
+  UI.Open(TAB_IMPORT)
+end
 
-  local summary = ns.Bundle.Summary(payload)
-  renderRows(summary)
-
-  if not str then
-    header:SetText("|cffff5555Could not build the bundle|r — /warband status has the detail")
-    footer:SetText("")
-  else
-    local wb = ns.Store.db and ns.Store.db.warbandBank
-    local bank = (wb and wb.seenAt)
-      and format("  ·  warband bank %s (by %s)", ns.ago(wb.seenAt), wb.seenByName or "?")
-      or "  ·  warband bank never seen"
-    header:SetText(format("%d character%s  ·  freshest %s%s",
-      #summary, #summary == 1 and "" or "s",
-      #summary > 0 and ns.ago(payload.bundle.freshestSeenAt) or "never", bank))
-    local note = bytes > ns.SOFT_BYTES and "  |cfff1fa8c(large — try /warband copy current)|r" or ""
-    footer:SetText(format("|cff6272a4%s  ·  %d bytes from %d of JSON|r%s", ns.WIRE, bytes, rawBytes or 0, note))
-    -- Stamped here rather than in Export.Build, so /warband status can report
-    -- when a string was last put in front of the user instead of resetting the
-    -- answer every time it is asked.
-    if ns.Store.Ready() then ns.Store.db.lastExport = ns.now() end
-  end
-
-  frame:Show()
+function UI.ShowOptions()
+  UI.Open(TAB_OPTIONS)
 end
 
 function UI.Toggle(mode)
@@ -469,8 +588,73 @@ function UI.Toggle(mode)
   UI.Show(mode)
 end
 
+function UI.ToggleJunk()
+  if frame and frame:IsShown() then
+    if frame.selectedTab == TAB_IMPORT then
+      frame:Hide()
+    else
+      UI.SelectTab(TAB_IMPORT)
+    end
+    return
+  end
+  UI.ShowJunk()
+end
+
 function UI.Hide()
   if frame then frame:Hide() end
+end
+
+function UI.JunkIsShown()
+  return frame and frame:IsShown() and frame.selectedTab == TAB_IMPORT
+end
+
+--- Combat starting. Only the import tab has to go — its rows are secure and
+--- cannot be re-baked until the fight ends — so the export string a player had
+--- open mid-ready-check stays where it was. Remembered and brought back by
+--- UI.AfterCombat.
+function UI.CombatLockdown()
+  if UI.JunkIsShown() then
+    UI.reopenTab = TAB_IMPORT
+    frame:Hide()
+  end
+end
+
+--- Combat over: reopen whatever combat closed or queued, exactly once.
+function UI.AfterCombat()
+  local p = UI.pendingOpen
+  UI.pendingOpen = nil
+  if p then
+    UI.Open(p.tab, p.mode)
+    return
+  end
+  if UI.reopenTab then
+    local tab = UI.reopenTab
+    UI.reopenTab = nil
+    UI.Open(tab)
+  end
+end
+
+--- A merchant opened or closed. Rendering keeps the Sell buttons honest; the
+--- auto-open half is the Options tab's "open the clear-out list at merchants",
+--- which only fires when the resolved list actually has rows — an empty panel
+--- popping over every vendor visit would train people to turn it off.
+function UI.MerchantChanged(open)
+  if UI.JunkIsShown() then UI.RenderJunk() end
+  local opts = ns.Store.db and ns.Store.db.opts
+  if open then
+    if opts and opts.autoJunk and not (frame and frame:IsShown()) and not InCombatLockdown() then
+      local rowsData = ns.Junk.Resolve()
+      if #rowsData > 0 then
+        UI.autoOpened = true
+        UI.ShowJunk()
+      end
+    end
+  elseif UI.autoOpened then
+    UI.autoOpened = nil
+    -- Only if it is still the auto-opened panel: a player who switched tabs
+    -- has made the window theirs, and it stays.
+    if UI.JunkIsShown() then frame:Hide() end
+  end
 end
 
 -- Blizzard's addon compartment entry, declared by the .toc. This is the second

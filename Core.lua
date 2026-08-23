@@ -163,43 +163,36 @@ handlers.TRAIT_CONFIG_UPDATED = function() ns.dirty("talents") end
 handlers.ACTIVE_COMBAT_CONFIG_CHANGED = function() ns.dirty("talents") end
 handlers.PLAYER_SPECIALIZATION_CHANGED = function() ns.dirty("talents") end
 
--- The two things we defer: a panel asked for during a fight, and any
--- container/gear/talent scope the dirty scheduler held back for the same
--- reason (ns.dirty in Init.lua).
+-- The two things we defer: anything the window queued or closed during a
+-- fight (UI.AfterCombat reopens it exactly once), and any container/gear/
+-- talent scope the dirty scheduler held back for the same reason (ns.dirty in
+-- Init.lua).
 handlers.PLAYER_REGEN_ENABLED = function()
   ns.flushDirty()
-  if UI.pending then
-    local mode = UI.pending
-    UI.pending = nil
-    UI.Show(mode)
-  end
-  -- Reopened either because the fight interrupted it or because it was asked
-  -- for mid-pull. Both land here so the panel comes back exactly once.
-  if UI.reopenJunk or UI.pendingJunk then
-    UI.reopenJunk, UI.pendingJunk = nil, nil
-    UI.ShowJunk()
-  end
+  UI.AfterCombat()
 end
 
--- Secure attributes cannot be written in combat, so the clear-out panel closes
--- rather than going stale behind the player — the same fail-closed posture the
--- export panel takes, for a sharper reason: a stale row holds a bag slot, and a
--- bag slot that moved is the wrong item.
+-- Secure attributes cannot be written in combat, so the Import tab closes
+-- rather than going stale behind the player — a stale row holds a bag slot,
+-- and a bag slot that moved is the wrong item. The Export tab holds no secure
+-- state and stays put.
 handlers.PLAYER_REGEN_DISABLED = function()
-  UI.JunkCombatLockdown()
+  UI.CombatLockdown()
 end
 
 -- Selling is the one thing this addon does that changes the game, and it is
 -- possible only while a merchant window is open. The flag is set from the
--- event rather than read from a frame, so nothing has to guess.
+-- event rather than read from a frame, so nothing has to guess. The UI call
+-- keeps the Sell buttons honest and carries the "open the clear-out list at
+-- merchants" option.
 handlers.MERCHANT_SHOW = function()
   ns.Junk.merchantOpen = true
-  if UI.JunkIsShown() then UI.RenderJunk() end
+  UI.MerchantChanged(true)
 end
 
 handlers.MERCHANT_CLOSED = function()
   ns.Junk.merchantOpen = false
-  if UI.JunkIsShown() then UI.RenderJunk() end
+  UI.MerchantChanged(false)
 end
 
 frame:SetScript("OnEvent", function(_, event, arg1)
@@ -292,13 +285,15 @@ SlashCmdList.WARBANDPRO = function(msg)
     end
   elseif cmd == "junk" or cmd == "clean" then
     UI.ToggleJunk()
+  elseif cmd == "options" then
+    UI.ShowOptions()
   elseif cmd == "perf" then
     ns.Perf.Report()
   elseif cmd == "perf reset" then
     ns.Perf.Reset()
     ns.print("perf counters reset")
   else
-    ns.print("/warband · /warband copy current · /warband junk · /warband status · "
+    ns.print("/warband · /warband copy current · /warband junk · /warband options · /warband status · "
       .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband perf")
   end
 end

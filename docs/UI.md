@@ -2,83 +2,80 @@
 
 Copying from WoW chat is notoriously awful. This addon lives or dies by how painless we make copy + paste both sides.
 
-## Game side — export panel
+## Game side — one native window (1.5.0)
 
-### Problem
-
-ChatFrame EditBox truncates at ~2048 chars, linkifies `-` lines, no scroll, selection dies when you move mouse. Long wb1! 4-7KB for 6 chars dies in default chat. You can't `SetClipboard`. Only manual Ctrl-A Ctrl-C works from a focused EditBox.
-
-### What we build (native Blizzard widgets only, no Ace)
-
-Single panel `WarbandProExportFrame`:
-
-- Trigger: AddonCompartment click (`WarbandPro_OnAddonCompartmentClick`) **and** slash `/warband` **and** keybind optional. No minimap button by default (lightweight). Compartment is Blizzard's stated place now — minimap bloats compat.
-- Frame: `CreateFrame("Frame", "WarbandProExportFrame", UIParent, "BackdropTemplate")` 520x460, draggable title "Warband.pro — Export Warband", close X, Esc to close (`tinsert(UISpecialFrames, frame:GetName())`).
-- Inside:
-  - Header row freshness dots summary: "6 chars · freshest 12m ago · Warbank 1h ago (by Vocnar)" — one line readable so before copy you know it's not stale.
-  - Middle: ScrollFrame + EditBox (not single-line Input). Important props:
-    - `editBox:SetMultiLine(true)` `SetMaxLetters(0)` (0 = no limit, Blizzard caveat but our 7KB under 20KB okay)
-    - `editBox:SetAutoFocus(true)` so on show it focuses immediately
-    - `editBox:SetFontObject(GameFontHighlightSmall)` mono for copy reliably
-    - `editBox:HighlightText()` on OnShow so Ctrl-C alone works, no drag
-    - `editBox:SetScript("OnEscapePressed", function() frame:Hide() end)`
-    - no `OnTextChanged` loop — we set once per export, user copy only.
-  - Bottom: two buttons:
-    - `[ Select All ]` does `editBox:HighlightText()` + `editBox:SetFocus()` — 1 click for users who missed auto-highlight
-    - `[ Copy Close ]` note: text still needs Ctrl-C. Button just hides frame after after they copied? Actually keep open until Ctrl-C.
-  - 3 small helper text lines:
-    - "1. Press Ctrl+A then Ctrl+C (auto-selected)"
-    - "2. In warband.pro hit Import (i) or Ctrl+V"
-    - "3. Esc closes this"
-  - Streamer toggle implicit: gold hidden to `•••` only if settings.StreamSafe true — we default show gold but honor toggle later.
-
-Why not `StaticPopupDialogs`? That template's EditBox capped at ~1024 historically and steals focus harsh. Custom frame less taint.
-
-### Handling long strings > 20KB (future if we add recipes)
-
-If len > 20480 we chunk into `wb1.1/3` etc? But v1 we target 4-7KB so not needed. Guard: if > 20KB we show second page "String too long for copy popup >20KB — use slim mode" and offer ` /warband copy current` fallback single-char.
-
-### Automation safety
-
-- If InCombatLockdown() > opening panel blocks: show red bar "cannot export in combat" (secure rule) then queues reopen after combat via `PLAYER_REGEN_ENABLED` one-shot. Fail closed, not error spam.
-- No OnUpdate, no ticker scanning while panel open — only static string.
-
-### Manual test proof it's easy
-
-From `docs/QA.md` checklist expanded:
-
-- /warband opens within 2 clicks: Compartment -> click export or slash "/warband"
-- Auto-highlighted on open without mouse drag (human just hits Ctrl-C)
-- Ctrl-A + Ctrl-C works, pastes into Notepad startswith wb1! exact len reported at bottom.
-- Esc closes, second open same behavior.
-- Multi-char bundle 6 still in single EditBox scrollable, scrollbar appears but highlight still all.
-
-
-## Game side — clear-out panel (1.4.0)
-
-A second frame, `WarbandProJunkFrame`, opened by `/warband junk`. Same
-hand-rolled backdrop, same Blizzard-widgets-only rule, same Esc-closes
-registration.
+One frame, `WarbandProFrame`, with the tabs every stock panel wears along the
+bottom: **Export · Import · Options**. `/warband` and the addon compartment
+open it on Export, `/warband junk` on Import, `/warband options` on Options.
+Esc closes (`UISpecialFrames`), the whole window drags, and it clamps to the
+screen.
 
 ```
-+-------------------------------------------------------------+
-| warband.pro  ·  clear out                                [x] |
-| [ paste the cleanup string from warband.pro/gear           ] |
-| 6 items to clear  ·  2 no longer in your bags  ·  list 1h ago|
-| +---------------------------------------------------------+ |
-| | Ironclaw Warhelm      610  cannot wear   [Sell][Disench] | |
-| | Worn Drudge Cowl      560  90 behind     [Sell][Disench] | |
-| | Cracked Bone Ring           grey         [Sell]          | |
-| +---------------------------------------------------------+ |
-| open a merchant to sell  ·  paste a new list any time        |
-+-------------------------------------------------------------+
++--[bag icon]-- Warband.pro Companion ---------------------[x]-+
+|  6 characters · freshest 12m ago · warband bank 1h (Vocnar)  |
+|  * Vocnar-Wyrmrest Accord  12m ago  bank 1h ago              |
+|  * Voctara-Wyrmrest Accord  3d ago                           |
+|  +--------------------------------------------------------+  |
+|  | wb1!aH4sIAAAAAAAA...                        (selected) |  |
+|  +--------------------------------------------------------+  |
+|  1. Ctrl+C copies  2. warband.pro > Import  3. Esc closes    |
+|  wb1! · 6420 bytes from 39104 of JSON        [ Select all ]  |
++--------------------------------------------------------------+
+   [ Export ] [ Import ] [ Options ]
 ```
 
-**Two frames rather than one with a mode.** The export panel exists to be
-copied *from*, and reverts anything typed into it so a broken paste never
-reaches the website. This one exists to be pasted *into*. One frame doing both
-would make that rule conditional, and that is the kind of conditional that
-eventually eats somebody's paste.
+**Built from Blizzard's own templates, on purpose.** `ButtonFrameTemplate`
+for the chrome (portrait, title, close button, inset), `PanelTabButtonTemplate`
+plus the `PanelTemplates_*` helpers for the tabs, `InputBoxTemplate` for the
+paste field, `InsetFrameTemplate` for the text wells, `UIPanelButtonTemplate`
+and `UICheckButtonTemplate` for controls. This replaced 1.0-1.4's hand-rolled
+flat backdrop for one reason: a window assembled from the client's parts looks
+like the client and *inherits the player's interface settings* — UI scale,
+font scale, colorblind text — with zero code of ours. Ask Mr. Robot's addon is
+the shape reference (export string out, website verdicts in, options beside
+them); the skin is deliberately not ours but Blizzard's. Text colors inside
+the window use the client's palette (gray for muted, gold for warnings, the
+standard quality colors) rather than the website's.
+
+Still no Ace, no LibStub registration, no minimap button — the compartment is
+Blizzard's stated place now. Mixin calls that could plausibly move
+(`SetTitle`, `SetPortraitToAsset`) are guarded so a rename costs the title or
+the icon, never the window.
+
+### Export tab
+
+- Header line of freshness: "6 characters · freshest 12m ago · warband bank 1h
+  ago (by Vocnar)" — readable before you copy, so you know it's not stale.
+- Character rows with the traffic-light dots, then the string in a
+  ScrollFrame + multiline EditBox inside an inset well:
+  - `SetMaxLetters(0)` — the default cap would truncate the wire
+  - `HighlightText()` + focus on a 0-second timer after show, so Ctrl+C alone
+    works with no drag; `[ Select all ]` is the one-click recovery for anyone
+    who clicked elsewhere first
+  - `OnTextChanged` reverts user typing — this box is copied *from*, and a
+    broken paste must never reach the website
+- Footer: wire name, bytes on the wire from bytes of JSON, and a warning past
+  `ns.SOFT_BYTES` pointing at `/warband copy current`.
+
+### Import tab
+
+The clear-out list — the string warband.pro sends back (`wbc1!`), decoded by
+Import.lua, resolved against the live bags by Junk.lua:
+
+- A native `InputBoxTemplate` paste field at the top. It decodes on paste and
+  clears itself; rejections print the decoder's sentence for that failure.
+  No revert rule here — this box is pasted *into*, its text is the player's.
+- One row per resolved item: quality-colored name, item level, the reason
+  (`cannot wear` / `N behind` / `grey`), then `[Sell]` and, for enchanters,
+  a secure `[Disenchant]`.
+
+**One window did not merge the two paste rules.** 1.4.0 ran two frames
+specifically so "revert what the user types" could never apply to the box the
+user pastes into. The rules turned out to belong to the *widgets*, not the
+frames: each EditBox carries its own unconditionally, and the tab split keeps
+the two boxes from ever being the same widget. What the merge actually bought
+is one muscle-memory location for everything warband.pro, which is the AMR
+lesson.
 
 **The rows are real Buttons, and the disenchant one is secure.** Disenchanting
 is a spell cast at an item — protected, so an addon may not do it, and may only
@@ -86,10 +83,11 @@ place a `SecureActionButtonTemplate` under the player's own click. The pool of
 rows is built once at first open and its attributes are re-baked out of combat
 on every redraw; nothing is created, reparented or rewritten during a fight.
 
-**Combat closes it.** `PLAYER_REGEN_DISABLED` hides the panel and
-`PLAYER_REGEN_ENABLED` brings it back. That is the export panel's fail-closed
-posture applied for a sharper reason: a row holds a bag position, and a
-position that moved is the wrong item.
+**Combat closes this tab only.** `PLAYER_REGEN_DISABLED` hides the window when
+the Import tab is up (a row holds a bag position, and a position that moved is
+the wrong item), and `PLAYER_REGEN_ENABLED` brings it back; switching *to* the
+tab mid-fight is refused with the same sentence. The Export tab holds no
+secure state, so a string left open through a ready-check stays put.
 
 **Sell is dark away from a merchant** rather than hidden. A row that changes
 shape when you walk up to a vendor is harder to read than one that lights up,
@@ -100,6 +98,51 @@ the item instead of selling it.
 **Greys are found here, not sent.** The website's copy of your bags is as old
 as your last paste; vendor trash is only worth listing if it is what you are
 carrying now.
+
+### Options tab
+
+Native checkboxes over the same `WarbandProDB.opts` the slash commands write —
+the tab and `/warband gear on|off` are two doors to one switch:
+
+- **Capture gear** (`includeGear`) — turning it on rescans immediately, same
+  as the slash command.
+- **Include item links** (`includeLinks`) — the debug toggle that was
+  previously reachable only by editing SavedVariables.
+- **Open the clear-out list at merchants** (`autoJunk`, off by default) — at
+  `MERCHANT_SHOW`, if the resolved list has rows, the Import tab opens by
+  itself and closes again at `MERCHANT_CLOSED` — unless the player switched
+  tabs meanwhile, which makes the window theirs. It never auto-opens in
+  combat, and never over a window already open. This is the one AMR
+  convenience worth porting whole ("automatically show junk list at
+  vendors"); their auto-equip and gear-set halves depend on a gear-set import
+  that does not exist on this wire yet.
+
+No UI-scale option, deliberately: AMR needs one because its window is skinned
+from scratch; this window inherits the player's scale by being made of the
+client's own parts.
+
+### Automation safety
+
+- Opening the window in combat queues it (`UI.pendingOpen`) and
+  `PLAYER_REGEN_ENABLED` honors the request exactly once. Fail closed, not
+  error spam.
+- No OnUpdate, no ticker while the window is open — the export string is
+  static, and the junk list redraws only on the events Core.lua already
+  watches.
+
+### Manual test proof it's easy
+
+From `docs/QA.md` checklist expanded:
+
+- /warband opens within 2 clicks: Compartment -> click or slash "/warband"
+- Auto-highlighted on open without mouse drag (human just hits Ctrl-C)
+- Ctrl-A + Ctrl-C works, pastes into Notepad startswith wb1! exact len reported at bottom.
+- Esc closes, second open same behavior.
+- Multi-char bundle 6 still in single EditBox scrollable, scrollbar appears but highlight still all.
+- Tabs: Export ↔ Import ↔ Options round trip keeps each tab's state; the
+  selected tab survives a combat hide/reopen.
+- Window matches the client's UI scale — change scale in Settings, /reload,
+  the window tracks it with no option of its own.
 
 ## Web side — Import simplicity
 

@@ -17,7 +17,7 @@ it currently holds.
 | --- | --- | --- |
 | Addons must be free of charge | ✅ | MIT licensed, no paid tier, no gated features. |
 | Addon code must be completely visible | ✅ **enforced** | No minification (fails on any line over 2000 bytes), and no `loadstring` / `load` / `RunScript` anywhere in the zip, `Vendor/` included. Plain Lua, no packed blobs. |
-| Addons may not include advertisements | ✅ **enforced** | No promotional strings in shipped Lua. `warband.pro` appears three times in game — a panel title and two lines of paste instructions — all functional, none clickable. |
+| Addons may not include advertisements | ✅ **enforced** | No promotional strings in shipped Lua. `warband.pro` appears in game only in functional strings — the window title, paste instructions, and the import decoder's rejection sentences — none clickable, none promotional. |
 | Addons may not solicit donations | ✅ **enforced** | Fails on `donate`/`donation` and on Patreon / Ko-fi / PayPal / Buy Me a Coffee / Boosty in shipped Lua. |
 | Must not negatively impact realms or other players | ✅ | No network transmission at all — `SendAddonMessage`, `SendChatMessage`, and `BNSendGameData` fail the build. No `OnUpdate` scanner; captures are event-driven and throttled. |
 | No offensive or objectionable material | ✅ | None. |

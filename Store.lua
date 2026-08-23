@@ -41,6 +41,7 @@ function Store.Init()
   db.opts = db.opts or {}
   if db.opts.includeLinks == nil then db.opts.includeLinks = false end
   if db.opts.includeGear == nil then db.opts.includeGear = true end
+  if db.opts.autoJunk == nil then db.opts.autoJunk = false end
 
   _G.WarbandProDB = db
   Store.db = db

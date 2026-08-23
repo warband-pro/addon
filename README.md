@@ -87,10 +87,19 @@ In-game `/reload` (full restart needed if .toc changed), then `/warband`.
 
 ## Use
 
+One window, three tabs along the bottom the way every stock panel does it —
+**Export** (the `wb1!` string, pre-selected), **Import** (paste the cleanup
+string from warband.pro/gear, sell and disenchant from the list), **Options**
+(gear capture, item links, auto-open at merchants). Built from Blizzard's own
+frame templates, so it follows your UI scale and font settings with no
+settings of its own.
+
 ```
-/warband                panel + bundle freshness
-/warband copy           bundle wb1! to clipboard
+/warband                the window, Export tab — bundle + freshness
+/warband copy           same
 /warband copy current   single-char only
+/warband junk           Import tab — the clear-out list
+/warband options        Options tab
 /warband clear <name>   prune from DB
 /warband status         debug counts/len/lastSeen
 /warband optimize       prune chars not seen 90d

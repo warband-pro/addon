@@ -30,6 +30,10 @@ read_globals = {
   "ChatFontNormal", "DEFAULT_CHAT_FRAME", "C_Timer", "GetServerTime",
   "GetBuildInfo", "InCombatLockdown",
 
+  -- the tabbed window (UI.lua)
+  "PanelTemplates_SetNumTabs", "PanelTemplates_SetTab", "PanelTemplates_TabResize",
+  "PlaySound", "SOUNDKIT",
+
   -- /warband perf (Perf.lua)
   "debugprofilestop", "UpdateAddOnMemoryUsage", "GetAddOnMemoryUsage",
   "UpdateAddOnCPUUsage", "GetAddOnCPUUsage", "GetCVar",
