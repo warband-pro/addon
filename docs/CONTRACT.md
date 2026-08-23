@@ -70,7 +70,9 @@ Top-level:
 
   "gear": [
     {"slot":1,"where":"equipped","id":212018,"ilvl":639,
-     "s":"item:212018::::::::80:250::9:6:12053:10390:1520:10255:1:28:2462:::"}
+     "s":"item:212018::::::::80:250::9:6:12053:10390:1520:10255:1:28:2462:::"},
+    {"slot":11,"where":"bag","id":215135,"ilvl":626,"n":"Seal of the Poisoned Pact","q":3,"cls":4,"sub":0,
+     "s":"item:215135::::::::80:250::4:6:12053:1:28:::"}
   ],
   "talents": {
     "activeSpecID": 103,
@@ -186,6 +188,18 @@ against an equipment document that only refreshes at the wearer's last logout.
 | `id` | The item's numeric id. Redundant with the id embedded in `s`; kept so the website can resolve name/icon/filter without parsing the string. Deflate folds the duplication. |
 | `ilvl` | `C_Item.GetCurrentItemLevel` at capture time — upgrade track, crest investment and all, which a bare item id cannot tell you. Optional; omitted if the client could not answer. |
 | `s` | The item string, **verbatim**: everything between `\|H` and `\|h` in the hyperlink. Not decomposed — see below. |
+| `n` | Display name, out of the same hyperlink's brackets. Added in 1.3.0; bag/bank/warbank entries only. The website has no item-id-to-name lookup at all, so without this a cleanup row renders as a bare id. |
+| `q` | Numeric quality, 0 Poor … 5 Legendary, from the container item info. Added in 1.3.0; bag/bank/warbank entries only. |
+| `b` | Soulbound. **Emitted only when true** — absence means NOT bound, never "unknown", matching `items[].isBound`. The website's BoE guard depends on that reading. Added in 1.3.0; bag/bank/warbank entries only. |
+| `cls` | Item class id (2 Weapon, 4 Armor), `GetItemInfoInstant` position 6. Added in 1.3.0; bag/bank/warbank entries only. |
+| `sub` | Item subclass id — for armor, 1 Cloth … 4 Plate — position 7. With `cls`, what lets the website call an item unwearable by this class. Added in 1.3.0; bag/bank/warbank entries only. |
+
+**The 1.3.0 fields never appear on `where:"equipped"` entries.** The website
+resolves an equipped item through the Profile API, which already carries name,
+quality and class, so repeating them here would be dead weight on every
+character. All five are optional and additive on `wb1!`: a bundle from an
+older addon carries none of them, and the website reads absence as "this addon
+did not send it", never as a value.
 
 **Cosmetic slots are excluded everywhere**: shirt (4) and tabard (19) never
 appear, matching the website's `SLOTS` table in `gear.ts`.

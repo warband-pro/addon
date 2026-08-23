@@ -42,6 +42,14 @@ jobs:
       - name: luacheck .
         run: luacheck .
 
+      # The gear classifier against a fake client whose fixture puts a valid
+      # INVTYPE_* string in GetItemInfoInstant's icon position — so the
+      # off-by-one that silently dropped every bag item for two minor versions
+      # would sort items into the wrong slot and fail loudly, not vanish.
+      # Runs here because this job already installed lua5.1.
+      - name: gear classification against a fake client
+        run: lua5.1 tools/gear-test.lua
+
   validate:
     name: packaging + contract
     runs-on: ubuntu-latest

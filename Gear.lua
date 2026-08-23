@@ -47,6 +47,16 @@ local function itemString(link)
   return link:match("|H(item[^|]+)|h")
 end
 
+-- The display name inside the same hyperlink's brackets. The website has no
+-- item-id-to-name lookup at all, so a bag item without this renders as a bare
+-- id in the cleanup list — the whole reason 1.3.0 exists.
+local function itemName(link)
+  if type(link) ~= "string" then return nil end
+  local name = link:match("|h%[(.-)%]|h")
+  if name == "" then return nil end
+  return name
+end
+
 -- Stable top-level functions rather than a closure built per item: these ran
 -- once per equipped slot and once per occupied bag/bank/warbank slot, and a
 -- fresh closure for each call was pure allocation for something ns.safe's
@@ -96,13 +106,30 @@ function Gear.Visit(where, bagID, slot, info, out)
   if not canonicalSlot then return end
   local s = itemString(info.hyperlink)
   if not s then return end
-  out[#out + 1] = {
+  -- The 1.3.0 fields, owned-gear entries only (equipped items never carry
+  -- them — the website resolves an equipped item through the Profile API and
+  -- these would be dead weight). All optional on the wire; a nil is dropped
+  -- by the canonical encoder rather than sent, and the website reads absence
+  -- as "this addon did not send it", never as a value:
+  --   n    display name, for a list with no item-id-to-name lookup
+  --   q    numeric quality, so greys and heirlooms can be told apart
+  --   b    soulbound, emitted only when true — absence means NOT bound,
+  --        which is the reading the website's BoE guard depends on
+  --   cls  item class id  (2 weapon, 4 armor)
+  --   sub  item subclass id (for armor, 1 cloth … 4 plate)
+  local entry = {
     slot = canonicalSlot,
     where = where,
     id = info.itemID,
     ilvl = containerItemLevel(bagID, slot),
     s = s,
+    n = itemName(info.hyperlink),
+    q = info.quality,
+    cls = itemInfo.classID,
+    sub = itemInfo.subclassID,
   }
+  if info.isBound then entry.b = true end
+  out[#out + 1] = entry
 end
 
 -- The gear list held in four scopes rather than rebuilt wholesale on every

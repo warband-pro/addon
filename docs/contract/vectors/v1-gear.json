@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "addon": "1.1.0-test",
+  "addon": "1.3.0-test",
   "exportedAt": 1724000000,
   "gameVersion": "12.1.0",
   "interface": 120100,
@@ -22,8 +22,10 @@
       {"slot":16,"where":"equipped","id":212050,"ilvl":645,
        "s":"item:212050:7228::::::80:251::7:6:12053:10390:1520:10255:9:1:28:::"},
       {"slot":11,"where":"bag","id":215135,"ilvl":626,
+       "n":"Seal of the Poisoned Pact","q":3,"cls":4,"sub":0,
        "s":"item:215135::::::::80:250::4:6:12053:1:28:::"},
       {"slot":16,"where":"bank","id":222446,"ilvl":619,
+       "n":"Vagabond's Cleaver","q":4,"b":true,"cls":2,"sub":0,
        "s":"item:222446::::::::80:250::3:6:12053:1:::"}
     ],
     "talents": {

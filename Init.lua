@@ -74,13 +74,19 @@ local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 local itemInfoCache = {}
 ns.itemInfoStats = { hits = 0, misses = 0 }
 
--- Field order matches how the two existing call sites already destructure
--- GetItemInfoInstant's return list (Gear.lua reads position 5, Scan.lua reads
--- 6 and 7) — this only caches that result, it does not relitigate it. Routed
--- through ns.safe, not a bare pcall: a bad id must cost this one lookup, not
--- (as Scan.lua's old unprotected rollup could) the whole scan it is part of.
+-- Field order is GetItemInfoInstant's actual return list — itemID, itemType,
+-- itemSubType, itemEquipLoc, icon, classID, subClassID — so equipLoc is
+-- position 4. This line used to read it at position 5, which is the icon file
+-- id: EQUIPLOC_SLOT is keyed by INVTYPE_* strings, so every bag, bank and
+-- warband-tab item missed the lookup and Gear.Visit dropped every one, from
+-- 1.1.0 until this fix. Equipped gear walks fixed slot numbers and never
+-- consults equipLoc, which is why the wire looked populated the whole time.
+-- tools/gear-test.lua stands a fake client in front of this and fails loudly
+-- if the destructuring ever drifts again. Routed through ns.safe, not a bare
+-- pcall: a bad id must cost this one lookup, not (as Scan.lua's old
+-- unprotected rollup could) the whole scan it is part of.
 local function rawItemInfo(id)
-  local _, _, _, _, equipLoc, classID, subclassID = GetInstant(id)
+  local _, _, _, equipLoc, _, classID, subclassID = GetInstant(id)
   return { equipLoc = equipLoc, classID = classID, subclassID = subclassID }
 end
 

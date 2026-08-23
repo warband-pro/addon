@@ -23,14 +23,44 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-08-23 — bag gear actually reaches the wire, and it has a name
+
+**Every bag, bank and warband-tab gear entry was being dropped before it
+reached the wire — since 1.1.0.** The classifier read `GetItemInfoInstant`'s
+icon (return 5) where it meant the equip location (return 4). The lookup that
+sorts an item into its slot is keyed by `INVTYPE_*` strings, an icon file id
+matches none of them, and every owned item fell through. Equipped gear walks
+fixed slot numbers and never consults the equip location, so the export looked
+populated the whole time — warband.pro's best-in-bags, upgrade column and
+cleanup list have been reading an empty array for two minor versions. Found
+from a user's real export: 16 `gear[]` entries, all `where:"equipped"`, beside
+a bag holding seven items another tool could see.
+
 ### Fixed
 
+- Bag, bank and warband-bank gear entries are captured again. One destructuring
+  read `equipLoc` at the wrong position; `tools/gear-test.lua` now stands a
+  fake client in front of the classifier — with a valid `INVTYPE_*` string
+  planted in the icon position — so this exact drift sorts items into the
+  wrong slot and fails CI loudly instead of dropping them and passing as an
+  empty bag.
 - A ding is noticed when it happens. `Scan.Identity` — the pass that reads your
   level, XP, rested XP, zone and item level — only ran at login and on a loading
   screen. Level in the open world, type `/warband copy`, and the string carried
   the level you were an hour ago; it corrected itself the next time you zoned or
   logged out. `PLAYER_LEVEL_UP` and `PLAYER_LEVEL_CHANGED` now run the same pass,
   one second later so `UnitLevel` has caught up.
+
+### Added
+
+- Owned gear entries carry five new optional fields, so warband.pro's cleanup
+  view can name what it judges: `n` (display name, from the item's own
+  hyperlink — the website has no item-id-to-name lookup), `q` (numeric
+  quality), `b` (soulbound, sent only when true — absence means not bound),
+  `cls` and `sub` (item class and subclass ids, which is what lets the website
+  call plate on a mage unwearable). Equipped entries never carry them: the
+  Profile API already answers all five for what is worn. All additive on
+  `wb1!`; older bundles keep decoding.
 
 ## [1.2.0] — 2026-08-21 — every vault slot, not only the summary
 
@@ -153,7 +183,8 @@ Retail Midnight 12.1 only. Works with whatever UI you run.
 
 Then future tags auto-upload via BigWigs packager once Project IDs are set.
 
-[Unreleased]: https://github.com/warband-pro/addon/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/warband-pro/addon/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/warband-pro/addon/releases/tag/v1.3.0
 [1.2.0]: https://github.com/warband-pro/addon/releases/tag/v1.2.0
 [1.1.0]: https://github.com/warband-pro/addon/releases/tag/v1.1.0
 [1.0.2]: https://github.com/warband-pro/addon/releases/tag/v1.0.2
