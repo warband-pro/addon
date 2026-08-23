@@ -54,6 +54,53 @@ From `docs/QA.md` checklist expanded:
 - Multi-char bundle 6 still in single EditBox scrollable, scrollbar appears but highlight still all.
 
 
+## Game side — clear-out panel (1.4.0)
+
+A second frame, `WarbandProJunkFrame`, opened by `/warband junk`. Same
+hand-rolled backdrop, same Blizzard-widgets-only rule, same Esc-closes
+registration.
+
+```
++-------------------------------------------------------------+
+| warband.pro  ·  clear out                                [x] |
+| [ paste the cleanup string from warband.pro/gear           ] |
+| 6 items to clear  ·  2 no longer in your bags  ·  list 1h ago|
+| +---------------------------------------------------------+ |
+| | Ironclaw Warhelm      610  cannot wear   [Sell][Disench] | |
+| | Worn Drudge Cowl      560  90 behind     [Sell][Disench] | |
+| | Cracked Bone Ring           grey         [Sell]          | |
+| +---------------------------------------------------------+ |
+| open a merchant to sell  ·  paste a new list any time        |
++-------------------------------------------------------------+
+```
+
+**Two frames rather than one with a mode.** The export panel exists to be
+copied *from*, and reverts anything typed into it so a broken paste never
+reaches the website. This one exists to be pasted *into*. One frame doing both
+would make that rule conditional, and that is the kind of conditional that
+eventually eats somebody's paste.
+
+**The rows are real Buttons, and the disenchant one is secure.** Disenchanting
+is a spell cast at an item — protected, so an addon may not do it, and may only
+place a `SecureActionButtonTemplate` under the player's own click. The pool of
+rows is built once at first open and its attributes are re-baked out of combat
+on every redraw; nothing is created, reparented or rewritten during a fight.
+
+**Combat closes it.** `PLAYER_REGEN_DISABLED` hides the panel and
+`PLAYER_REGEN_ENABLED` brings it back. That is the export panel's fail-closed
+posture applied for a sharper reason: a row holds a bag position, and a
+position that moved is the wrong item.
+
+**Sell is dark away from a merchant** rather than hidden. A row that changes
+shape when you walk up to a vendor is harder to read than one that lights up,
+and `Junk.Sell` checks the merchant flag again on click — the window can close
+between a draw and a press, and `UseContainerItem` outside a merchant *uses*
+the item instead of selling it.
+
+**Greys are found here, not sent.** The website's copy of your bags is as old
+as your last paste; vendor trash is only worth listing if it is what you are
+carrying now.
+
 ## Web side — Import simplicity
 
 Goal you said: "just hit Import and maybe grab from your clipboard if not we just pop a box you throw it in". Yes.

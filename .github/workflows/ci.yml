@@ -78,6 +78,18 @@ jobs:
       - name: Contract vectors round-trip
         run: node tools/vector.mjs
 
+      # Import.lua is the only file here that reads a string somebody else
+      # produced, which makes it the only one where being wrong is a security
+      # question. It is pure, so it can be tested without a game client — and
+      # this runs against the golden wbc1! fixture the step above regenerates,
+      # so the round trip is checked rather than each half in isolation.
+      - name: Import decoder, junk-matching and gear-classification tests
+        run: |
+          sudo apt-get install -y --no-install-recommends lua5.1
+          lua5.1 tools/import-test.lua
+          lua5.1 tools/junk-test.lua
+          lua5.1 tools/gear-test.lua
+
       # A drifted fixture means /app is testing against a string this addon no
       # longer produces. Regenerate with `node tools/vector.mjs --write`.
       - name: Committed .wb1 fixtures match

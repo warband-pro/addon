@@ -11,6 +11,13 @@
 //   node tools/vector.mjs --write  also write the .wb1 fixtures next to them
 //
 // The .wb1 fixtures are what src/lib/warband-import.ts tests against in /app.
+//
+// Two wires live here. A vector named wbc1-* is the RETURN direction — what
+// warband.pro hands back for the addon's junk list — and rides the identical
+// envelope with a different prefix and a different payload shape. Same
+// generator on purpose: the two directions cannot be allowed to drift into two
+// encoders, because the addon has exactly one base64url table and one deflate
+// call to spend on both.
 
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
@@ -19,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'contract', 'vectors');
 const PREFIX = 'wb1!';
+const CLEANUP_PREFIX = 'wbc1!';
 
 // Matches Bundle.lua: sorted keys, no whitespace, undefined dropped, empty
 // tables emitted as [].
@@ -35,8 +43,8 @@ function canonical(value) {
 const b64url = (buf) => buf.toString('base64url');
 const unb64url = (str) => Buffer.from(str, 'base64url');
 
-export function encode(payload) {
-  return PREFIX + b64url(deflateRawSync(Buffer.from(canonical(payload), 'utf8'), { level: 9 }));
+export function encode(payload, prefix = PREFIX) {
+  return prefix + b64url(deflateRawSync(Buffer.from(canonical(payload), 'utf8'), { level: 9 }));
 }
 
 export function decode(str) {
@@ -58,21 +66,59 @@ export function decode(str) {
   return payload;
 }
 
+/**
+ * The return wire. Caps are the addon's, not the website's: Import.lua reads
+ * this on a machine also running a raid, and LibDeflate's DecompressDeflate
+ * has no streaming cap, so the INPUT length is the real bomb guard and the
+ * output check is a second line rather than the first.
+ */
+const CLEANUP_MAX_WIRE = 40 * 1024;
+const CLEANUP_MAX_DECODED = 512 * 1024;
+const CLEANUP_VERDICTS = new Set(['sell', 'de', 'del']);
+
+export function decodeCleanup(str) {
+  if (!str.startsWith(CLEANUP_PREFIX)) throw new Error(`expected ${CLEANUP_PREFIX} prefix`);
+  if (str.length > CLEANUP_MAX_WIRE) throw new Error('cleanup string over 40KB');
+  const raw = inflateRawSync(unb64url(str.slice(CLEANUP_PREFIX.length)));
+  if (raw.length > CLEANUP_MAX_DECODED) throw new Error('cleanup payload over 512KB');
+  const payload = JSON.parse(raw.toString('utf8'));
+  if (payload.v !== 1) throw new Error(`unsupported cleanup version ${payload.v}`);
+  if (typeof payload.generatedAt !== 'number') throw new Error('generatedAt missing');
+  if (!Array.isArray(payload.chars)) throw new Error('chars is not an array');
+  for (const c of payload.chars) {
+    if (!c.guid) throw new Error('cleanup character has no guid to match on');
+    if (!Array.isArray(c.items)) throw new Error(`items is not an array for ${c.guid}`);
+    for (const i of c.items) {
+      if (!CLEANUP_VERDICTS.has(i.k)) throw new Error(`unknown verdict ${i.k}`);
+      // `s` is the whole identity mechanism — an entry without one names no
+      // item the addon can find, so it is a malformed entry rather than a
+      // lenient one.
+      if (typeof i.s !== 'string' || !i.s) throw new Error('cleanup item has no item string');
+    }
+  }
+  return payload;
+}
+
+const isCleanup = (file) => file.startsWith('wbc1-');
+
 const write = process.argv.includes('--write');
 let failed = 0;
 
 for (const file of readdirSync(DIR).filter((f) => f.endsWith('.json'))) {
+  const cleanup = isCleanup(file);
   const source = JSON.parse(readFileSync(join(DIR, file), 'utf8'));
-  const wire = encode(source);
+  const wire = encode(source, cleanup ? CLEANUP_PREFIX : PREFIX);
   try {
-    const back = decode(wire);
+    const back = cleanup ? decodeCleanup(wire) : decode(wire);
     const same = canonical(back) === canonical(source);
     if (!same) throw new Error('round-trip changed the payload');
     const ratio = ((wire.length / canonical(source).length) * 100).toFixed(0);
-    console.log(`PASS ${file}  ${canonical(source).length}B json -> ${wire.length}B wire (${ratio}%)  chars=${back.characters.length}`);
+    const count = cleanup ? `chars=${back.chars.length}` : `chars=${back.characters.length}`;
+    console.log(`PASS ${file}  ${canonical(source).length}B json -> ${wire.length}B wire (${ratio}%)  ${count}`);
     if (write) {
-      writeFileSync(join(DIR, file.replace(/\.json$/, '.wb1')), wire + '\n');
-      console.log(`     wrote ${file.replace(/\.json$/, '.wb1')}`);
+      const ext = cleanup ? '.wbc1' : '.wb1';
+      writeFileSync(join(DIR, file.replace(/\.json$/, ext)), wire + '\n');
+      console.log(`     wrote ${file.replace(/\.json$/, ext)}`);
     }
   } catch (e) {
     failed++;
@@ -82,12 +128,18 @@ for (const file of readdirSync(DIR).filter((f) => f.endsWith('.json'))) {
 
 // Rejections the website must also make.
 const bad = [
-  ['no prefix', 'aGVsbG8'],
-  ['garbage body', 'wb1!not-a-deflate-stream'],
+  ['no prefix', 'aGVsbG8', decode],
+  ['garbage body', 'wb1!not-a-deflate-stream', decode],
+  // Each decoder must refuse the other's string. The two are a few centimetres
+  // apart in two different applications and a misfiled paste is valid rather
+  // than malformed, so the refusal is what lets each side say where it belongs.
+  ['a cleanup string in the bundle decoder', 'wbc1!AAAA', decode],
+  ['a bundle in the cleanup decoder', 'wb1!AAAA', decodeCleanup],
+  ['garbage cleanup body', 'wbc1!not-a-deflate-stream', decodeCleanup],
 ];
-for (const [label, input] of bad) {
+for (const [label, input, fn] of bad) {
   try {
-    decode(input);
+    fn(input);
     failed++;
     console.log(`FAIL rejects ${label}: accepted it`);
   } catch {

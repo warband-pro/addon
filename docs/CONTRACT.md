@@ -10,7 +10,12 @@ This file is the law for both addon Lua and web app D1. Any change bumps version
   website's own research found equipped gear needs no addon at all, so what
   was left to add (bag/bank gear, spec loadouts) was small enough to stay on
   the existing prefix.
-- `wb2!` — future, still reserved. Nothing in this repo produces it yet.
+- `wb2!` — future, still reserved. Nothing in this repo produces it yet, and
+  `wbc1!` deliberately did not spend it.
+- `wbc1!` — the **return** direction, added in 1.4.0: the cleanup list
+  warband.pro produces and the player pastes into `/warband junk`. A separate
+  channel rather than a version of the one above, so it can version on its own
+  schedule — see the `wbc1!` section for the payload and the matching rules.
 
 Format = `{versionPrefix}{base64url(deflate(jsonPayload))}`
 
@@ -177,7 +182,8 @@ against an equipment document that only refreshes at the wearer's last logout.
 ### `gear[]` — one flat array per character
 
 ```json
-{"slot":1,"where":"equipped","id":212018,"ilvl":639,
+{"slot":1,"where":"equipped","id":212018,"ilvl":639,"n":"Aureate Sentry's Greathelm",
+ "cls":4,"sub":4,
  "s":"item:212018::::::::80:250::9:6:12053:10390:1520:10255:1:28:2462:::"}
 ```
 
@@ -233,6 +239,45 @@ any off-hand-family item (shield, held item, off-hand weapon) on 17 — the
 addon cannot know which of the two ring slots a bagged ring would go in, so it
 does not guess. A character can therefore have more than one `gear[]` entry at
 `slot: 11`, one `where: "equipped"` and others `where: "bag"` or `"bank"`.
+
+**`n`, `q`, `b`, `cls` and `sub` were added in 1.3.0 for the cleanup feature**
+(`wbc1!`, below). All five are additive on `wb1!` and optional: an older
+website reading a newer bundle simply does not see them, and a newer website
+reading an older bundle must treat their absence as "not looked at" rather
+than as a value — the same rule every other optional field carries.
+
+The name is the load-bearing one. The website has no item-id-to-name lookup at
+all: resolving one means a Game Data call per item id, which is exactly the
+cost item search avoids by resolving the *query* instead. A cleanup list is the
+opposite shape — it starts from inventory — so a name already sitting in the
+hyperlink here saves a call per row there. It is read with a second `match` on
+the link the item string already came from, not from `GetItemInfo`, which is
+async and may not have loaded when the scan runs.
+
+`cls`/`sub` come from `ns.itemInfo`, which memoizes `GetItemInfoInstant` per
+item id for the session and was already being called to classify the slot — so
+both fields cost nothing beyond the bytes. They exist so the website can judge
+whether *this* character can wear an item without shipping an armor-class table
+or an equippable-items dump: **the addon does not filter gear by what the
+character can use**, it never has, and `EQUIPLOC_SLOT` gates on equip location
+only. A plate chest in a druid’s bag belongs on the wire; until 1.3.0 the
+website had no way to know it was plate.
+
+> **Correction, 2026-08-23.** This paragraph read "has always been on the
+> wire". True of the intent, false of the fact: **no bag, bank or
+> warband-bank gear reached the wire at all between 1.1.0 and 1.3.0.**
+> `ns.itemInfo` read `GetItemInfoInstant`’s icon (position 5) where it meant
+> to read `itemEquipLoc` (position 4), so `EQUIPLOC_SLOT` missed on every
+> item and `Gear.Visit` returned early every time. Equipped gear was
+> unaffected — `Gear.Equipped` walks fixed slot numbers and never consults
+> equipLoc — which is exactly why nobody noticed: the wire looked populated.
+> Fixed in 1.3.0 and pinned by `tools/gear-test.lua`, whose fixture puts a
+> valid `INVTYPE_*` string in the icon position so a repeat reads as a wrong
+> slot rather than as an empty bag.
+>
+> Two consequences when reading older data: a bundle from 1.1.0-1.2.x carries
+> `gear[]` entries that are **100% `where:"equipped"`**, and the website’s
+> best-in-bags had no input for its entire existence.
 
 **Duplication with `bags[].items[]` is deliberate.** A gear piece sitting in a
 bag appears twice in the payload: once as a plain `{id, count}` stack in the
@@ -350,8 +395,10 @@ reject if over the decoded size cap (see below) or >20 chars
 ```
 
 Test vectors live in `docs/contract/vectors/`. `node tools/vector.mjs` round-trips
-every `.json` there and writes the matching `.wb1` fixture with `--write`; the
-web decoder tests read those fixtures.
+every `.json` there and writes the matching fixture with `--write`; the web
+decoder tests read those fixtures. A vector named `wbc1-*` is the return
+direction and gets a `.wbc1` fixture through the same encoder — see the
+`wbc1!` section below.
 
 **The vectors verify the envelope, not the item-string contents.** They round-trip
 correctly — deflate, base64url, the `wb1!` prefix — and are real proof that
@@ -374,6 +421,112 @@ Both were found while writing Export.lua, and the code is right.
    deflate stream with no zlib header, so `DecompressionStream("deflate")`
    rejects it. Use `"deflate-raw"` / `pako.inflateRaw`. `CompressZlib` would be
    the other way to settle this, at the cost of six bytes; raw stays.
+
+## `wbc1!` — the return direction, added in addon 1.4.0
+
+Everything above describes the addon talking to the website. This is the one
+string that goes the other way: the cleanup list warband.pro's `/gear` view
+produces, which the player pastes into `/warband junk`.
+
+### Why not `wb2!`
+
+`wb2!` is reserved above for a **breaking bump of the outbound wire** and stays
+reserved. This is not a new version of that wire — it is a different channel,
+carrying a different payload, in the other direction, and it will want to
+version on its own schedule. Giving it `wbc1!` also means each decoder can
+recognise the other's prefix and say *where the string belongs* rather than
+that it is broken: the two paste boxes sit in two different applications, and
+a string in the wrong one is misfiled, not malformed. Both sides implement
+that refusal, and `tools/vector.mjs` tests it in both directions.
+
+### Envelope — identical to `wb1!`, reversed
+
+```
+json    = canonical JSON            -- no whitespace, keys sorted, same rules as Bundle.JSON
+deflate = raw deflate               -- no zlib header
+b64url  = RFC 4648 §5, no = padding
+output  = "wbc1!" .. b64url
+```
+
+The website encodes with `CompressionStream("deflate-raw")` and its own
+canonical stringifier; the addon decodes with `LibDeflate:DecompressDeflate`
+and `Import.JSONDecode`. **No checksum**, matching `wb1!` — deflate fails
+loudly on a corrupt stream and both decoders fail closed after it.
+
+The website emits canonical JSON rather than whatever its `JSON.stringify`
+produces for one reason: it makes `vectors/wbc1-min.wbc1` a **golden** vector
+instead of an example. The committed fixture is byte-identical to what
+`src/lib/cleanup.ts` emits, so a test on either side catches the other drifting.
+A payload that merely decodes the same would only prove the decoder works.
+
+### Payload
+
+```json
+{
+  "v": 1,
+  "generatedAt": 1724000000,
+  "chars": [{
+    "guid": "Player-1-TEST",
+    "name": "Vocnar",
+    "items": [
+      {"k":"de","id":221151,"s":"item:221151::...","r":"unusable","ilvl":610},
+      {"k":"de","id":215135,"s":"item:215135::...","r":"gap","g":56,"ilvl":570}
+    ]
+  }]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `v` | Format version, `1`. A different value is a hard reject. |
+| `generatedAt` | Unix **seconds**, same unit as `seenAt` everywhere else here. The junk panel prints its age; there is no expiry. |
+| `chars[].guid` | `UnitGUID("player")`, exactly as this addon stored and sent it. The match key — see below. |
+| `chars[].name` | Display only, for the panel header. Never matched on. |
+| `items[].k` | The verdict: `sell`, `de` (disenchant), or `del`. |
+| `items[].id` | Item id, for display and for a sanity check against the resolved item. |
+| `items[].s` | **The identity key.** The verbatim item string, as this addon sent it. |
+| `items[].r` | Why: `gap` (far below the equipped piece) or `unusable` (wrong armor class). |
+| `items[].g` | Item levels below the equipped item it would replace. Present only when `r` is `gap`. |
+| `items[].ilvl` | The item's own level, for the row. Optional. |
+
+### Matching is by item string, and nothing else
+
+**The wire carries no bag coordinates, deliberately.** A bag position captured
+at export time is stale by the time the string comes back — the player looted,
+sold, sorted, ran a dungeon — and `C_Container.UseContainerItem` on a slot that
+moved sells *whatever is there now*. That is the one failure this feature must
+never have, and the only way to be sure of it is to never carry a coordinate
+that could be believed.
+
+So `Junk.Resolve()` walks the live bags at display time and matches on `s`. A
+verdict finds the item it was written about, or it finds nothing and the panel
+says how many are no longer in the bags. Coordinates come from the walk that
+just happened, never from storage.
+
+**A verdict applies to every live match of its `s`.** The website sends one
+entry per distinct string — duplicates are collapsed before encoding — because
+two items with the same item string are the same item in every respect the
+game exposes, including the `uniqueID` field the string itself carries. Sending
+the verdict twice would ask the addon which copy each one meant, and there is
+no answer.
+
+**A string from another account matches nothing** and the panel says so. The
+guid simply does not appear in `WarbandProDB.chars`, which is the whole check —
+no identity is asserted, and nothing about it needs to be private, since the
+string carries only what that account's own export already carried.
+
+### Reader caps
+
+| Cap | Value | Why |
+| --- | --- | --- |
+| input wire length | 40KB | The real bomb guard. `LibDeflate:DecompressDeflate` has no streaming cap, so bounding the *input* is what bounds the work; a legitimate cleanup list for 20 characters is well under a kilobyte. |
+| decoded payload | 512KB | Second line, checked after inflate. |
+| JSON nesting depth | 16 | `Import.JSONDecode` is recursive-descent and this payload is four levels deep. |
+
+`Import.JSONDecode` is hand-rolled and strict: it accepts exactly the grammar
+`Bundle.JSON` emits and rejects trailing garbage. It does **not** use
+`loadstring` — `tools/validate.mjs` fails the build on that, and executing a
+pasted string would be the single worst thing this addon could do.
 
 ## Version bump policy
 
@@ -506,6 +659,27 @@ carry over to the heavier synthetic warband the 1/6/20 table used: **~512KB
 JSON / ~84KB wire at the 20-character cap**, still well inside the 1MB decoded
 limit. `talents` costs one loadout string per known spec and is small relative
 to gear.
+
+### What 1.3.0's five fields add, measured
+
+Same six-character roster again, `tools/sample.mjs` before and after. The
+sample also grew two deliberately-junk bag entries per character in 1.3.0 — a
+list of nothing tests nothing — so the two effects are separated here rather
+than reported as one number:
+
+| | JSON | wire |
+|---|---|---|
+| 1.2.0 | 82.3KB | 16.4KB |
+| + `n`/`q`/`b`/`cls`/`sub` on the same entries | 87.4KB | 17.3KB |
+| + two junk bag entries per character | 89.2KB | 17.7KB |
+| **field delta for 6 characters** | **+5.1KB** | **+0.9KB** |
+| **field delta per character** | **~+0.85KB** | **~+0.15KB** |
+
+The name is nearly all of it, and it still deflates well — names repeat their
+vocabulary across a warband, which is exactly what a 32KB window is good at.
+Carried to the 20-character cap the five fields cost roughly **+3KB wire**,
+landing near ~87KB against the same 1MB decoded ceiling. Nothing here moves a
+cap.
 
 ## Sample vectors
 

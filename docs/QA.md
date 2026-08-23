@@ -23,6 +23,30 @@ Pass 1 — single char fresh
 - [ ] Paste into /app import preview → 1 char green dot, gold matches, bags count, currencies >=1, consumables numbers, vault matches in-game Weekly Rewards UI visual comparison (1/3 etc)
 - [ ] /console taintLog 0 — /reload — check Logs/taint.log no line WarbandPro
 
+## Clear-out — /warband junk (1.4.0)
+
+The taint line above is the one that matters most for this panel: it is the
+only place this addon puts a secure button on screen. Run the taint check again
+after using it, not only after the export pass.
+
+- [ ] /warband junk on a character with no list — panel opens, says "paste the cleanup string from warband.pro/gear above"
+- [ ] Paste your own export string (wb1!) into the paste box — red line names it as an export string, does NOT say invalid
+- [ ] Paste rubbish — red line, panel does not close, nothing stored
+- [ ] warband.pro /gear → [ cleanup ] → [copy addon string] → paste here — list renders, paste box clears
+- [ ] /dump WarbandProDB.junk — one entry keyed by your guid, generatedAt a plausible unix time
+- [ ] Rows show item name in quality colour, item level, and a reason ("30 behind" / "cannot wear")
+- [ ] Sell buttons are disabled away from a merchant, footer says "open a merchant to sell"
+- [ ] Open a merchant — Sell enables, footer changes; click one — item sells, row disappears, header count drops
+- [ ] Non-enchanter: no Disenchant buttons at all, verdict column reads sell
+- [ ] Enchanter: Disenchant buttons present; click one — cast starts (it is your click, not the addon's)
+- [ ] Move a listed item to the bank, reopen the panel — it leaves the list and "N no longer in your bags" counts it
+- [ ] Two identical items in bags — both appear as rows, one verdict covered both
+- [ ] Grey vendor trash appears without being on the pasted list at all
+- [ ] Paste a string from a DIFFERENT account — panel says the list is for characters this account has not scanned
+- [ ] Enter combat with the panel open — it closes; leave combat — it reopens by itself
+- [ ] /warband junk while in combat — chat says it will open when you drop out, and it does
+- [ ] /console taintLog 1 — repeat the merchant + disenchant pass — /reload — Logs/taint.log has no WarbandPro line
+
 Pass 2 — multi-char bundle
 - [ ] Log Voctara alt without opening warbank — /warband copy bundle len 2
 - [ ] Verify bundle still contains Warbank from Vocnar snapshot (seenAt not reset, seenBy still Vocnar)

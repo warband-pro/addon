@@ -54,18 +54,49 @@ function itemString(id, spec) {
 // Slots 1-19 minus 4 (shirt) and 19 (tabard) — matches Gear.lua's EQUIPPED_SLOTS.
 const EQUIP_SLOTS = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 
+// Names are as made-up as the ids. The website reads gear[].n directly rather
+// than resolving a name per id, so a sample with no names exercises the wrong
+// path — the "your addon predates cleanup" fallback rather than the list.
+const NAME_A = ['Aureate', 'Sureki', 'Tarnished', 'Eversong', 'Worn', 'Golden'];
+const NAME_B = ['Sentry', 'Zealot', 'Dawnlit', 'Warden', 'Drudge', 'Pilgrim'];
+const NAME_C = ['Greathelm', 'Hauberk', 'Cinch', 'Warglaive', 'Signet', 'Cowl'];
+function itemName() {
+  return `${NAME_A[rnd(NAME_A.length)]} ${NAME_B[rnd(NAME_B.length)]}'s ${NAME_C[rnd(NAME_C.length)]}`;
+}
+
+// Armor class/subclass pairs. 4 = Armor (0 misc — necks, rings, trinkets,
+// cloaks; 1-4 cloth through plate), 2 = Weapon. The addon does not filter gear
+// by what the character can wear, so a sample that only ever emits wearable
+// items never exercises the website's `unusable` verdict.
+const ARMOR_SUBS = [1, 2, 3, 4];
+
 function gear(spec, ilvlBase) {
   const equipped = EQUIP_SLOTS.map((slot) => {
     const id = 210000 + rnd(20000);
-    return { slot, where: 'equipped', id, ilvl: ilvlBase + rnd(15), s: itemString(id, spec) };
+    return {
+      slot, where: 'equipped', id, ilvl: ilvlBase + rnd(15), s: itemString(id, spec),
+      n: itemName(), cls: 4, sub: 2,
+    };
   });
   // A couple of unequipped pieces so a preview of best-in-bags has something to
   // compare against — a spare ring and a spare trinket.
   const spare = [11, 13].map((slot) => {
     const id = 210000 + rnd(20000);
-    return { slot, where: 'bag', id, ilvl: ilvlBase - 10 + rnd(20), s: itemString(id, spec) };
+    return {
+      slot, where: 'bag', id, ilvl: ilvlBase - 10 + rnd(20), s: itemString(id, spec),
+      n: itemName(), q: 3 + rnd(2), b: true, cls: 4, sub: 0,
+    };
   });
-  return [...equipped, ...spare];
+  // Two pieces well below the equipped kit, one of them the wrong armor class:
+  // the two shapes the cleanup view is built to name.
+  const junk = [1, 5].map((slot) => {
+    const id = 210000 + rnd(20000);
+    return {
+      slot, where: 'bag', id, ilvl: ilvlBase - 40 - rnd(40), s: itemString(id, spec),
+      n: itemName(), q: 2 + rnd(2), b: true, cls: 4, sub: ARMOR_SUBS[rnd(ARMOR_SUBS.length)],
+    };
+  });
+  return [...equipped, ...spare, ...junk];
 }
 
 const LOADOUT_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

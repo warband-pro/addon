@@ -23,6 +23,55 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-08-23 — the clear-out panel
+
+**The first thing warband.pro has ever sent back.** Until now this addon only
+talked outward: you pasted a string into the site and that was the end of the
+conversation. `/warband junk` is the other half. Copy the cleanup list off
+warband.pro's gear page, paste it here, and you get a list of what to get rid
+of — with a Sell button that works at any merchant and, if you are an
+enchanter, a Disenchant button beside it.
+
+### Added
+
+- `/warband junk` — the clear-out panel. Paste box at the top, one row per
+  item, an age line so you can see how old the list is.
+- Sell at a merchant. The button is dark until a merchant window is open, and
+  the item it sells is the one on that row.
+- Disenchant, for enchanters. This is your click, not the addon's — the game
+  does not allow an addon to cast for you, and this addon does not try. Your
+  profession is checked when the panel draws, not when the list was made, so
+  dropping enchanting does not leave a button that casts nothing.
+- Grey vendor trash is listed too, and it never came from the website. Your
+  bags right now are the only honest source for that, and the site's copy is
+  as old as your last paste.
+- `wbc1!`, the return format. Its own prefix rather than the reserved `wb2!`,
+  which is still for a breaking change to the export string.
+
+### How it finds your items
+
+**Not by bag position.** The list is made from an export you took earlier, and
+by the time it comes back you have looted, sold, sorted and run a dungeon —
+bag slot 14 is not what it was. Selling by remembered position would eventually
+sell the wrong thing, so the panel matches items by their full item string and
+takes the position from the bags as they are at that moment.
+
+A consequence worth knowing: items you have already got rid of, or moved to the
+bank, simply drop off the list, and the header counts them as no longer in your
+bags. Two copies of the same item both get listed from one entry.
+
+### Safety
+
+- The panel closes when you enter combat and comes back when you leave. Nothing
+  is rewritten mid-fight, which is also why nothing goes stale behind you.
+- Pasting your export string into the paste box says so, rather than calling it
+  invalid — it is a perfectly good string, just the wrong direction.
+- The decoder is hand-written and reads exactly one shape. It does not run
+  anything it reads, and 49 tests run against it on every push, including the
+  real string the website produces.
+- Nothing is ever deleted. The panel can say an item is worth deleting; the
+  keystrokes are yours.
+
 ## [1.3.0] — 2026-08-23 — bag gear actually reaches the wire, and it has a name
 
 **Every bag, bank and warband-tab gear entry was being dropped before it
@@ -61,6 +110,11 @@ a bag holding seven items another tool could see.
   call plate on a mage unwearable). Equipped entries never carry them: the
   Profile API already answers all five for what is worn. All additive on
   `wb1!`; older bundles keep decoding.
+
+- Measured on the six-character sample: **+0.85KB of JSON and +0.15KB of wire
+  per character**, or about +3KB of wire at the 20-character cap. Names repeat
+  their words across a warband and deflate folds the repeats. Update and paste
+  again; nothing about your stored data needs clearing.
 
 ## [1.2.0] — 2026-08-21 — every vault slot, not only the summary
 

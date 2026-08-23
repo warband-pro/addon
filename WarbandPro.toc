@@ -39,5 +39,7 @@ Gear.lua
 Perf.lua
 Bundle.lua
 Export.lua
+Import.lua
+Junk.lua
 UI.lua
 Core.lua
