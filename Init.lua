@@ -79,13 +79,26 @@ local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 local itemInfoCache = {}
 ns.itemInfoStats = { hits = 0, misses = 0 }
 
--- Field order matches how the two existing call sites already destructure
--- GetItemInfoInstant's return list (Gear.lua reads position 5, Scan.lua reads
--- 6 and 7) — this only caches that result, it does not relitigate it. Routed
--- through ns.safe, not a bare pcall: a bad id must cost this one lookup, not
--- (as Scan.lua's old unprotected rollup could) the whole scan it is part of.
+-- The return list, written out because guessing at it cost this addon two
+-- minor versions of bag gear:
+--
+--   1 itemID  2 itemType  3 itemSubType  4 itemEquipLoc
+--   5 icon    6 classID   7 subclassID
+--
+-- **equipLoc is position 4, not 5.** Both original call sites read 5, this memo
+-- inherited it, and the comment that used to sit here asserted position 5 as
+-- settled fact — which is why the perf refactor reproduced it faithfully. What
+-- position 5 actually holds is the icon file id, a number, so
+-- EQUIPLOC_SLOT[icon] missed on every single item and Gear.Visit dropped every
+-- bag, bank and warband-bank item from 1.1.0 until this was found. Nothing
+-- errored and nothing was empty in a way anyone could see: Gear.Equipped walks
+-- fixed slot numbers and never reads equipLoc, so the half that worked hid the
+-- half that never did. tools/gear-test.lua now pins all three positions.
+--
+-- Routed through ns.safe, not a bare pcall: a bad id must cost this one lookup,
+-- not (as Scan.lua's old unprotected rollup could) the whole scan it is part of.
 local function rawItemInfo(id)
-  local _, _, _, _, equipLoc, classID, subclassID = GetInstant(id)
+  local _, _, _, equipLoc, _, classID, subclassID = GetInstant(id)
   return { equipLoc = equipLoc, classID = classID, subclassID = subclassID }
 end
 

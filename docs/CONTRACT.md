@@ -241,8 +241,24 @@ both fields cost nothing beyond the bytes. They exist so the website can judge
 whether *this* character can wear an item without shipping an armor-class table
 or an equippable-items dump: **the addon does not filter gear by what the
 character can use**, it never has, and `EQUIPLOC_SLOT` gates on equip location
-only. A plate chest in a druid’s bag has always been on the wire; until 1.3.0
-the website had no way to know it was plate.
+only. A plate chest in a druid’s bag belongs on the wire; until 1.3.0 the
+website had no way to know it was plate.
+
+> **Correction, 2026-08-23.** This paragraph read "has always been on the
+> wire". True of the intent, false of the fact: **no bag, bank or
+> warband-bank gear reached the wire at all between 1.1.0 and 1.3.0.**
+> `ns.itemInfo` read `GetItemInfoInstant`’s icon (position 5) where it meant
+> to read `itemEquipLoc` (position 4), so `EQUIPLOC_SLOT` missed on every
+> item and `Gear.Visit` returned early every time. Equipped gear was
+> unaffected — `Gear.Equipped` walks fixed slot numbers and never consults
+> equipLoc — which is exactly why nobody noticed: the wire looked populated.
+> Fixed in 1.3.0 and pinned by `tools/gear-test.lua`, whose fixture puts a
+> valid `INVTYPE_*` string in the icon position so a repeat reads as a wrong
+> slot rather than as an empty bag.
+>
+> Two consequences when reading older data: a bundle from 1.1.0-1.2.x carries
+> `gear[]` entries that are **100% `where:"equipped"`**, and the website’s
+> best-in-bags had no input for its entire existence.
 
 **Duplication with `bags[].items[]` is deliberate.** A gear piece sitting in a
 bag appears twice in the payload: once as a plain `{id, count}` stack in the

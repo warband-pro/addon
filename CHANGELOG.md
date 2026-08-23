@@ -104,6 +104,23 @@ All five are optional and additive on `wb1!`. An older warband.pro reading a
 newer string does not see them; a newer one reading an older string treats them
 as not looked at, which is not the same as empty.
 
+### Fixed
+
+- **Bag, bank and warband-bank gear now actually reaches warband.pro.** It
+  never has. The lookup that works out which slot a bagged item would go in
+  read the wrong field — it took the item's icon where it meant to take its
+  equip location — so every bag item failed the check and was dropped before
+  it could be sent. Only equipped gear made it onto the wire, because equipped
+  gear is read a different way that never touches that field.
+
+  This has been true since bag gear was added in 1.1.0. If you have wondered
+  why warband.pro never found an upgrade sitting in your bags, this is why:
+  it was never told about anything in them. Best-in-bags, the upgrade column
+  on the gear page, and the "equip that" line in the tonight plan have all had
+  nothing to work with this whole time. They start working with this build.
+
+  Update and paste again. Nothing about your stored data needs clearing.
+
 Measured on the six-character sample: **+0.85KB of JSON and +0.15KB of wire per
 character**, or about +3KB of wire at the 20-character cap. Names repeat their
 words across a warband and deflate folds the repeats.
