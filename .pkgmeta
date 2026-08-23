@@ -19,7 +19,8 @@ manual-changelog:
   markup-type: markdown
 
 # Everything a player never needs. docs/ is the coding reference and tools/ only
-# runs on a laptop; both would be dead weight in every download.
+# runs on a laptop; both would be dead weight in every download. CLAUDE.md and
+# .claude/ are the same kind of thing for a coding agent.
 ignore:
   - docs
   - tools
@@ -29,3 +30,5 @@ ignore:
   - .editorconfig
   - .luacheckrc
   - .pkgmeta
+  - .claude
+  - CLAUDE.md
