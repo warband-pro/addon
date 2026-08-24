@@ -18,6 +18,51 @@ pointer, plus the two rules that are not written down anywhere else.
 | What the app side expects | [`docs/APP-IMPORT.md`](docs/APP-IMPORT.md) |
 | Distribution rules | [`docs/POLICY.md`](docs/POLICY.md) |
 
+## Never Mix the Two Repositories
+
+**This repo is public and `warband-pro/app` is not.** This one is MIT on
+GitHub and the packager ships it to CurseForge and Wago on every tag. That one
+holds Battle.net and Discord client secrets, a session signing key, Cloudflare
+account and D1 database ids, and a wiki whose own contract says credentials and
+unpublished ids never enter it.
+
+**A file that crosses from there to here is published, and publishing is a
+one-way door.** A later commit does not un-ship a release: the tag is out and
+CurseForge has already mirrored it. This is the same shape as the harness
+branch below, and it is worse, because the thing that escapes is not a label.
+
+The risk is not carelessness with secrets. It is that **both repos are checked
+out side by side, at sibling paths, and take near identical git commands.** On
+2026-08-24 a session working across both ran two commands meant for this repo
+while the shell was still in the app's directory — a `git pull` and a
+`git branch -d`. Neither did harm; one was redundant and the other errored. The
+same slip one line later, between a `git add -A` and a `git commit`, commits the
+app's working tree here.
+
+So:
+
+- **One change, one repo.** A single commit never spans both. Cross-repo work —
+  a `wb1!` change, a label both sides print — is two commits in two repos, and
+  [`docs/CONTRACT.md`](docs/CONTRACT.md) is the seam they meet at.
+- **Name the repo in the command** when both are open: `git -C /path/to/addon`,
+  not `cd` and hope. `pwd` before any `git add`.
+- **Nothing from the app is ever copied here** — not a config value, not a
+  secret, not a snippet of its wiki. What this repo needs to know about the app
+  is the wire format, and that lives in `docs/CONTRACT.md` and
+  [`docs/APP-IMPORT.md`](docs/APP-IMPORT.md).
+
+A `PreToolUse` hook
+([`.claude/hooks/one-repo-per-commit.sh`](.claude/hooks/one-repo-per-commit.sh))
+refuses a commit whose staged files are not this addon's, and refuses one
+carrying a line that looks like a real credential. **It is an allowlist, not a
+denylist** — it describes what this repo *is*, so it catches `src/`, `.wiki/`,
+`wrangler.jsonc` and everything else over there without naming any of them. It
+reads this repo's index whatever directory the command ran in, because a check
+that trusted the command's own cwd would be blind exactly when it matters.
+
+Prose is the other half and not a substitute: this file records, immediately
+below, what happened the last time this repo relied on prose alone.
+
 ## Git
 
 **Commit and push straight to `main`.** No feature branches, no pull requests.

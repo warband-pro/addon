@@ -9,6 +9,11 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/no-harness-branch-push.sh\"",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/one-repo-per-commit.sh\"",
+            "timeout": 5
           }
         ]
       }
