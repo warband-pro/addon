@@ -144,56 +144,40 @@ From `docs/QA.md` checklist expanded:
 - Window matches the client's UI scale — change scale in Settings, /reload,
   the window tracks it with no option of its own.
 
-## Web side — Import simplicity
+## Web side — what actually shipped
 
-Goal you said: "just hit Import and maybe grab from your clipboard if not we just pop a box you throw it in". Yes.
+**This section described a modal that was never built — corrected 2026-08-24.**
 
-### Where it lives
+It specified a web import *modal* with `navigator.clipboard.readText()`, a
+preview table, a `[Confirm Import]` button, a toast, and a 25 KB size cap. None
+of that is what `warband-pro/app` does, and some of it was actively dangerous to
+build from: the cap is wrong by a factor of forty, so a perfectly ordinary
+six-character bundle would have been rejected as "too large" with advice
+(`/warband copy current`) that then sends a single alt.
 
-/app Camp page top bar and Settings > Import. Hotkey `i` to open anywhere (like command palette). Existing `Sync.astro` button-only prefetch surface — we mimic button-only pattern no auto-pull.
+What the site actually does, and the only description of it this repo should
+carry:
 
-### Flow
+| | |
+|---|---|
+| Where | a one-line field in the rail's `$ import` block, on **every** route |
+| Reached by | pressing `i` anywhere, or the rail's own field directly |
+| Submit | paste, then Enter. No preview step, no confirm button |
+| Feedback | a receipt listing what arrived, which decays after six seconds; the block's `never`/`38m ago` stamp is the part that persists |
+| Size cap | 1 MB decoded, 1..20 characters — see [CONTRACT.md](CONTRACT.md) and [APP-IMPORT.md](APP-IMPORT.md) |
 
-1. User clicks [Import] or hits `i`
-2. Modal mounts, tries `navigator.clipboard.readText()` inside click handler (must be user gesture else Permission Denied). If succeeds and text startsWith `wb1!` or `wb0!` length > 10, we auto-fill preview immediately — 0 paste needed!
-3. If clipboard empty / permission denied / not wb1! — show big <textarea> auto-focused, placeholder "Paste wb1! string here — press Ctrl+V", paste triggers debounce preview render (~150ms).
-4. Preview table live (no confirm yet):
-   - header "Warband bundle — 6 chars — exported 12m ago"
-   - rows: name · realm · faction dot 🟢<6h 🟡<3d 🔴>3d ⚪never · gold · bag free slots · bank free · warbank age · phials etc derived (same as Tracker Preview in README)
-   - warn if bundle older than 3d for > half chars: "half stale — you may want to log alts again later"
-5. [Confirm Import] upserts into character_addon_cache D1: per char row keyed by user_id+realm_slug+char_name guid? Use guid if possible for renames. Overwrites last_seen_ms etc but missing chars in bundle NOT deleted (keeps prior).
-6. Toast "Imported 6 characters · 2m ago freshened" then Data staleness dots in Camp refresh without reload.
-7. Modal closes on Esc, stores imported_at_ms for staleness calculation.
+The import surface went route → overlay → rail field, and the reasoning for
+each move is recorded in the app repo's own wiki
+(`.wiki/wiki/concepts/shell-model.md` §10), which is where the web UI is
+specified. **This repo owns the wire, not the website.** A second description of
+one surface, maintained in a repo that cannot see it, is the drift both projects
+already know about — it is why the app derives its landing page from an
+inventory instead of writing it, and it is why the four stale names for this one
+field ("warband.pro > Import", `/settings/import`, "Camp page top bar", "the
+top-right sink") all survived for months.
 
-### Clipboard nuance
-
-- Modern Chrome/Edge allow `readText()` only in click context and only over HTTPS — warband.pro is HTTPS so fine. Fallback paste box works on Firefox / Safari where permission more strict.
-- Never `readText()` polling, only inside Import click.
-- Don't auto-submit — user must still press Confirm after preview so they see staleness before overriding.
-
-### Paste validation UX
-
-On paste, if not starting wb1!:
-
-- If starts wb0! — say "That's Camp DNA share, not inventory — use Share import tab"
-- Else "Doesn't look like Warband string — starts with wb1! ? Try /warband copy again"
-- Too long >25KB decoded or >20 chars — red "bundle too large, try /warband copy current single"
-
-All client-side before D1 write — no server blast.
-
-### Accessibility
-
-- Text area monospaced JetBrains Mono same as bench aesthetic, neon pink #ff2e88 border muted.
-- Data table small but readable, names in class color (read-only).
-- Keyboard: Tab from textarea to Confirm, Enter confirms.
-- Mobile: if phone clipboard — still works but Warband addon mobile never (WoW PC only) so desktop flow prioritized.
-
-### Tonight Plan integration after import
-
-After Confirm, Tonight Plan re-evaluates using fresh consumables data:
-- If 0 phials and data fresh (<6h) block +12 suggestion with red.
-- If 0 phials but data 5d old (yellow) grey text "per last import 5d ago — verify?"
-This ties multi-char bundle to actual push value you wanted.
+**The rule this leaves behind:** anything in this repo describing the website is
+either the wire contract, or a pointer. It is never a design.
 
 ## AI coding hints (since AI never sees game)
 
@@ -204,7 +188,9 @@ This ties multi-char bundle to actual push value you wanted.
 
 ## Copy-paste difficulty addressed
 
-WoW chat = hard. This panel = 1 shortcut: /warband Enter -> Ctrl-C. Web side = 0 shortcuts if clipboard permission succeeds: Click Import -> Preview appears (auto grabbed) -> Confirm. If permission denied -> Ctrl-V fallback. Either way under 5 sec for 6 alts Saturday before your push.
-
-When we ship light, this UI description remains but docs/UI.md can be trimmed to CONTRACT + QA minus implementation rambling.
+WoW chat = hard. This panel is two keystrokes: `/warband` Enter, then Ctrl+C on
+a string that is already selected — or one keybind, since 2026-08-24, which is
+what docs/FLOW.md had been promising all along. The web side is three: `i`,
+Ctrl+V, Enter. Six alts in well under five seconds, and the panel says `copied`
+when the first half is done.
 

@@ -43,3 +43,7 @@ Import.lua
 Junk.lua
 UI.lua
 Core.lua
+
+# Bindings.xml is declarative and names a function UI.lua defines, so it is
+# listed last rather than with the Lua files it depends on.
+Bindings.xml

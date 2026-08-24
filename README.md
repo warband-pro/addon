@@ -25,7 +25,7 @@ It's the same problem Altoholic + SavedInstances solve locally — we make it we
 2. Log any character — snapshot saved silently in account-wide `WarbandProDB`.
 3. Log alts 2..6 through the week — 0 extra steps, bag updates throttled .5s.
 4. Any character: `/warband` → auto-highlighted box → `Ctrl+C` copies `wb1!aH...` (4-7KB for 6 chars, ~26KB with full bag contents).
-5. Second monitor, [warband.pro](https://warband.pro) open — top-right `[ ↻ sync / ↥ import ]` → Import (`i` hotkey) → auto-grabs clipboard if you just copied, else paste → preview:
+5. Second monitor, [warband.pro](https://warband.pro) open — press `i` anywhere to put the cursor in the rail's import field, paste, Enter:
 
 ```
 Vocnar — 2h ago — 847g — 312 pots — fresh
@@ -107,7 +107,7 @@ settings of its own.
 /warband perf           scan timing, slot counts, item-info cache, memory
 ```
 
-On [warband.pro](https://warband.pro): `/settings/import` or top-right Import (`i`) → auto-clipboard grab if `wb1!` present → preview → Confirm → Tonight Plan re-evaluates.
+On [warband.pro](https://warband.pro): press `i` anywhere — the cursor lands in the rail's `$ import` field, on whatever route you are reading — paste, Enter. A receipt names what arrived and the tonight plan re-ranks.
 
 ## Sites — this repo deploys everywhere
 
@@ -123,7 +123,7 @@ Until IDs are set, release warns "site skipped — no token" rather than failing
 
 ## Second-monitor flow — why omnipresent import matters
 
-Game on main monitor, warband.pro on second interior monitoring. Back-and-forth 4-10 times per night: log out → glance sync, loot spark / open vault / open warbank → addon already snapped it, `/warband Enter Ctrl+C` 1 sec, second monitor Import click (`i`) — if clipboard holds `wb1!` from 10 sec ago preview appears zero paste, else auto-focus Ctrl+V, Confirm → Tonight Plan flips.
+Game on main monitor, warband.pro on the second. Back and forth four to ten times a night: log out, glance at sync, loot a spark / open the vault / open the warband bank — the addon has already snapped it — then `/warband`, Ctrl+C (the panel says `copied`), eyes right, `i`, Ctrl+V, Enter. The tonight plan flips.
 
 Top-right sink `[ ↻ sync / ↥ import ▼ ]` lives every route, mirrors ghost sync buttons in blocks.
 
@@ -137,7 +137,7 @@ When shipping light, flat root, no badges clutter, per your rule Problem→Insta
 
 ## Decisions
 
-Locked: multi-char default ✓, staleness per-section stamps ✓, retail Midnight only ✓, wb1! format ✓, vendor LibDeflate only ✓, omnipresent sink top-right ✓, companion framing ✓, vanilla no Ace3/LibStub ✓
+Locked: multi-char default ✓, staleness per-section stamps ✓, retail Midnight only ✓, wb1! format ✓, vendor LibDeflate only ✓, import is a rail field on every route ✓, companion framing ✓, vanilla no Ace3/LibStub ✓
 
 Open 5 before 1.0: minimap N default off — Compartment enough?, itemName in bundle or id-only + Game Data lookup?, warbank stamp shared vs per-char?, recipe totalRecipes static fetch?, CF vs Wago first?
 

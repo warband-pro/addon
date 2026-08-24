@@ -32,14 +32,14 @@ local DOT = {
   red    = "|cffff2020*|r",
   never  = "|cff808080*|r",
 }
-local MUTED, WARN, BAD = "808080", "ffd100", "ff2020"
+local MUTED, WARN, BAD, GOOD = "808080", "ffd100", "ff2020", "00ff00"
 
 local TAB_EXPORT, TAB_IMPORT, TAB_OPTIONS = 1, 2, 3
 local MAX_ROWS = 8
 local JUNK_ROWS = 12
 
 local frame, panels, tabs
-local editBox, header, footer, rows
+local editBox, header, footer, rows, help
 local junkPaste, junkHeader, junkFooter, junkRows, junkChild
 local optionChecks = {}
 
@@ -80,6 +80,31 @@ local function makeWell(parent)
 end
 
 -- ── export tab ──────────────────────────────────────────────────────────────
+
+-- Step 2 read "warband.pro > Import", and the site has no such destination:
+-- import is a field in the rail, reached with `i`, on every route. The README
+-- said `/settings/import` (a route that has been deleted) and docs/UI.md said
+-- the Camp page's top bar — three stale names for one field, none of them
+-- right, in the one instruction a player follows every night. What ships is
+-- what the site actually does.
+--
+-- Button labels stay capitalized ("Select all", "Sell", "Disenchant") while
+-- every line of panel prose is lowercase: the buttons are Blizzard's chrome
+-- and match "Accept" and "Cancel" beside them, and the prose is ours and
+-- matches the chat lines it shares a voice with.
+local HELP_STEPS = "1. Ctrl+C copies (already selected)   2. on warband.pro press i, paste, Enter   3. Esc closes"
+
+-- Repaint the instruction line for whether the string has been copied yet.
+-- `UI.copied` is per-render rather than persisted: it answers "did you copy
+-- *this* string", and a fresh build is a fresh string.
+local function refreshHelp()
+  if not help then return end
+  if UI.copied then
+    help:SetText(format("|cff%scopied|r  ·  on warband.pro press i, paste, Enter", GOOD))
+  else
+    help:SetText(HELP_STEPS)
+  end
+end
 
 local function buildExport()
   local p = panels[TAB_EXPORT]
@@ -122,13 +147,30 @@ local function buildExport()
       self:HighlightText()
     end
   end)
+  -- The one moment this addon exists for, and nothing acknowledged it.
+  --
+  -- The player's whole job here is Ctrl+C. WoW gives an addon no way to read
+  -- the clipboard, so the copy itself cannot be confirmed — but the keystroke
+  -- can be seen, and seeing it is enough to say "that landed, here is what to
+  -- do next". Before this the window gave no flash, no state change, no sound:
+  -- the only evidence was /warband status's "last copied", which was stamped
+  -- when the panel *rendered* (below) and so reset itself every time the window
+  -- was opened and closed without a keypress. A readout answering the wrong
+  -- question is worse than no readout.
+  editBox:SetScript("OnKeyDown", function(_, key)
+    if key ~= "C" or not IsControlKeyDown() then return end
+    if not UI.current or UI.current == "" then return end
+    if ns.Store.Ready() then ns.Store.db.lastExport = ns.now() end
+    UI.copied = true
+    refreshHelp()
+  end)
   scroll:SetScrollChild(editBox)
 
-  local help = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  help = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   help:SetPoint("BOTTOMLEFT", 0, 18)
   help:SetPoint("BOTTOMRIGHT", 0, 18)
   help:SetJustifyH("LEFT")
-  help:SetText("1. Ctrl+C copies (already selected)   2. warband.pro > Import, or Ctrl+V   3. Esc closes")
+  help:SetText(HELP_STEPS)
 
   footer = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   footer:SetPoint("BOTTOMLEFT", 0, 2)
@@ -147,7 +189,7 @@ end
 local function renderRows(summary)
   for i = 1, MAX_ROWS do rows[i]:SetText("") end
   if #summary == 0 then
-    rows[1]:SetText("|cff" .. MUTED .. "No characters scanned yet — log in on a character and it lands here.|r")
+    rows[1]:SetText("|cff" .. MUTED .. "no characters scanned yet — log in on a character and it lands here|r")
     return
   end
   local shown = math.min(#summary, MAX_ROWS)
@@ -166,27 +208,68 @@ local function refreshExport()
   local str, bytes, payload, rawBytes = ns.Export.Build({ currentOnly = UI.mode == "current" })
   UI.current = str or ""
   editBox:SetText(UI.current)
+  -- A new string has not been copied yet, whatever happened to the last one.
+  UI.copied = false
+  refreshHelp()
 
   local summary = ns.Bundle.Summary(payload)
   renderRows(summary)
 
   if not str then
-    header:SetText("|cff" .. BAD .. "Could not build the bundle|r — /warband status has the detail")
+    -- One plain sentence before the diagnostics. `/warband status` is what the
+    -- README itself calls a debug dump — event counts, per-section stamps, a raw
+    -- Lua error — and this was the one path that sent an ordinary player to it.
+    header:SetText("|cff" .. BAD .. "could not build the bundle|r — nothing to copy yet"
+      .. "; /warband status has the detail")
     footer:SetText("")
+  elseif #summary == 0 then
+    -- An empty bundle is not a bundle. `Bundle.Build` has no empty guard, so
+    -- with nothing scanned the string still built, the footer still reported a
+    -- byte count, and the box still auto-highlighted — a perfectly copyable
+    -- payload carrying `characters: []`, which the site rejects out of hand.
+    -- The row above already says why; this stops the panel contradicting it.
+    header:SetText(format("|cff%snothing to send yet|r — log in on a character and it lands here", WARN))
+    footer:SetText("")
+    UI.current = ""
+    editBox:SetText("")
   else
     local wb = ns.Store.db and ns.Store.db.warbandBank
     local bank = (wb and wb.seenAt)
       and format("  ·  warband bank %s (by %s)", ns.ago(wb.seenAt), wb.seenByName or "?")
       or "  ·  warband bank never seen"
-    header:SetText(format("%d character%s  ·  freshest %s%s",
+    -- Two warnings the panel used to leave for the far side of the copy.
+    --
+    -- A bundle where every character is red is worth knowing about *before*
+    -- alt-tabbing to paste it, not after: the site says "half stale" once it
+    -- has the string, by which point the effort is spent. The dots already
+    -- carry the per-character answer; this is the one about the bundle.
+    local allStale = true
+    for i = 1, #summary do
+      if summary[i].dot ~= "red" and summary[i].dot ~= "never" then allStale = false break end
+    end
+    -- And the cap. Past MAX_CHARS the oldest characters are dropped from the
+    -- wire and `droppedOverCap` is written into the payload — where nothing
+    -- ever read it, so a player's 21st alt simply did not exist on the site
+    -- with no line anywhere saying why. The remedy travels with it.
+    local dropped = payload.bundle.droppedOverCap
+    local warnLine = ""
+    if dropped then
+      warnLine = format("  |cff%s·  %d oldest left out (cap %d) — /warband clear <name>|r",
+        WARN, dropped, ns.MAX_CHARS)
+    elseif allStale then
+      warnLine = format("  |cff%s·  all stale — log those alts in again for fresher numbers|r", WARN)
+    end
+    header:SetText(format("%d character%s  ·  freshest %s%s%s",
       #summary, #summary == 1 and "" or "s",
-      #summary > 0 and ns.ago(payload.bundle.freshestSeenAt) or "never", bank))
+      #summary > 0 and ns.ago(payload.bundle.freshestSeenAt) or "never", bank, warnLine))
     local note = bytes > ns.SOFT_BYTES and format("  |cff%s(large — try /warband copy current)|r", WARN) or ""
     footer:SetText(format("|cff%s%s  ·  %d bytes from %d of JSON|r%s", MUTED, ns.WIRE, bytes, rawBytes or 0, note))
-    -- Stamped here rather than in Export.Build, so /warband status can report
-    -- when a string was last put in front of the user instead of resetting the
-    -- answer every time it is asked.
-    if ns.Store.Ready() then ns.Store.db.lastExport = ns.now() end
+    -- `lastExport` is NOT stamped here any more — 2026-08-24.
+    --
+    -- It was, and /warband status reported it as "last copied", so opening this
+    -- window and closing it again without touching the keyboard reset the
+    -- answer to "just now". The stamp belongs to the copy, and the copy is a
+    -- keystroke this panel can see; it is written in the editBox's OnKeyDown.
   end
 
   -- Highlighting only sticks once the frame has actually drawn.
@@ -244,7 +327,7 @@ local function buildImport()
   intro:SetPoint("TOPLEFT")
   intro:SetPoint("TOPRIGHT")
   intro:SetJustifyH("LEFT")
-  intro:SetText("Paste the cleanup string from warband.pro/gear — it reads itself.")
+  intro:SetText("paste the cleanup string from warband.pro/gear — it reads itself")
 
   -- The native single-line input, not a bare EditBox: InputBoxTemplate carries
   -- the recessed border every stock text field wears.
@@ -264,16 +347,27 @@ local function buildImport()
   junkPaste:SetScript("OnTextChanged", function(self, userInput)
     if not userInput then return end
     local text = self:GetText()
-    if text == "" or #text < 6 then return end
+    if text == "" then return end
     local decoded, code = ns.Import.DecodeCleanup(text)
     if not decoded then
       -- Only complain once the paste looks finished. A prefix typed one
       -- character at a time would otherwise scold on every keystroke.
-      if text:sub(1, #ns.CLEANUP_WIRE) == ns.CLEANUP_WIRE or #text > 24 then
+      --
+      -- The floor was `#text < 6` plus this test, which together swallowed
+      -- anything 1-24 characters that did not start with the prefix: no
+      -- decode, no message, no clear — the box simply sat there having done
+      -- nothing, which is indistinguishable from a broken addon. A paste is
+      -- one event, so anything arriving at once is finished by definition.
+      if #text >= #ns.CLEANUP_WIRE or #text > 24 then
         junkHeader:SetText("|cff" .. BAD .. ns.Import.Message(code) .. "|r")
       end
       return
     end
+    -- What was there before, so the receipt can say this replaced something.
+    -- Pasting a second list over a first was silent, and the two lists are
+    -- usually for different characters — "nothing happened" and "your previous
+    -- list is gone" looked identical.
+    local had = ns.Junk.Count()
     local kept = ns.Junk.Save(decoded)
     self:SetText("")
     self:ClearFocus()
@@ -282,6 +376,13 @@ local function buildImport()
       return
     end
     UI.RenderJunk()
+    -- After RenderJunk, which writes this same line from the resolved list —
+    -- the receipt is about the paste and has to win.
+    -- `kept` is characters, not items: Save stores one list per GUID and skips
+    -- any this account has never scanned. Saying "items" here would report the
+    -- wrong unit for the one number the paste produced.
+    junkHeader:SetText(format("|cff%sread a list for %d character%s%s|r", GOOD, kept,
+      kept == 1 and "" or "s", had > 0 and ", replacing the last one" or ""))
   end)
 
   junkHeader = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -338,18 +439,35 @@ function UI.RenderJunk()
     else
       local hex = QUALITY_HEX[r.quality or 1] or "ffffff"
       local reason = ns.Junk.ReasonText(r)
+      -- What the site said to DO with this, not only why it is on the list.
+      --
+      -- `Junk.VerdictLabel` has existed since the panel was written, is
+      -- covered by four cases in tools/junk-test.lua — including "delete is
+      -- advice, and says so" — and was never called. So a `del` row, an item
+      -- warband.pro judged should be deleted by hand, rendered as an ordinary
+      -- row with a live [Sell] button: the reason column explained why it was
+      -- junk while the button contradicted the recommendation beside it.
+      local verdict = ns.Junk.VerdictLabel(r, canDE)
       w.label:SetText(format(
-        "|cff%s%s|r%s%s",
+        "|cff%s%s|r%s%s%s",
         hex,
         r.name or "?",
         r.ilvl and format("  |cff%s%d|r", MUTED, r.ilvl) or "",
-        reason ~= "" and format("  |cff%s%s|r", MUTED, reason) or ""
+        reason ~= "" and format("  |cff%s%s|r", MUTED, reason) or "",
+        format("  |cff%s%s|r", MUTED, verdict)
       ))
 
       -- Sell is only ever live at a merchant. Off it, the button says why
       -- rather than disappearing — a row that changes shape when you walk up
       -- to a vendor is harder to read than one that lights up.
-      w.sell:SetEnabled(ns.Junk.merchantOpen)
+      --
+      -- `del` is the exception, and it is why the verdict had to reach the row
+      -- at all: nothing here deletes an item and the game would not allow it,
+      -- so the button is not merely disabled by position — there is no sell
+      -- for this row to do, and offering one was advice the site did not give.
+      local sellable = r.k ~= "del" or r.grey
+      w.sell:SetShown(sellable)
+      w.sell:SetEnabled(sellable and ns.Junk.merchantOpen)
       w.sell:SetScript("OnClick", function()
         if ns.Junk.Sell(r.bag, r.slot) then UI.RenderJunk() end
       end)
@@ -517,8 +635,20 @@ local function build()
   panels = { makePanel(), makePanel(), makePanel() }
 
   tabs = {}
-  tabs[TAB_EXPORT]  = makeTab(TAB_EXPORT, "Export")
-  tabs[TAB_IMPORT]  = makeTab(TAB_IMPORT, "Import")
+  -- Named by direction, with the site as the fixed reference — 2026-08-24.
+  --
+  -- They read "Export" and "Import", and the pair was inverted against the
+  -- only mental model a player has: warband.pro's own control for receiving
+  -- this string is called import, so the addon's *Export* feeds the web's
+  -- import and the addon's *Import* consumes what the web's /gear page hands
+  -- back. Someone who has just pressed import in the browser and typed
+  -- /warband landed on a tab called Import and was looking at the wrong one.
+  --
+  -- Nothing in the window said which way either tab flowed except one sentence
+  -- buried inside the second panel. A direction is what these tabs actually
+  -- differ by, so it is what they are named by.
+  tabs[TAB_EXPORT]  = makeTab(TAB_EXPORT, "To warband.pro")
+  tabs[TAB_IMPORT]  = makeTab(TAB_IMPORT, "From warband.pro")
   tabs[TAB_OPTIONS] = makeTab(TAB_OPTIONS, "Options")
   frame.Tabs = tabs
   PanelTemplates_SetNumTabs(frame, #tabs)
@@ -657,8 +787,16 @@ function UI.MerchantChanged(open)
   end
 end
 
--- Blizzard's addon compartment entry, declared by the .toc. This is the second
--- and last global the addon defines.
+-- Blizzard's addon compartment entry, declared by the .toc, and the keybinding
+-- entry declared by Bindings.xml. These are the last globals the addon defines.
+--
+-- Both open the same window on the same tab, because both answer the same
+-- question — "put the string in front of me" — and a key that landed somewhere
+-- else would be a second design of one action.
 function _G.WarbandPro_OnAddonCompartmentClick()
+  UI.Toggle("bundle")
+end
+
+function _G.WarbandPro_ToggleFromBinding()
   UI.Toggle("bundle")
 end

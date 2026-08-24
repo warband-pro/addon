@@ -1,0 +1,22 @@
+<Bindings>
+    <!--
+      The keybinding docs/FLOW.md has described since it was written.
+
+      That document lays out the nightly path as "/warband, Enter, Ctrl+C, or
+      keybind bar button" and calls it the sub-two-second loop repeated four to
+      ten times an evening. No BINDING_* was ever registered, so the real path
+      was five actions — Enter, type the command, Enter, Ctrl+C, Esc — two of
+      them chat-line typing, which a stuck chat focus eats.
+
+      One binding, on the toggle rather than on a tab: the window opens on the
+      export panel and that is what the key is for. Combat is handled where the
+      toggle already handles it — the request queues and fires on
+      PLAYER_REGEN_ENABLED — so this needs no protection of its own.
+
+      It is deliberately unbound by default. A binding this addon assigned for
+      itself would take a key the player has already given to something else.
+    -->
+    <Binding name="WARBANDPRO_TOGGLE" header="WARBANDPRO" category="WarbandPro">
+        WarbandPro_ToggleFromBinding()
+    </Binding>
+</Bindings>

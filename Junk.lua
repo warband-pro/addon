@@ -59,6 +59,19 @@ function Junk.Save(decoded)
   return kept
 end
 
+--- How many characters currently hold a stored cleanup list.
+---
+--- Read before a paste overwrites one, so the receipt can say the new list
+--- replaced something rather than leaving the player to notice that their
+--- previous list is gone.
+function Junk.Count()
+  local db = Store.db
+  if not db or type(db.junk) ~= "table" then return 0 end
+  local n = 0
+  for _ in pairs(db.junk) do n = n + 1 end
+  return n
+end
+
 --- Whether this character can disenchant, checked live rather than trusted from
 --- the export. A profession dropped since then would otherwise leave a button
 --- that casts nothing.

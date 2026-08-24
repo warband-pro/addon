@@ -43,12 +43,34 @@ handlers.ADDON_LOADED = function(addon)
   Store.Init()
 end
 
+--- Say hello exactly once per install, and never again.
+---
+--- Everything this addon does is silent by design — it captures on login and
+--- when a bag, bank, vault or mailbox opens, and prints nothing — which is
+--- right for the ninety-nine logins after the first and wrong for the first.
+--- Nothing was printed on install, so a player who got this from CurseForge
+--- and forgot the command had only the addon-compartment icon to find it by,
+--- and docs/FLOW.md rules out a minimap button on purpose.
+---
+--- The flag lives in SavedVariables, so this is one line in a lifetime rather
+--- than one per session. It names the command and the site, because those are
+--- the two things a first-time player has no other way to learn.
+local function greet()
+  if not Store.Ready() then return end
+  local db = Store.db
+  if db.greeted then return end
+  db.greeted = true
+  Store.Touch()
+  ns.print("installed — play normally, then type |cffffd100/warband|r to copy your bundle into warband.pro")
+end
+
 handlers.PLAYER_LOGIN = function()
   Store.Init()
   Gear.Seed()   -- before any scan: rebuilds this session's scope tables from storage
   Scan.All()
   Instances.Request()
   Instances.Vault()
+  greet()
 end
 
 handlers.PLAYER_ENTERING_WORLD = function()

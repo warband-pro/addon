@@ -20,15 +20,15 @@ So this addon is the bridge — lightweight bundle that makes Altoholic + SavedI
 
 This is not "install once, export once a month". It's frequent, low-friction, ambient:
 
-1. **Log out of char, hit sync** — Roser screen already did LFR? Character logged out. You glance at second monitor, hit `$ sync` top-right, you expect API freshness 1m ago now. You just want to know roster fresh.
+1. **Log out of char, hit sync** — character logged out after LFR. You glance at the second monitor and press `[sync with battle.net]` in the rail, beside the freshness rows it moves. You just want to know the roster is fresh.
 
 2. **Loot something meaningful, open vault, open warbank** — you just looted Spark fragment, opened Great Vault (3/8 → 4/8), opened Warband Bank with 200 Crests inside, got 20 phials from AH mail. You know that matters for Tonight Plan. You already have WarbandPro snapping it silently in background (bag update throttled .5s, bank opened, vault update). So bundle is already fresh without you remembering.
 
-3. **Second monitor tap to export/import** — game main, eyes slide to web, you hit `i` or click Import in top-right sink `[ ↻ sync / ↥ import ▼ ]`. If clipboard already holds wb1! from 12m ago (you did /warband Enter Ctrl+C 10 sec ago), web auto-grabs via `navigator.clipboard.readText()` inside that click — preview appears instantly, zero Ctrl+V. If denied, textarea auto-focused, you Ctrl+V.
+3. **Second monitor tap to import** — game on the main screen, eyes slide right, you press `i`. The cursor lands in the rail's `$ import` field on whatever route you were reading; Ctrl+V, Enter. A receipt names the characters that arrived and decays after six seconds, and the `$ import` stamp above it moves to `just now`.
 
 4. **Preview → Confirm → Tonight Plan flips** — Web shows 6 rows with staleness dots 🟢 <6h / 🟡 <3d / 🔴 >3d / ⚪ never. Hover says "Bags 2h ago, Bank 5d ago (open bank to refresh)". You confirm, D1 upserts each char individually, missing chars not deleted — just stale. Tonight Plan re-reads consumables rollup: "Vocgrim 0 phials → but Vocnar has 120 in Warbank → don't block +12, just consolidate first".
 
-5. **Repeat 4-10 times per play night** — You will log alts to check vault, to transfer gold, to grab mats. Each time you export again. So export must be <2 sec: `/warband` Enter Ctrl+C or keybind bar button, auto-highlight, Esc close.
+5. **Repeat 4-10 times per play night** — You will log alts to check the vault, to transfer gold, to grab mats. Each time you export again. So export must be <2 sec: `/warband` Enter Ctrl+C, or one key — the binding lives under Key Bindings > WarbandPro and ships unbound, because a key this addon assigned itself would take one the player has already spent. Auto-highlight, Esc closes.
 
 6. **Saturday push** — Play normally Mon-Sat, Saturday before +12 you paste once and get all 6 current. You never remembered per-char export.
 
@@ -45,7 +45,7 @@ This is not "install once, export once a month". It's frequent, low-friction, am
 Top-right Menubar `[ ↻ sync / ↥ import ▼ ]` is single place refresh lives regardless of route:
 
 - `↻ Sync API now` — same `data-sync-all` handler, refreshes roster/vitals/lockouts, reloads (purposeful — server-rendered rail would otherwise lie). Shows "API 12m ago".
-- `↥ Import addon (wb1!)` — opens modal, tries clipboard grab, fallback paste box, preview table with 🟢🟡🔴, confirm upserts, toast "Imported 6 · freshest 2m".
+- **Import** — a one-line field in the rail's `$ import` block, on every route. Paste, Enter. The receipt lists each character with its freshness dot and gold; the block's own stamp is the part that persists.
 - bottom small line combining: `API 12m · Addon freshest 2h · Warbank 1d (by Vocnar)` — immediate trust signal second-monitor glance.
 
 Existing block-embedded ghost sync buttons stay as mirrors, driven by same handler via `keys.ts` finding every `[data-sync-all]`. So you still see sync where motivation is (beside stale readout) and in sink where action is.
@@ -62,7 +62,7 @@ Hotkeys: `1-4` route, `?` help already. `i` opens import from anywhere.
 
 ## Success looks like
 
-- Human never says "do I need to re-export?". Copy panel tells freshness, web modal tells importer age vs current DB age, preview shows stale warning.
+- Human never says "do I need to re-export?". The copy panel names the freshest stamp and warns before the copy when every character is stale; it says `copied` when Ctrl+C lands, so "did that work" is answered where it is asked.
 - No data loss on export: Warband Bank seen 1h ago by Vocnar still present even if you exported from Voctara who didn't open bank. Shared account-wide.
 - No combat taint: export in combat safely disabled, queue reopen after `PLAYER_REGEN_ENABLED`.
 - Memory <2MB for 6 chars, SavedVariables <200KB.
@@ -72,7 +72,7 @@ Hotkeys: `1-4` route, `?` help already. `i` opens import from anywhere.
 
 - `RESEARCH-REFERENCE.md` → Midnight 12.0+ rules, why no Ace3, Interface 120001, Compartment, C_Container/C_Bank, Secret Values/CLEU avoidance, LibDeflate wb1! standard.
 - `CONTRACT.md` → wire shape, versioning, validation, DoS caps.
-- `UI.md` → game panel exact EditBox props + auto-highlight, web modal clipboard permission trick + textarea fallback.
+- `UI.md` → the game panel's exact EditBox props and auto-highlight. The website is the app repo's to specify; UI.md carries a pointer, not a design.
 - `TESTING.md` → offline luacheck + pure tests + vector round-trip + 5-min manual pass scripted for AI screenshot parse.
 - `QA.md` → copy-paste result format `PASS/FAIL`.
 - `CI.md` → packager, semver, tokens.

@@ -23,7 +23,32 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+### Added
+
+- A keybinding. Key Bindings > WarbandPro opens the window, so the four to ten
+  exports a play night cost one key instead of typing into chat. It ships
+  unbound — picking a key for you would take one you had already spent.
+- The panel says `copied` when you press Ctrl+C, and `/warband status` reports
+  when you actually copied rather than when you last opened the window.
+- One line on your first login after installing, naming the command. Nothing
+  else this addon does prints anything, which is right every night except the
+  first.
+- The clear-out list says what to do with each item, not only why it is on the
+  list. An item warband.pro says to delete by hand no longer shows a Sell
+  button — the game would not let that button work anyway.
+- A paste into the clear-out box now says what it read, and says so when it
+  replaced a list you already had.
+
 ### Changed
+
+- The tabs are named by direction: `To warband.pro` and `From warband.pro`.
+  They read Export and Import, which is backwards from the site's own words —
+  the site calls receiving this string an import, so the addon's Export fed the
+  site's import and a player who had just clicked import in the browser opened
+  a tab called Import and was looking at the wrong one.
+- Step 2 of the copy instructions says what the site actually does: press `i`,
+  paste, Enter. It said "warband.pro > Import", which is a destination that
+  does not exist.
 
 - One window instead of two. `/warband` opens a tabbed panel now — Export,
   Import, Options along the bottom, the way the game's own panels do it. It

@@ -29,6 +29,11 @@ read_globals = {
   "C_AddOns", "GetAddOnMetadata", "CreateFrame", "UIParent", "UISpecialFrames",
   "ChatFontNormal", "DEFAULT_CHAT_FRAME", "C_Timer", "GetServerTime",
   "GetBuildInfo", "InCombatLockdown",
+  -- The export box watches for a real Ctrl+C so the copy can be acknowledged:
+  -- WoW exposes no clipboard to read back, but it does say which modifier is
+  -- held, and that is enough to stamp `lastExport` on the copy rather than on
+  -- the render. See UI.lua's OnKeyDown.
+  "IsControlKeyDown",
 
   -- the tabbed window (UI.lua)
   "PanelTemplates_SetNumTabs", "PanelTemplates_SetTab", "PanelTemplates_TabResize",

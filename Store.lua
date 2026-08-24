@@ -38,6 +38,9 @@ function Store.Init()
   db.chars = db.chars or {}
   db.warbandBank = db.warbandBank or { seenAt = nil, seenByGuid = nil, seenByName = nil, tabs = {} }
   db.lastExport = db.lastExport or 0
+  -- Whether this install has ever told the player it is here. One line, once,
+  -- on the first login after install — see Core.lua's PLAYER_LOGIN.
+  db.greeted = db.greeted or false
   db.opts = db.opts or {}
   if db.opts.includeLinks == nil then db.opts.includeLinks = false end
   if db.opts.includeGear == nil then db.opts.includeGear = true end
