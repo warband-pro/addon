@@ -140,6 +140,46 @@ ship against `wb1!`. `docs/CONTRACT.md` is the law for the wire half.
 `main` only, direct push, tag to release. No PR ceremony for a one-maintainer
 repo — CI still runs on every push, so the safety net is the same.
 
+## Running the checks locally — and the half you cannot
+
+CI installs `lua5.1` and `luarocks` on an Ubuntu runner. **A Windows
+workstation has neither, and deliberately does not** — see below. So the seven
+offline checks split cleanly by runtime, and it is worth knowing which half you
+are actually running before you push:
+
+| Check | Needs | On a Node-only machine |
+|-------|-------|------------------------|
+| `node tools/validate.mjs` | Node | ✅ runs |
+| `node tools/vector.mjs` | Node | ✅ runs |
+| `node tools/slop.mjs --unreleased` | Node | ✅ runs |
+| `node tools/vector.mjs --write` + `git diff --exit-code -- docs/contract/vectors` | Node | ✅ runs |
+| `luacheck .` | lua5.1 + luarocks | ❌ CI only |
+| `lua5.1 tools/gear-test.lua` | lua5.1 | ❌ CI only |
+| `lua5.1 tools/import-test.lua` | lua5.1 | ❌ CI only |
+| `lua5.1 tools/junk-test.lua` | lua5.1 | ❌ CI only |
+
+```bash
+node tools/validate.mjs && node tools/vector.mjs && node tools/slop.mjs --unreleased
+```
+
+That is the whole local gate on a Node-only box, and it proves packaging, the
+`.toc`, the wire format and the release notes. It proves **nothing about the
+Lua** — not the lint, not the gear classifier, not the import decoder.
+
+**This is a deliberate trade, not an oversight.** Installing lua5.1 + luarocks
+to mirror a 17-second CI job means carrying a second language toolchain on a
+machine whose whole operating principle is one good tool per job. The Lua half
+runs on every push and on every PR, and `main` is push-only for one maintainer,
+so the feedback gap is a single push rather than a review cycle. **Push and read
+the CI result** — do not assume a green local run means a green build. A leaked
+global or an off-by-one in the gear classifier will be caught by the runner and
+nowhere else.
+
+If that gap ever stops being acceptable — a Lua change big enough that a
+push-and-wait loop is too slow — the fix is `lua5.1` plus
+`luarocks install luacheck`, and the four `lua5.1` lines above become runnable
+verbatim. Nothing in the repo needs to change for that.
+
 ## What CI cannot catch
 
 Everything that needs a live client. These stay manual, in `docs/QA.md`:
