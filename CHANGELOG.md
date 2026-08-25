@@ -21,13 +21,25 @@ node tools/slop.mjs 1.0.2
 CI runs it against `## [Unreleased]` on every push, so notes written as you go are already clean at tag time. The rules are in [tools/slop.mjs](tools/slop.mjs) and they only flag borrowed phrasing, keynote voice, and adjectives standing in for numbers — the terse fragments and em dashes here are the house style and stay.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Versions follow [semver](https://semver.org/), with the wire format as the thing being versioned:
+Versions follow [semver](https://semver.org/), anchored to **what the player has to do about it**:
 
-- **MAJOR** — `wb1!` → `wb2!`. The website rejects old strings with "update your addon".
-- **MINOR** — a new optional field or capture. The website still reads older bundles.
-- **PATCH** — a fix. Payload shape unchanged.
+- **MAJOR** — they have to update, or it stops working. `wb1!` → `wb2!`: the website rejects strings from an older addon with "update your addon".
+- **MINOR** — something new. A new capture, a new field on the wire, or a new thing the in-game UI does. Nothing they already do breaks, and the website still reads older bundles.
+- **PATCH** — a fix. No new capture, no new field, no new control.
 
-The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
+**This used to say the wire format was the thing being versioned**, and it stopped
+being true one release before it was corrected. 1.5.0 added a minimap button, a
+keybinding and an options tab and changed **no wire field at all** — a MINOR by
+the rule above and by every instinct, but not by a rule that only knew about
+payload shape. 1.1.0 through 1.4.0 all happened to move the wire, so the narrow
+rule described four releases in a row and looked settled.
+
+The wire is still the hard edge of MAJOR, because it is the only change a player
+cannot absorb by ignoring it — the string in their clipboard stops being
+accepted by a website they do not control. That prefix has its own rules, and
+they are in [docs/CONTRACT.md](docs/CONTRACT.md), which is law for this repo and
+`warband-pro/app` at once. **A wire break is at least a MAJOR here; not every
+MAJOR has to be a wire break.**
 
 ## [Unreleased]
 

@@ -193,8 +193,12 @@ A new luacheck warning is usually a leaked global rather than a style nit —
 `.luacheckrc` lists every global this addon is allowed to touch.
 
 Changing the wire format is never a local decision: `wb1!` is a contract with
-`warband-pro/app`, and [`docs/CONTRACT.md`](docs/CONTRACT.md) has the
-versioning and bump policy. Regenerate fixtures with
+`warband-pro/app`, and [`docs/CONTRACT.md`](docs/CONTRACT.md) says when the
+prefix moves — additive and narrowing changes do not spend one, and only a
+break does. **What number the next release gets is a different question**, and
+[`CHANGELOG.md`](CHANGELOG.md) answers it: semver anchored to what the player
+has to do about it, not to payload shape. A wire break is at least a MAJOR; not
+every MAJOR is a wire break. Regenerate fixtures with
 `node tools/vector.mjs --write`.
 
 ## Working Conventions

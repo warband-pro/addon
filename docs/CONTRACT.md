@@ -528,11 +528,36 @@ string carries only what that account's own export already carried.
 `loadstring` — `tools/validate.mjs` fails the build on that, and executing a
 pasted string would be the single worst thing this addon could do.
 
-## Version bump policy
+## When the prefix moves
 
-- Patch (v1.0.0 -> v1.0.1) addon only, shape same, consumer unchanged.
-- Minor v1 -> web adds optional fields but still accepts old. Old addon still valid.
-- Major v1 -> v2 (wb2!) shape breaking, old string rejected with helpful "update addon" message in web UI.
+This section is about **the wire**, and only the wire. The addon's own release
+number is a different question with a different answer, and it lives in
+[../CHANGELOG.md](../CHANGELOG.md) — keeping both here is what let the two drift
+apart once already, when this file's rules were written in addon-version terms
+(`v1.0.0 -> v1.0.1`) that had nothing to do with the prefix they were describing.
+
+Three ways a payload can change, and only one of them spends a prefix:
+
+- **Additive** — a new optional field. The prefix does not move. A website
+  written against the older shape still reads the bundle and ignores what it
+  does not know; a website written against the newer one reads a missing field
+  as absent rather than as an error. Everything in `v1` after 1.0.0 arrived this
+  way, including gear and talents, which is why they are on `wb1!` and not
+  `wb2!`.
+- **Narrowing** — a cap tightens or a field stops being emitted. Also no prefix
+  move, provided the consumer already tolerates absence, which the field rules
+  above require of it.
+- **Breaking** — an existing field changes meaning, type, or position. This is
+  the only one that costs a prefix: `wb1!` → `wb2!`, and the website rejects the
+  old string with "update your addon" rather than misreading it.
+
+A prefix move is a MAJOR release of the addon, because the player has to act.
+The reverse does not follow — a MAJOR can happen for a reason that never touches
+the wire.
+
+**Both directions version independently.** `wbc1!` is a separate channel, added
+in 1.4.0, and it deliberately did not spend `wb2!`. A break in one is not a
+break in the other.
 
 ## v1 as implemented — four shape changes
 
