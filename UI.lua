@@ -634,7 +634,7 @@ local function build()
     frame.TitleContainer.TitleText:SetText("Warband.pro Companion")
   end
   if frame.SetPortraitToAsset then
-    frame:SetPortraitToAsset("Interface\\Icons\\INV_Misc_Bag_10")
+    frame:SetPortraitToAsset(ns.ICON)
   end
 
   -- Every panel anchors to the inset. ButtonFrameTemplate has shipped one for
@@ -835,7 +835,6 @@ end
 -- Still no artwork of our own (docs/POLICY.md): Blizzard's own tracking-ring
 -- border, and a face already in the player's client.
 
-local MINIMAP_ICON = "Interface\\Icons\\inv_enchant_voidcrystal"
 local MINIMAP_ANGLE = 216   -- lower-left, the emptiest arc of the stock ring
 local minimapButton
 
@@ -915,7 +914,7 @@ local function buildMinimap()
   b:SetMovable(true)
 
   local icon = b:CreateTexture(nil, "BACKGROUND")
-  icon:SetTexture(MINIMAP_ICON)
+  icon:SetTexture(ns.ICON)
   icon:SetSize(20, 20)
   icon:SetPoint("TOPLEFT", 7, -5)
   -- Stock icon art carries a drawn-on square border of its own, and the ring

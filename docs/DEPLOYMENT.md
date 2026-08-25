@@ -47,7 +47,7 @@ So both addon list tooltip (Notes field) and site pages reinforce companion natu
 
 ## Brand assets
 
-- Icon: `Interface\Icons\INV_Misc_Bag_10` — generic bag, fits companion storage theme, free of copyrighted art. Replace with custom 64x64 if you draw one later — update `IconTexture`.
+- Icon: `Interface\Icons\inv_enchant_voidcrystal` — one face for the addon compartment, the window portrait and the minimap button. A texture already in the client, so no artwork ships. It was a generic bag until 1.5.0; the crystal is distinguishable at 20px on a crowded minimap ring, which a brown bag among brown bags is not.
 - Toc Notes shortened to fit 70-char client tooltip: "Companion for warband.pro — gathers bags, bank, warband bank, currencies, lockouts from every alt | warband.pro" — long Notes-enUS has full sentence.
 - Minimap button on by default since 1.5.0, alongside AddonCompartment. Hand-built, no LibDBIcon, so "lightweight" still holds — it references `Interface\Icons\inv_enchant_voidcrystal` and `Interface\Minimap\MiniMap-TrackingBorder`, both already in the client. Off with `/warband minimap off`.
 - License MIT, vendor LibDeflate zlib notice in Vendor/LibDeflate.lua.

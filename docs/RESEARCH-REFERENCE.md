@@ -24,7 +24,7 @@ Midnight template is explicit: complete addon template with modern Blizzard API 
 ## Author: warband.pro
 ## Version: @project-version@ (replaced by BigWigs packager)
 ## SavedVariables: WarbandProDB
-## IconTexture: Interface\Icons\INV_Misc_Bag_10
+## IconTexture: Interface\Icons\inv_enchant_voidcrystal
 ## AddonCompartmentFunc: WarbandPro_OnAddonCompartmentClick
 ## Category: warband.pro companion
 ## X-Curse-Project-ID: xxx (once registered)

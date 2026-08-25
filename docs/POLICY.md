@@ -45,13 +45,13 @@ Nothing here transmits — the player is the transport.
 
 ## The avatar trap
 
-`WarbandPro.toc` sets `IconTexture: Interface\Icons\INV_Misc_Bag_10`. That is
+`WarbandPro.toc` sets `IconTexture: Interface\Icons\inv_enchant_voidcrystal`. That is
 correct and normal — it references a texture already in the player's client for
-the addon compartment button, and ships no artwork. The minimap button added in
-1.5.0 does the same thing twice more (`Interface\Icons\inv_enchant_voidcrystal`
-for the face, `Interface\Minimap\MiniMap-TrackingBorder` for the ring), and the
-count does not change the rule: referencing the client's own textures is what
-every addon does, and this repo still contains no image files.
+the addon compartment button, and ships no artwork. The same texture is the
+window's portrait and the minimap button's face, and the button's ring is
+`Interface\Minimap\MiniMap-TrackingBorder`. The count does not change the rule:
+referencing the client's own textures is what every addon does, and this repo
+still contains no image files.
 
 **Do not use that icon, or any other Blizzard art, as the CurseForge project
 avatar.** An avatar is an image *you upload*, and re-uploading Blizzard's icon

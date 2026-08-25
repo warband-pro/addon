@@ -11,7 +11,7 @@ Esc closes (`UISpecialFrames`), the whole window drags, and it clamps to the
 screen.
 
 ```
-+--[bag icon]-- Warband.pro Companion ---------------------[x]-+
++--[crystal]--- Warband.pro Companion ---------------------[x]-+
 |  6 characters · freshest 12m ago · warband bank 1h (Vocnar)  |
 |  * Vocnar-Wyrmrest Accord  12m ago  bank 1h ago              |
 |  * Voctara-Wyrmrest Accord  3d ago                           |
@@ -138,8 +138,9 @@ anything.
 compatibility grounds, and the argument was really about the library: a minimap
 button meant LibDBIcon, LibDBIcon meant LibStub, and this addon ships neither.
 Hand-built, there is no dependency to weigh — the ring is Blizzard's
-`MiniMap-TrackingBorder`, the face is `Interface\Icons\inv_enchant_voidcrystal`,
-and both are already in the player's client. What decided it is the loop in
+`MiniMap-TrackingBorder` and the face is `ns.ICON`, the same texture the window
+wears as its portrait and the .toc names for the compartment; both are already
+in the player's client. What decided it is the loop in
 `docs/FLOW.md`: four to ten exports a play night, each an alt-tab out of a
 fight. The compartment is a list of every addon installed, so each of those was
 a click, a read and a second click.

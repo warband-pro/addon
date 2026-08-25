@@ -64,18 +64,20 @@ setting of its own. Open it from the minimap, a key, the addon compartment or
 
 ### Changed
 
-- One window instead of two. `/warband` opens a tabbed panel now — Export,
-  Import, Options along the bottom. `/warband junk` goes to the Import tab;
-  the clear-out list, its paste box, Sell and Disenchant all live there and
-  work as before. Esc still closes, the export string still selects itself.
+- One window instead of two. `/warband junk` goes to the Import tab; the
+  clear-out list, its paste box, Sell and Disenchant all live there and work
+  as before. Esc still closes, the export string still selects itself.
+- One icon everywhere. The addon compartment, the window's portrait and the
+  minimap button are the same purple crystal. It used to be a bag, which is
+  hard to pick out of a ring of other brown icons.
 - The tabs are named by direction: `To warband.pro` and `From warband.pro`.
-  They read Export and Import, which is backwards from the site's own words —
-  the site calls receiving this string an import, so the addon's Export fed the
-  site's import and a player who had just clicked import in the browser opened
-  a tab called Import and was looking at the wrong one.
+  They read Export and Import, which is backwards from the site's own words:
+  the site calls receiving this string an import, so a player who had just
+  clicked import in the browser opened the tab called Import and was on the
+  wrong one.
 - Step 2 of the copy instructions says what the site actually does: press `i`,
-  paste, Enter. It said "warband.pro > Import", which is a destination that
-  does not exist.
+  paste, Enter. It said "warband.pro > Import", a destination that never
+  existed.
 - Combat now closes only the Import tab (its buttons cannot be rewritten
   mid-fight). An export string left open through a ready-check stays open.
 
@@ -86,9 +88,8 @@ setting of its own. Open it from the minimap, a key, the addon compartment or
   heading called WARBANDPRO as a row called WARBANDPRO_TOGGLE; it reads as
   words now.
 - Pasting a cleanup string into the clear-out panel errored before the
-  decoder ever ran: the `wbc1!` prefix constant was defined in the test
-  fixture but not in the addon. The tests now load the shipped file instead
-  of restating it.
+  decoder ever ran: the `wbc1!` prefix was defined in the test fixture but
+  not in the addon.
 - Junk lists now clear when their character is gone — even from a manual
   SavedVariables edit. Matches the warbank orphan guard that already ran on
   every optimize.

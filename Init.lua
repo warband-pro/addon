@@ -13,6 +13,16 @@ ns.WIRE_V     = 1
 ns.MAX_CHARS  = 20          -- CONTRACT.md rejects a bundle larger than this
 ns.SOFT_BYTES = 20480       -- past this the panel warns instead of pretending
 
+-- The addon's face, in one place. It is the window's portrait and the minimap
+-- button, and `WarbandPro.toc` names the same texture again for the addon
+-- compartment because a .toc cannot read a Lua value. Two copies, and the .toc
+-- is the one that will drift, so change this line and grep for the other.
+--
+-- A texture already in the player's client, never a file we ship — the addon
+-- carries no artwork at all, which is docs/POLICY.md's line and also why there
+-- is nothing here to keep in sync with a CurseForge avatar.
+ns.ICON = "Interface\\Icons\\inv_enchant_voidcrystal"
+
 local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 ns.VERSION = (getMeta and getMeta(ADDON, "Version")) or "0.0.0-dev"
 if ns.VERSION:find("@") then ns.VERSION = "0.0.0-dev" end   -- unbuilt @project-version@
