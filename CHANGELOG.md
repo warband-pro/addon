@@ -23,6 +23,16 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-08-25 — one window, and three ways into it
+
+**Everything this addon does now lives behind one panel, and there is finally
+an icon to open it with.** 1.4.0 added the clear-out list as a second frame, so
+there were two windows and no way from one to the other. This is one window
+with tabs along the bottom the way the game's own panels do it, built from
+Blizzard's frame templates so it follows your UI scale and fonts with no
+setting of its own. Open it from the minimap, a key, the addon compartment or
+`/warband`.
+
 ### Added
 
 - A minimap button. Click it for the export string, right-click it for the
@@ -34,6 +44,13 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
   so the four to ten exports a play night cost one key instead of typing into
   chat. It ships unbound — picking a key for you would take one you had
   already spent.
+- An Options tab. Gear capture and item links were slash-and-SavedVariables
+  toggles before; they are checkboxes now, and `/warband gear on|off` still
+  works.
+- Open the clear-out list at merchants — off by default. When a merchant
+  window opens and the list has something in your bags, the Import tab opens
+  by itself and closes when you leave the merchant.
+- `/warband options` opens the window on that tab.
 - The panel says `copied` when you press Ctrl+C, and `/warband status` reports
   when you actually copied rather than when you last opened the window.
 - One line on your first login after installing, naming the command. Nothing
@@ -47,6 +64,10 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ### Changed
 
+- One window instead of two. `/warband` opens a tabbed panel now — Export,
+  Import, Options along the bottom. `/warband junk` goes to the Import tab;
+  the clear-out list, its paste box, Sell and Disenchant all live there and
+  work as before. Esc still closes, the export string still selects itself.
 - The tabs are named by direction: `To warband.pro` and `From warband.pro`.
   They read Export and Import, which is backwards from the site's own words —
   the site calls receiving this string an import, so the addon's Export fed the
@@ -55,29 +76,14 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 - Step 2 of the copy instructions says what the site actually does: press `i`,
   paste, Enter. It said "warband.pro > Import", which is a destination that
   does not exist.
-
-- One window instead of two. `/warband` opens a tabbed panel now — Export,
-  Import, Options along the bottom, the way the game's own panels do it. It
-  is built from Blizzard's frame templates, so it follows your UI scale and
-  font settings without a scale option of its own.
-- `/warband junk` goes to the Import tab; the clear-out list, its paste box,
-  Sell and Disenchant all live there and work as before. Esc still closes,
-  the export string still selects itself.
 - Combat now closes only the Import tab (its buttons cannot be rewritten
   mid-fight). An export string left open through a ready-check stays open.
 
-### Added
-
-- An Options tab. Gear capture and item links were slash-and-SavedVariables
-  toggles before; they are checkboxes now, and `/warband gear on|off` still
-  works.
-- Open the clear-out list at merchants — off by default. When a merchant
-  window opens and the list has something in your bags, the Import tab opens
-  by itself and closes when you leave the merchant.
-- `/warband options` opens the window on that tab.
-
 ### Fixed
 
+- Four warnings on every login about an XML attribute that does not exist.
+  The keybinding also sat under a heading called WARBANDPRO as a row called
+  WARBANDPRO_TOGGLE; it reads as words now.
 - Pasting a cleanup string into the clear-out panel errored before the
   decoder ever ran: the `wbc1!` prefix constant was defined in the test
   fixture but not in the addon. The tests now load the shipped file instead
@@ -300,7 +306,9 @@ Retail Midnight 12.1 only. Works with whatever UI you run.
 
 Then future tags auto-upload via BigWigs packager once Project IDs are set.
 
-[Unreleased]: https://github.com/warband-pro/addon/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/warband-pro/addon/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/warband-pro/addon/releases/tag/v1.5.0
+[1.4.0]: https://github.com/warband-pro/addon/releases/tag/v1.4.0
 [1.3.0]: https://github.com/warband-pro/addon/releases/tag/v1.3.0
 [1.2.0]: https://github.com/warband-pro/addon/releases/tag/v1.2.0
 [1.1.0]: https://github.com/warband-pro/addon/releases/tag/v1.1.0

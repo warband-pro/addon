@@ -47,6 +47,27 @@ after using it, not only after the export pass.
 - [ ] /warband junk while in combat — chat says it will open when you drop out, and it does
 - [ ] /console taintLog 1 — repeat the merchant + disenchant pass — /reload — Logs/taint.log has no WarbandPro line
 
+## The window and the ways in (1.5.0)
+
+Nothing in CI touches a frame, and there is no Lua interpreter on the
+maintainer's machine either — `luacheck` runs on push and the first thing to
+meet a live client is this list. So run it, do not skim it.
+
+- [ ] Minimap icon on the ring at login, inside the stock tracking border
+- [ ] Click it — window opens on the export tab, string already selected
+- [ ] Click it again — window closes
+- [ ] Right-click — Options tab; right-click again — closes
+- [ ] Hover — tooltip names the addon, the character count and the freshest age
+- [ ] Drag it round the ring — it follows the cursor and stays where dropped
+- [ ] /reload — still where you dropped it
+- [ ] Full logout and back — still there (WarbandProDB.opts.minimapAngle persisted)
+- [ ] Options > Show the minimap button, uncheck — icon goes; check — it returns to the same spot
+- [ ] /warband minimap off, then on — same result, and chat says which
+- [ ] Enter combat and click the icon — chat says it will open when you drop out, and it does
+- [ ] Key Bindings has a section "Warband.pro Companion" with one row, "Open the export window", unbound
+- [ ] Bind it and press — window opens on the export tab; press again — closes
+- [ ] No LUA_WARNING about Bindings.xml at login, and BugSack is empty
+
 Pass 2 — multi-char bundle
 - [ ] Log Voctara alt without opening warbank — /warband copy bundle len 2
 - [ ] Verify bundle still contains Warbank from Vocnar snapshot (seenAt not reset, seenBy still Vocnar)
