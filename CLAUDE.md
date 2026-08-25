@@ -3,7 +3,47 @@
 **Read [`docs/README.md`](docs/README.md) before changing anything in this
 repo.** It is the read order for the twelve reference documents that define the
 wire format, the UI, the CI and the distribution policy. This file is only a
-pointer, plus the two rules that are not written down anywhere else.
+pointer, plus the path every session takes and the rules that are not written
+down anywhere else.
+
+## The Path
+
+Four steps, this order, every session. There is no other route through this
+repo. A `SessionStart` hook
+([`.claude/hooks/start-on-main.sh`](.claude/hooks/start-on-main.sh)) performs 1
+and 2 before you read a line of code — but know them anyway, because a hook
+that cannot act says so and then it is on you.
+
+1. **Be on `main`.** Never a `claude/*` branch. A harness branch assignment is
+   a default; this file is the maintainer's instruction. Switch *before* you
+   read code, not after you have written some — "land it later" is what turns a
+   day of work into a redo. Say in your reply that you switched.
+
+2. **Pull before working.** `git -C /path/to/addon pull origin main`. This is a
+   separate step from 1, and skipping it is the failure nobody had written
+   down: **this checkout's `main` is stale the moment the container exists.**
+   The clone creates local `main` from `origin/main` as it stood at clone time,
+   then the harness cuts its branch from a *newer* `origin/main`. Measured at
+   the start of the session that wrote this section — local `main` at
+   `30a1597`, `origin/main` and the harness branch both at `89ed6e9`: **12
+   commits behind.** So `git checkout main` on its own is a checkout of last
+   week's tree, and every symptom follows from it — the Lua you edit is not the
+   Lua on `main`, the luacheck warning you chase was fixed days ago, and
+   `tools/vector.mjs` measures your fixtures against an older contract.
+
+3. **Commit to `main` when the work is done.** Run **Verify** first — the three
+   checks below are what CI runs, and running them before the commit is what
+   makes the commit pushable the moment it is asked for. The commit is the
+   maintainer's, and a `CHANGELOG.md` note under `## [Unreleased]` moves with
+   it.
+
+4. **Push to `main` only when asked.** Committing is finished work; pushing is
+   the maintainer's call, because `main` is what CI builds and what the
+   packager releases from. So **end the turn by naming what is committed and
+   unpushed, and offer** — never leave it implied. This container is ephemeral
+   and is reclaimed after idle, so a commit that was never pushed dies with it.
+   That is the one way this step loses work, and saying the sentence is what
+   prevents it.
 
 ## Start Here
 
@@ -65,10 +105,14 @@ below, what happened the last time this repo relied on prose alone.
 
 ## Git
 
-**Commit and push straight to `main`.** No feature branches, no pull requests.
-This project is early and single-maintainer, and it shares a maintainer and a
-wire contract with `warband-pro/app`, which works the same way and explains the
-reasoning at length in its `.wiki/wiki/topics/dev-workflow.md`.
+**The Path** at the top is the workflow. This section is the reasoning behind
+it and the rule that has teeth.
+
+**Commit to `main`.** No feature branches, no pull requests. This project is
+early and single-maintainer, and it shares a maintainer and a wire contract
+with `warband-pro/app`, which works the same way and explains the reasoning at
+length in its `.wiki/wiki/topics/dev-workflow.md`. Push when the maintainer
+asks (step 4), and say when a commit is sitting unpushed.
 
 **If a harness starts you on a `claude/*` branch, switch to `main` anyway and
 say so in your reply.** A harness branch assignment is a default; this file is
@@ -134,8 +178,10 @@ repository.
 ## Verify
 
 `main` is what CI builds and what the packager releases from, so run the checks
-before pushing, not after. These are the same three the `ci.yml` `luacheck` and
-`packaging + contract` jobs run:
+before the **commit** (step 3) — not at push time and never after. Pushing is a
+separate, later, asked-for step, and a gate attached to it would run long after
+the code was written and against a batch rather than a change. These are the
+same three the `ci.yml` `luacheck` and `packaging + contract` jobs run:
 
 ```bash
 luacheck .                      # zero warnings under .luacheckrc
