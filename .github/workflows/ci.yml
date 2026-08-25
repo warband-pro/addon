@@ -72,6 +72,19 @@ jobs:
       - name: Slop pass on unreleased notes
         run: node tools/slop.mjs --unreleased
 
+      # tools/notes.mjs is what the release publishes, and until this step it
+      # ran nowhere else — so a break in it would surface mid-release, after the
+      # tag exists. That is the exact shape of the bug it was written to fix:
+      # something only the release path exercised, wrong for every release.
+      # Cut the newest released section here on every push instead.
+      - name: Release notes extract for the newest section
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -1)
+          test -n "$VERSION"
+          node tools/notes.mjs "$VERSION" > /dev/null
+          echo "notes.mjs cuts $VERSION cleanly"
+
       # The half of the wb1! contract that can be tested without a game client:
       # encode a vector the way Export.lua does, decode it the way the website
       # will, and require the payload to survive the trip unchanged.

@@ -1,5 +1,7 @@
-#!/usr/bin/env node
 // The changelog's one parser.
+//
+// No shebang, unlike everything else in tools/: this one is imported, never
+// run. Every other .mjs here is a command.
 //
 // Two things read a release section out of CHANGELOG.md and they must agree:
 // tools/slop.mjs proofreads it before a tag, and tools/notes.mjs is what the
