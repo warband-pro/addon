@@ -94,15 +94,15 @@ string from warband.pro/gear, sell and disenchant from the list), **Options**
 frame templates, so it follows your UI scale and font settings with no
 settings of its own.
 
-```
+``` 
 /warband                the window, Export tab — bundle + freshness
 /warband copy           same
 /warband copy current   single-char only
 /warband junk           Import tab — the clear-out list
 /warband options        Options tab
-/warband clear <name>   prune from DB
+/warband clear <name>   prune from DB, clears its junk list and warbank credit
 /warband status         debug counts/len/lastSeen
-/warband optimize       prune chars not seen 90d
+/warband optimize       prune chars not seen 90d, drops orphaned junk and warbank credit
 /warband gear on|off    toggle gear capture, keeps what's already stored
 /warband perf           scan timing, slot counts, item-info cache, memory
 ```

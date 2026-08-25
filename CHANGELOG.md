@@ -76,6 +76,9 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
   decoder ever ran: the `wbc1!` prefix constant was defined in the test
   fixture but not in the addon. The tests now load the shipped file instead
   of restating it.
+- Junk lists now clear when their character is gone — even from a manual
+  SavedVariables edit. Matches the warbank orphan guard that already ran on
+  every optimize.
 
 ## [1.4.0] — 2026-08-23 — the clear-out panel
 

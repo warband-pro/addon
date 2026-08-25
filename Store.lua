@@ -139,10 +139,18 @@ end
 --- clear — the same orphan the warband bank's attribution would become, handled
 --- in the same two places for the same reason.
 function Store.DropJunk(removedGuids)
-  local junk = Store.db and Store.db.junk
+  local db = Store.db
+  local junk = db and db.junk
   if not junk then return end
-  for guid in pairs(removedGuids) do
-    junk[guid] = nil
+  if removedGuids then
+    for guid in pairs(removedGuids) do
+      junk[guid] = nil
+    end
+  end
+  for guid in pairs(junk) do
+    if not db.chars[guid] then
+      junk[guid] = nil
+    end
   end
 end
 
