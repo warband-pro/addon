@@ -28,7 +28,7 @@ This is not "install once, export once a month". It's frequent, low-friction, am
 
 4. **Preview → Confirm → Tonight Plan flips** — Web shows 6 rows with staleness dots 🟢 <6h / 🟡 <3d / 🔴 >3d / ⚪ never. Hover says "Bags 2h ago, Bank 5d ago (open bank to refresh)". You confirm, D1 upserts each char individually, missing chars not deleted — just stale. Tonight Plan re-reads consumables rollup: "Vocgrim 0 phials → but Vocnar has 120 in Warbank → don't block +12, just consolidate first".
 
-5. **Repeat 4-10 times per play night** — You will log alts to check the vault, to transfer gold, to grab mats. Each time you export again. So export must be <2 sec: `/warband` Enter Ctrl+C, or one key — the binding lives under Key Bindings > WarbandPro and ships unbound, because a key this addon assigned itself would take one the player has already spent. Auto-highlight, Esc closes.
+5. **Repeat 4-10 times per play night** — You will log alts to check the vault, to transfer gold, to grab mats. Each time you export again. So export must be <2 sec: `/warband` Enter Ctrl+C, or one key — the binding lives under Key Bindings > Warband.pro Companion and ships unbound, because a key this addon assigned itself would take one the player has already spent. Auto-highlight, Esc closes.
 
 6. **Saturday push** — Play normally Mon-Sat, Saturday before +12 you paste once and get all 6 current. You never remembered per-char export.
 

@@ -171,7 +171,8 @@ client still hangs off an event and a throttle (`Init.lua`).
 From `docs/QA.md` checklist expanded:
 
 - /warband opens in one click on the minimap button — or the Compartment,
-  or the slash command, or the keybinding, all landing on the Export tab
+  or the slash command, or the keybinding (Key Bindings > Warband.pro
+  Companion), all landing on the Export tab
 - Auto-highlighted on open without mouse drag (human just hits Ctrl-C)
 - Ctrl-A + Ctrl-C works, pastes into Notepad startswith wb1! exact len reported at bottom.
 - Esc closes, second open same behavior.

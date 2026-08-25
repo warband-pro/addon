@@ -984,3 +984,11 @@ end
 function _G.WarbandPro_ToggleFromBinding()
   UI.Toggle("bundle")
 end
+
+-- What the Key Bindings panel reads. `Bindings.xml` names an action and a
+-- header; the panel turns each into text by looking up a global, and prints the
+-- raw token when there is none. Both were missing, so the binding sat under a
+-- heading called WARBANDPRO as a row called WARBANDPRO_TOGGLE — findable, but
+-- shouting, and not the "Key Bindings > WarbandPro" docs/FLOW.md promises.
+_G.BINDING_HEADER_WARBANDPRO = "Warband.pro Companion"
+_G.BINDING_NAME_WARBANDPRO_TOGGLE = "Open the export window"

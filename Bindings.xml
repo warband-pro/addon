@@ -15,8 +15,17 @@
 
       It is deliberately unbound by default. A binding this addon assigned for
       itself would take a key the player has already given to something else.
+
+      There is no `category` attribute on Binding, whatever it looks like it
+      ought to have. The client says so on every login, four times:
+      "Unrecognized XML attribute: category". What groups a binding under its
+      own heading is `header`, and a header is only a name once a global
+      called BINDING_HEADER_ followed by that header exists to translate it.
+      UI.lua defines that one and BINDING_NAME_WARBANDPRO_TOGGLE beside it;
+      without them the panel reads "WARBANDPRO" over "WARBANDPRO_TOGGLE",
+      which is a row the player has to guess at.
     -->
-    <Binding name="WARBANDPRO_TOGGLE" header="WARBANDPRO" category="WarbandPro">
+    <Binding name="WARBANDPRO_TOGGLE" header="WARBANDPRO">
         WarbandPro_ToggleFromBinding()
     </Binding>
 </Bindings>

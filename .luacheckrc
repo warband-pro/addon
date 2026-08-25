@@ -14,6 +14,10 @@ globals = {
   "WarbandPro",
   "WarbandProDB",
   "WarbandPro_OnAddonCompartmentClick",
+  -- Bindings.xml names an action and a header; these are what the Key Bindings
+  -- panel reads to print them as words rather than as tokens.
+  "BINDING_HEADER_WARBANDPRO",
+  "BINDING_NAME_WARBANDPRO_TOGGLE",
   "SLASH_WARBANDPRO1",
   "SlashCmdList",
 }

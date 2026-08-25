@@ -30,9 +30,10 @@ The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
   are stored and how fresh the freshest one is, which is usually the whole
   question. `/warband minimap off` takes it away and the addon compartment
   still opens the window.
-- A keybinding. Key Bindings > WarbandPro opens the window, so the four to ten
-  exports a play night cost one key instead of typing into chat. It ships
-  unbound — picking a key for you would take one you had already spent.
+- A keybinding. Key Bindings > Warband.pro Companion > Open the export window,
+  so the four to ten exports a play night cost one key instead of typing into
+  chat. It ships unbound — picking a key for you would take one you had
+  already spent.
 - The panel says `copied` when you press Ctrl+C, and `/warband status` reports
   when you actually copied rather than when you last opened the window.
 - One line on your first login after installing, naming the command. Nothing
