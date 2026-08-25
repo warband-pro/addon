@@ -42,7 +42,7 @@ UI.lua
 
 Load order matters: Libs → Compat (none needed) → Core → Data → UI → Config. WoW loads file order listed.
 
-`IconTexture` + `AddonCompartmentFunc` = Blizzard's new addon compartment. Sits in minimap-adjacent Blizzard addon list. User clicks, we open panel. No LibDBIcon minimap button needed for lightweight. Optional later.
+`IconTexture` + `AddonCompartmentFunc` = Blizzard's new addon compartment. Sits in minimap-adjacent Blizzard addon list. User clicks, we open panel. Still no LibDBIcon — 1.5.0 added a minimap button, but hand-built from CreateFrame and the client's own ring texture, so no LibStub and nothing registered. See docs/UI.md "Minimap button".
 
 ## SavedVariables — warband bundle accumulation
 
@@ -163,7 +163,7 @@ UI:
 - No XML templating (optional but adds one file). Use CreateFrame Lua entirely — modern Blizzard still mixes XML+Lua but CreateFrame is fine.
 - Addon Compartment func opens panel. Escape closes.
 - EditBox pure Blizzard Widget: label, ScrollFrame, EditBox, Button Copy. Copy selects HighlightText.
-- No minimap icon by default. If we add, use LibDBIcon optional, toggleable in settings. Default off keeps compat.
+- Minimap icon on by default since 1.5.0, toggleable on the Options tab and with `/warband minimap on|off`. Not LibDBIcon: a Button parented to `Minimap`, positioned by angle, dragged on an OnUpdate that exists only between OnDragStart and OnDragStop. Compat cost is zero because nothing is registered with anything.
 - No keybind globals.
 - No tooltip injection by default (like Warband Nexus has enhanced tooltips showing locations). Cool but taint risk if we hook GameTooltip. Save for v2 optional.
 - Slash: /warband panel, /warband copy, /warband copy current, /warband status (debug), /warband dump raw json to chat truncated.

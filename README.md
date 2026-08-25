@@ -24,7 +24,7 @@ It's the same problem Altoholic + SavedInstances solve locally — we make it we
 1. Install this addon (CurseForge / Wago / WoWI — or Actions → CI → Artifact zip while pre-release).
 2. Log any character — snapshot saved silently in account-wide `WarbandProDB`.
 3. Log alts 2..6 through the week — 0 extra steps, bag updates throttled .5s.
-4. Any character: `/warband` → auto-highlighted box → `Ctrl+C` copies `wb1!aH...` (4-7KB for 6 chars, ~26KB with full bag contents).
+4. Any character: click the minimap icon (or `/warband`) → auto-highlighted box → `Ctrl+C` copies `wb1!aH...` (4-7KB for 6 chars, ~26KB with full bag contents).
 5. Second monitor, [warband.pro](https://warband.pro) open — press `i` anywhere to put the cursor in the rail's import field, paste, Enter:
 
 ```
@@ -66,7 +66,7 @@ Single-line hash, not human-readable on purpose: `wb1!<base64url(deflate(json))>
 
 - No network requests — check .toc, check code.
 - SavedVariables <200KB for 6 chars.
-- No OnUpdate scanner, only BAG_UPDATE throttled .5s, BANKFRAME_OPENED etc.
+- No OnUpdate scanner, only BAG_UPDATE throttled .5s, BANKFRAME_OPENED etc. The one OnUpdate in the addon runs while you drag the minimap button and stops when you let go.
 - Export is copy-only, you decide to paste to your own account on warband.pro.
 - Stream-safe toggle planned collapses gold to •••.
 
@@ -90,9 +90,14 @@ In-game `/reload` (full restart needed if .toc changed), then `/warband`.
 One window, three tabs along the bottom the way every stock panel does it —
 **Export** (the `wb1!` string, pre-selected), **Import** (paste the cleanup
 string from warband.pro/gear, sell and disenchant from the list), **Options**
-(gear capture, item links, auto-open at merchants). Built from Blizzard's own
-frame templates, so it follows your UI scale and font settings with no
-settings of its own.
+(gear capture, item links, the minimap button, auto-open at merchants). Built
+from Blizzard's own frame templates, so it follows your UI scale and font
+settings with no settings of its own.
+
+The icon on your minimap ring opens it: click for the string, right-click for
+Options, drag to move it. Hover says how many characters are stored and how
+fresh the freshest is. `/warband minimap off` if you would rather use the addon
+compartment — nothing else changes.
 
 ``` 
 /warband                the window, Export tab — bundle + freshness
@@ -105,6 +110,7 @@ settings of its own.
 /warband optimize       prune chars not seen 90d, drops orphaned junk and warbank credit
 /warband gear on|off    toggle gear capture, keeps what's already stored
 /warband perf           scan timing, slot counts, item-info cache, memory
+/warband minimap on|off show or hide the minimap button
 ```
 
 On [warband.pro](https://warband.pro): press `i` anywhere — the cursor lands in the rail's `$ import` field, on whatever route you are reading — paste, Enter. A receipt names what arrived and the tonight plan re-ranks.
@@ -139,7 +145,7 @@ When shipping light, flat root, no badges clutter, per your rule Problem→Insta
 
 Locked: multi-char default ✓, staleness per-section stamps ✓, retail Midnight only ✓, wb1! format ✓, vendor LibDeflate only ✓, import is a rail field on every route ✓, companion framing ✓, vanilla no Ace3/LibStub ✓
 
-Open 5 before 1.0: minimap N default off — Compartment enough?, itemName in bundle or id-only + Game Data lookup?, warbank stamp shared vs per-char?, recipe totalRecipes static fetch?, CF vs Wago first?
+Open 4 before 1.0: itemName in bundle or id-only + Game Data lookup?, warbank stamp shared vs per-char?, recipe totalRecipes static fetch?, CF vs Wago first? — minimap settled in 1.5.0: on by default, hand-built, no LibDBIcon.
 
 ---
 Next: scaffold toc+init skeleton done, addon+import sink patch live — prompt ready in docs/PROMPT.md. All deploys target "Warband.pro Companion" pointing to [warband.pro](https://warband.pro).

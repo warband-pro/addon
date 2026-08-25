@@ -580,6 +580,19 @@ local function buildOptions()
       ns.Store.Touch()
     end)
 
+  makeOption(p, -198,
+    "Show the minimap button",
+    "The icon on the minimap ring — click it for the export string, right-click it for this tab, "
+      .. "drag it anywhere round the ring. Turning it off leaves /warband and the addon compartment.",
+    function() local o = opts() return o and o.minimap end,
+    function(v)
+      local o = opts()
+      if not o then return end
+      o.minimap = v
+      ns.Store.Touch()
+      UI.RefreshMinimap()
+    end)
+
   local version = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   version:SetPoint("BOTTOMLEFT", 0, 2)
   version:SetPoint("BOTTOMRIGHT", 0, 2)
@@ -730,6 +743,20 @@ function UI.ToggleJunk()
   UI.ShowJunk()
 end
 
+--- Same shape as ToggleJunk, for the minimap button's right click: a second
+--- press on the same tab closes, a press from another tab switches.
+function UI.ToggleOptions()
+  if frame and frame:IsShown() then
+    if frame.selectedTab == TAB_OPTIONS then
+      frame:Hide()
+    else
+      UI.SelectTab(TAB_OPTIONS)
+    end
+    return
+  end
+  UI.ShowOptions()
+end
+
 function UI.Hide()
   if frame then frame:Hide() end
 end
@@ -785,6 +812,163 @@ function UI.MerchantChanged(open)
     -- has made the window theirs, and it stays.
     if UI.JunkIsShown() then frame:Hide() end
   end
+end
+
+-- ── minimap button ──────────────────────────────────────────────────────────
+
+-- The third door to the same window, and the only one that is visible without
+-- being gone looking for.
+--
+-- docs/FLOW.md ruled a minimap button out on purpose and the reasoning was
+-- compatibility: a button meant LibDBIcon, LibDBIcon meant LibStub, and this
+-- addon ships neither. That argument was always against the library rather
+-- than against the button — the ring is a texture the client already has and
+-- the maths is one cosine, so there is no dependency here to weigh.
+--
+-- What decided it is the loop the addon exists for. docs/FLOW.md counts four
+-- to ten exports in a play night, each one an alt-tab out of a fight. The
+-- compartment is a list of every addon installed, so each of those is a click,
+-- a read and a second click; this is one click at a spot that never moves.
+-- The compartment entry stays — it costs a .toc line and it is where a player
+-- who hid this button goes looking.
+--
+-- Still no artwork of our own (docs/POLICY.md): Blizzard's own tracking-ring
+-- border, and a face already in the player's client.
+
+local MINIMAP_ICON = "Interface\\Icons\\inv_enchant_voidcrystal"
+local MINIMAP_ANGLE = 216   -- lower-left, the emptiest arc of the stock ring
+local minimapButton
+
+local function minimapOpts()
+  return ns.Store.db and ns.Store.db.opts
+end
+
+--- Park the button on the ring, `deg` degrees anticlockwise from due east.
+local function placeMinimap(deg)
+  if not minimapButton then return end
+  local rad = math.rad(deg)
+  local radius = (Minimap:GetWidth() / 2) + 5
+  minimapButton:ClearAllPoints()
+  minimapButton:SetPoint("CENTER", Minimap, "CENTER", math.cos(rad) * radius, math.sin(rad) * radius)
+end
+
+--- Follow the cursor round the ring while the button is held.
+---
+--- This is the addon's only OnUpdate, and it exists only between the press and
+--- the release: OnDragStart installs it and OnDragStop takes it away again. It
+--- polls nothing — the thing it is reading is the player's own hand, and it
+--- stops when the hand does. Everything that watches the *game* still hangs off
+--- an event (Init.lua's throttle and dirty-set helpers).
+local function dragMinimap()
+  local scale = Minimap:GetEffectiveScale()
+  local mx, my = Minimap:GetCenter()
+  if not mx or not my then return end   -- an unanchored minimap costs the drag, not the session
+  local cx, cy = GetCursorPosition()
+  local deg = math.deg(math.atan2(cy / scale - my, cx / scale - mx)) % 360
+  local o = minimapOpts()
+  if o then o.minimapAngle = deg end
+  placeMinimap(deg)
+end
+
+--- What the window's header says, said before you open the window.
+---
+--- Read straight off the store rather than out of `Export.Build`: the header
+--- gets its number from a built bundle because it is about to show you that
+--- bundle, and a hover is not worth an encode and a deflate.
+local function minimapFreshest()
+  local db = ns.Store.db
+  if not db or not db.chars then return nil end
+  local best
+  for _, c in pairs(db.chars) do
+    local seen = c.seenAt and c.seenAt.lastSeen
+    if seen and (not best or seen > best) then best = seen end
+  end
+  return best
+end
+
+local function minimapTooltip(self)
+  GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+  GameTooltip:AddLine("Warband.pro Companion")
+  local n = ns.Store.Count()
+  GameTooltip:AddLine(format("%d character%s  ·  freshest %s",
+    n, n == 1 and "" or "s", ns.ago(minimapFreshest())), 1, 1, 1)
+  GameTooltip:AddLine(" ")
+  GameTooltip:AddLine("Click  ·  the export string", 1, 0.82, 0)
+  GameTooltip:AddLine("Right-click  ·  options", 1, 0.82, 0)
+  GameTooltip:AddLine("Drag  ·  move it round the ring", 0.5, 0.5, 0.5)
+  GameTooltip:Show()
+end
+
+--- Built once, and only when there is a Minimap to hang it on. Returns nil on a
+--- client without one rather than erroring, the same way every other API call
+--- in this addon fails a section instead of a session.
+local function buildMinimap()
+  if minimapButton then return minimapButton end
+  if not Minimap then return nil end
+
+  local b = CreateFrame("Button", "WarbandProMinimapButton", Minimap)
+  b:SetSize(31, 31)
+  b:SetFrameStrata("MEDIUM")
+  b:SetFrameLevel(8)
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  b:RegisterForDrag("LeftButton")
+  b:SetMovable(true)
+
+  local icon = b:CreateTexture(nil, "BACKGROUND")
+  icon:SetTexture(MINIMAP_ICON)
+  icon:SetSize(20, 20)
+  icon:SetPoint("TOPLEFT", 7, -5)
+  -- Stock icon art carries a drawn-on square border of its own, and the ring
+  -- above is already this button's border. Trim the edges rather than show two.
+  icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+  local ring = b:CreateTexture(nil, "OVERLAY")
+  ring:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+  ring:SetSize(53, 53)
+  ring:SetPoint("TOPLEFT")
+
+  b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+
+  -- Left opens the string, right opens the options — and the switch that takes
+  -- this button away is on that tab, so the thing a player wants to be rid of
+  -- is what hands them the way to do it.
+  b:SetScript("OnClick", function(_, button)
+    if button == "RightButton" then
+      UI.ToggleOptions()
+    else
+      UI.Toggle("bundle")
+    end
+  end)
+
+  b:SetScript("OnDragStart", function(self)
+    self:SetScript("OnUpdate", dragMinimap)
+    GameTooltip:Hide()
+  end)
+  b:SetScript("OnDragStop", function(self)
+    self:SetScript("OnUpdate", nil)
+    ns.Store.Touch()
+  end)
+
+  b:SetScript("OnEnter", minimapTooltip)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+  minimapButton = b
+  return b
+end
+
+--- Build, place, and show or hide the button to match the saved options. Safe
+--- to call again at any point — login, the Options checkbox and
+--- `/warband minimap` all come through here.
+function UI.RefreshMinimap()
+  local o = minimapOpts()
+  if not o then return end
+  if o.minimap == false then
+    if minimapButton then minimapButton:Hide() end
+    return
+  end
+  if not buildMinimap() then return end
+  placeMinimap(o.minimapAngle or MINIMAP_ANGLE)
+  minimapButton:Show()
 end
 
 -- Blizzard's addon compartment entry, declared by the .toc, and the keybinding

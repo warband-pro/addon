@@ -49,7 +49,7 @@ So both addon list tooltip (Notes field) and site pages reinforce companion natu
 
 - Icon: `Interface\Icons\INV_Misc_Bag_10` — generic bag, fits companion storage theme, free of copyrighted art. Replace with custom 64x64 if you draw one later — update `IconTexture`.
 - Toc Notes shortened to fit 70-char client tooltip: "Companion for warband.pro — gathers bags, bank, warband bank, currencies, lockouts from every alt | warband.pro" — long Notes-enUS has full sentence.
-- No minimap button by default, only AddonCompartment. Keeps compatibility, signals lightweight.
+- Minimap button on by default since 1.5.0, alongside AddonCompartment. Hand-built, no LibDBIcon, so "lightweight" still holds — it references `Interface\Icons\inv_enchant_voidcrystal` and `Interface\Minimap\MiniMap-TrackingBorder`, both already in the client. Off with `/warband minimap off`.
 - License MIT, vendor LibDeflate zlib notice in Vendor/LibDeflate.lua.
 
 ## Release checklist for v1.0.0

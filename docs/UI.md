@@ -37,10 +37,11 @@ them); the skin is deliberately not ours but Blizzard's. Text colors inside
 the window use the client's palette (gray for muted, gold for warnings, the
 standard quality colors) rather than the website's.
 
-Still no Ace, no LibStub registration, no minimap button — the compartment is
-Blizzard's stated place now. Mixin calls that could plausibly move
-(`SetTitle`, `SetPortraitToAsset`) are guarded so a rename costs the title or
-the icon, never the window.
+Still no Ace and no LibStub registration. There is a minimap button as of
+1.5.0 (below) and it changes nothing about that: it is CreateFrame and one
+cosine, not LibDBIcon, so the addon still registers with nothing. Mixin calls
+that could plausibly move (`SetTitle`, `SetPortraitToAsset`) are guarded so a
+rename costs the title or the icon, never the window.
 
 ### Export tab
 
@@ -108,6 +109,10 @@ the tab and `/warband gear on|off` are two doors to one switch:
   as the slash command.
 - **Include item links** (`includeLinks`) — the debug toggle that was
   previously reachable only by editing SavedVariables.
+- **Show the minimap button** (`minimap`, on by default) — the same switch as
+  `/warband minimap on|off`. It is on this tab and the button's right click
+  opens this tab, so the control that removes the icon is one click from the
+  icon itself.
 - **Open the clear-out list at merchants** (`autoJunk`, off by default) — at
   `MERCHANT_SHOW`, if the resolved list has rows, the Import tab opens by
   itself and closes again at `MERCHANT_CLOSED` — unless the player switched
@@ -120,6 +125,37 @@ the tab and `/warband gear on|off` are two doors to one switch:
 No UI-scale option, deliberately: AMR needs one because its window is skinned
 from scratch; this window inherits the player's scale by being made of the
 client's own parts.
+
+### Minimap button
+
+`WarbandProMinimapButton`, parented to `Minimap`, added in 1.5.0. Click for the
+export string, right-click for the Options tab, drag to move it round the ring;
+the hover tooltip says how many characters are stored and how fresh the
+freshest is, so a glance answers "do I need to export" without opening
+anything.
+
+**Why it exists now and not before.** `docs/FLOW.md` ruled it out on
+compatibility grounds, and the argument was really about the library: a minimap
+button meant LibDBIcon, LibDBIcon meant LibStub, and this addon ships neither.
+Hand-built, there is no dependency to weigh — the ring is Blizzard's
+`MiniMap-TrackingBorder`, the face is `Interface\Icons\inv_enchant_voidcrystal`,
+and both are already in the player's client. What decided it is the loop in
+`docs/FLOW.md`: four to ten exports a play night, each an alt-tab out of a
+fight. The compartment is a list of every addon installed, so each of those was
+a click, a read and a second click.
+
+The compartment entry stays. It costs one `.toc` line, and it is where a player
+who turned this button off goes looking.
+
+**Position is an angle, not a point.** `opts.minimapAngle` is degrees round the
+ring and `UI.lua` owns the default (216°, the emptiest arc of the stock ring),
+which is why `Store.lua` does not write one — a DB from before the button
+gains one by not having it.
+
+**The drag handler is the addon's only OnUpdate.** `OnDragStart` installs it and
+`OnDragStop` removes it, so it runs while the mouse button is down and never
+otherwise; what it reads is the cursor, not the game. Everything watching the
+client still hangs off an event and a throttle (`Init.lua`).
 
 ### Automation safety
 
@@ -134,7 +170,8 @@ client's own parts.
 
 From `docs/QA.md` checklist expanded:
 
-- /warband opens within 2 clicks: Compartment -> click or slash "/warband"
+- /warband opens in one click on the minimap button — or the Compartment,
+  or the slash command, or the keybinding, all landing on the Export tab
 - Auto-highlighted on open without mouse drag (human just hits Ctrl-C)
 - Ctrl-A + Ctrl-C works, pastes into Notepad startswith wb1! exact len reported at bottom.
 - Esc closes, second open same behavior.

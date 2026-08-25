@@ -38,7 +38,7 @@ We did final doc pass on Tue 2026-08-18 15:01 PT. This repo is ready to hand to 
 Locked: multi-char default, staleness per-section stamps, retail Midnight only, wb1! format, vendor LibDeflate only, omnipresent top-right sink, pure/impure test split, flow second monitor.
 
 Open last 5 before code but not blocking start:
-- minimap Y/N (default off)
+- ~~minimap Y/N (default off)~~ — settled in 1.5.0: yes, on by default, hand-built rather than LibDBIcon. docs/UI.md "Minimap button" has the reasoning.
 - itemName in bundle or id-only + Game Data lookup (size vs debugging tradeoff)
 - warbank shared stamp wording "by Vocnar" vs per-char stamp same time (shared makes sense)
 - recipe totalRecipes needs static data fetch (maybe borrow from Warbandeer static-data.json idea)

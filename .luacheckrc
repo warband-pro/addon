@@ -27,6 +27,9 @@ read_globals = {
   -- fall back to their LibDeflate when upstream's early return skips ours.
   "LibStub",
   "C_AddOns", "GetAddOnMetadata", "CreateFrame", "UIParent", "UISpecialFrames",
+  -- the minimap button: the ring it is anchored to, the tooltip it fills, and
+  -- the cursor position it reads while being dragged round the ring.
+  "Minimap", "GameTooltip", "GetCursorPosition",
   "ChatFontNormal", "DEFAULT_CHAT_FRAME", "C_Timer", "GetServerTime",
   "GetBuildInfo", "InCombatLockdown",
   -- The export box watches for a real Ctrl+C so the copy can be acknowledged:

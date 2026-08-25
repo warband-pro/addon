@@ -37,7 +37,7 @@ This is not "install once, export once a month". It's frequent, low-friction, am
 - Not thinking about addon install after first 5 min (CurseForge or `_retail_/Interface/AddOns/` drag).
 - Not reading tooltips scanning (we don't do tooltip injection).
 - Not auto-uploading in background (trust/privacy — user-initiated only, we never network).
-- Not opening settings to tweak (default correct: account-wide `WarbandProDB`, no minimap button, Compartment only).
+- Not opening settings to tweak (default correct: account-wide `WarbandProDB`, minimap button already on the ring, addon compartment as well).
 - Not managing recipe full list (too large) — we keep counts.
 
 ## App side omnipresent access (sink)

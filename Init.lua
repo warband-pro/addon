@@ -55,7 +55,10 @@ function ns.safe(fn, a, b, c)
   return nil
 end
 
--- Trailing-edge throttle. One timer per key, no OnUpdate anywhere in this addon.
+-- Trailing-edge throttle. One timer per key. Nothing in this addon watches the
+-- game on an OnUpdate — the one OnUpdate that exists is installed by the minimap
+-- button while it is being dragged and removed when the mouse comes up, and what
+-- it reads is the player's hand rather than anything the client is doing.
 local pending = {}
 function ns.throttle(key, delay, fn)
   if pending[key] then return end

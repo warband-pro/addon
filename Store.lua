@@ -45,6 +45,11 @@ function Store.Init()
   if db.opts.includeLinks == nil then db.opts.includeLinks = false end
   if db.opts.includeGear == nil then db.opts.includeGear = true end
   if db.opts.autoJunk == nil then db.opts.autoJunk = false end
+  -- The minimap button is on by default. Its angle is deliberately not
+  -- defaulted here: UI.lua owns the number it falls back to, so there is one
+  -- home for it, and a DB written before the button existed does not have to be
+  -- rewritten to gain one.
+  if db.opts.minimap == nil then db.opts.minimap = true end
 
   _G.WarbandProDB = db
   Store.db = db

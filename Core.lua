@@ -49,8 +49,10 @@ end
 --- when a bag, bank, vault or mailbox opens, and prints nothing — which is
 --- right for the ninety-nine logins after the first and wrong for the first.
 --- Nothing was printed on install, so a player who got this from CurseForge
---- and forgot the command had only the addon-compartment icon to find it by,
---- and docs/FLOW.md rules out a minimap button on purpose.
+--- and forgot the command had only the addon-compartment icon to find it by.
+--- Since 1.5.0 there is a minimap button too, and this line names it, because
+--- an icon a player has not yet been told belongs to us is one more unexplained
+--- icon on a crowded ring.
 ---
 --- The flag lives in SavedVariables, so this is one line in a lifetime rather
 --- than one per session. It names the command and the site, because those are
@@ -61,7 +63,8 @@ local function greet()
   if db.greeted then return end
   db.greeted = true
   Store.Touch()
-  ns.print("installed — play normally, then type |cffffd100/warband|r to copy your bundle into warband.pro")
+  ns.print("installed — play normally, then click the minimap icon (or type |cffffd100/warband|r) "
+    .. "to copy your bundle into warband.pro")
 end
 
 handlers.PLAYER_LOGIN = function()
@@ -70,6 +73,7 @@ handlers.PLAYER_LOGIN = function()
   Scan.All()
   Instances.Request()
   Instances.Vault()
+  UI.RefreshMinimap()   -- after Store.Init: the button reads its own option
   greet()
 end
 
@@ -305,6 +309,17 @@ SlashCmdList.WARBANDPRO = function(msg)
     else
       ns.print("saved data not loaded yet")
     end
+  elseif cmd == "minimap on" or cmd == "minimap off" then
+    if Store.Ready() then
+      local on = cmd == "minimap on"
+      Store.db.opts.minimap = on
+      Store.Touch()
+      UI.RefreshMinimap()
+      ns.print(on and "minimap button on — drag it anywhere round the ring"
+        or "minimap button off — the addon compartment and /warband still open the window")
+    else
+      ns.print("saved data not loaded yet")
+    end
   elseif cmd == "junk" or cmd == "clean" then
     UI.ToggleJunk()
   elseif cmd == "options" then
@@ -316,6 +331,7 @@ SlashCmdList.WARBANDPRO = function(msg)
     ns.print("perf counters reset")
   else
     ns.print("/warband · /warband copy current · /warband junk · /warband options · /warband status · "
-      .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband perf")
+      .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband minimap on|off · "
+      .. "/warband perf")
   end
 end
