@@ -81,9 +81,10 @@ setting of its own. Open it from the minimap, a key, the addon compartment or
 
 ### Fixed
 
-- Four warnings on every login about an XML attribute that does not exist.
-  The keybinding also sat under a heading called WARBANDPRO as a row called
-  WARBANDPRO_TOGGLE; it reads as words now.
+- Three warnings on every login, from `Bindings.xml` being listed in the
+  `.toc` as well as loaded by the client. The keybinding also sat under a
+  heading called WARBANDPRO as a row called WARBANDPRO_TOGGLE; it reads as
+  words now.
 - Pasting a cleanup string into the clear-out panel errored before the
   decoder ever ran: the `wbc1!` prefix constant was defined in the test
   fixture but not in the addon. The tests now load the shipped file instead

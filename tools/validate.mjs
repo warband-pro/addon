@@ -102,6 +102,17 @@ for (const entry of listed) {
   }
 }
 
+// --- Bindings.xml must not be in the .toc --------------------------------
+// The client finds Bindings.xml by name and parses it as bindings. Listing it
+// here parses it a second time as general UI XML, which rejects the Binding
+// element and every attribute on it — three LUA_WARNINGs per login, and the
+// warnings name real attributes, so the obvious reading is that the schema
+// changed. Two correct attributes were deleted chasing that before the element
+// line was read. Cheaper to make the mistake unrepeatable than to write it down.
+if (listed.some((entry) => entry.toLowerCase() === 'bindings.xml')) {
+  fail(`${tocName} lists Bindings.xml — the client already loads it by name, and listing it parses it again as UI XML (see the comment in Bindings.xml)`);
+}
+
 // --- every shipped Lua file is loaded by something -----------------------
 const luaFiles = [];
 const SKIP = new Set(['.git', '.github', '.release', 'docs', 'tools', 'node_modules']);

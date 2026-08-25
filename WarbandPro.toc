@@ -44,6 +44,7 @@ Junk.lua
 UI.lua
 Core.lua
 
-# Bindings.xml is declarative and names a function UI.lua defines, so it is
-# listed last rather than with the Lua files it depends on.
-Bindings.xml
+# Bindings.xml is deliberately absent from this list. The client loads it by
+# name from the addon folder; listing it here loads it a second time through the
+# general UI XML parser, which does not know what a Binding is and says so three
+# times on every login. tools/validate.mjs fails the build if it comes back.

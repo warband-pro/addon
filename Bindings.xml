@@ -16,14 +16,29 @@
       It is deliberately unbound by default. A binding this addon assigned for
       itself would take a key the player has already given to something else.
 
-      There is no `category` attribute on Binding, whatever it looks like it
-      ought to have. The client says so on every login, four times:
-      "Unrecognized XML attribute: category". What groups a binding under its
-      own heading is `header`, and a header is only a name once a global
-      called BINDING_HEADER_ followed by that header exists to translate it.
-      UI.lua defines that one and BINDING_NAME_WARBANDPRO_TOGGLE beside it;
-      without them the panel reads "WARBANDPRO" over "WARBANDPRO_TOGGLE",
-      which is a row the player has to guess at.
+      THIS FILE IS NOT LISTED IN WarbandPro.toc, AND MUST NOT BE. The client
+      finds Bindings.xml in an addon folder by name and hands it to the
+      bindings parser. Listing it in the .toc hands it a second time to the
+      general UI parser, which knows Frame and Script and has never heard of
+      Binding — so it walks the file rejecting every part of it in turn:
+
+        Unrecognized XML: Binding
+        Unrecognized XML attribute: name
+        Unrecognized XML attribute: header
+
+      three warnings on every login, and no keybinding registered by that pass.
+      The attribute lines are what make this expensive to read: they name real
+      attributes and invite you to go and delete them, which is what happened
+      twice here before the element line was noticed. `category` went first —
+      it was never a Binding attribute and deserved to go — then `header`,
+      which is Blizzard's own grouping mechanism and was never the problem.
+      An attribute warning from this parser is evidence about nothing except
+      which parser ran.
+
+      The Lua half is unaffected either way, because it is Lua:
+      BINDING_HEADER_WARBANDPRO and BINDING_NAME_WARBANDPRO_TOGGLE in UI.lua
+      are what turn the header and the action into words. Without them the
+      panel prints the raw tokens.
     -->
     <Binding name="WARBANDPRO_TOGGLE" header="WARBANDPRO">
         WarbandPro_ToggleFromBinding()
