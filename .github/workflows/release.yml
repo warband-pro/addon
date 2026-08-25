@@ -114,6 +114,35 @@ jobs:
           git tag -a "v$VERSION" -m "v$VERSION"
           git push origin "v$VERSION"
 
+      # Cut CHANGELOG.md down to this release's section, in the checkout only.
+      #
+      # `.pkgmeta` names CHANGELOG.md as the `manual-changelog` and the packager
+      # ships that file WHOLE — it does not split it by tag. So v1.5.0 and every
+      # release before it published the entire changelog as the release body,
+      # the CurseForge and Wago description, and the Discord embed, which then
+      # truncated at 4096 characters partway through the notes. About 1200
+      # characters of maintainer-facing header went out ahead of the notes every
+      # time: how to cut a release, what the slop pass is, the semver table.
+      #
+      # Rewriting the file here rather than pointing `.pkgmeta` somewhere else
+      # keeps one changelog and one filename. Nothing is committed — this
+      # checkout is thrown away at the end of the job — and the zip's own
+      # CHANGELOG.md becomes "what is new in this version", which is what a
+      # changelog inside a downloaded addon should say anyway. Full history
+      # stays in the repository and on the Releases page.
+      - name: Release notes for this tag only
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          node tools/notes.mjs "$VERSION" > .release-notes.md
+          # The first line must be this version's heading. If the file's header
+          # ever leaks back in, fail here rather than publish it to four places
+          # again — that is the failure this whole step exists to end.
+          head -1 .release-notes.md | grep -qF "## [$VERSION]"
+          mv .release-notes.md CHANGELOG.md
+          echo "release body is $(wc -c < CHANGELOG.md) bytes"
+
       - name: Package and publish
         uses: BigWigsMods/packager@v2
         env:

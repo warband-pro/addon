@@ -54,6 +54,21 @@ of reading `github.event.release` — that context is empty on a tag push. It al
 means Discord shows the release body verbatim rather than a second, separately
 rendered copy of the changelog.
 
+Which is why the release body has to be right at the source. `.pkgmeta` names
+CHANGELOG.md as the `manual-changelog` and the packager ships that file
+**whole**; it has no notion of a tag's section. Every release through v1.5.0
+therefore published the entire changelog to all four audiences, and Discord
+truncated it at 4096 characters somewhere inside notes nobody had reached. The
+"Release notes for this tag only" step now runs `tools/notes.mjs` and writes
+the one section over CHANGELOG.md in the checkout, before the packager sees it.
+Nothing is committed, and the zip's own changelog becomes what is new in that
+version.
+
+The parser is shared: `tools/changelog.mjs` finds a section and both
+`tools/slop.mjs` and `tools/notes.mjs` use it, so what the slop pass proofreads
+is what the release publishes. Splitting those was how the budget below came to
+be guarding a number that did not apply.
+
 ## The slop pass
 
 `tools/slop.mjs` reads a changelog section the way a stranger scrolling Discord

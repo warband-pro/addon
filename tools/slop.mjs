@@ -19,12 +19,7 @@
 // Exits non-zero on any finding. SLOP_OK=1 downgrades to a warning, for the
 // case where a rule is wrong and the release should not wait on a fix.
 
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const CHANGELOG = 'CHANGELOG.md';
+import { section, CHANGELOG } from './changelog.mjs';
 
 // Discord truncates an embed description at 4096 characters, mid-word, with no
 // indication anything was cut. Leave headroom for what the action adds.
@@ -100,26 +95,15 @@ if (!arg) {
   console.error('usage: node tools/slop.mjs <version> | --unreleased');
   process.exit(2);
 }
-const wanted = arg === '--unreleased' ? 'Unreleased' : arg.replace(/^v/, '');
-
-const text = readFileSync(join(ROOT, CHANGELOG), 'utf8');
-const lines = text.split('\n');
-
-// Find `## [x.y.z]` and take everything up to the next `## `. Link reference
-// definitions at the bottom of the file start with `[`, not `#`, so the last
-// section would otherwise swallow them — cut on those too.
-const start = lines.findIndex((l) => l.startsWith(`## [${wanted}]`));
-if (start === -1) {
+// Located by the one parser both this and tools/notes.mjs use, so what gets
+// proofread here is exactly what the release publishes.
+const found = section(arg);
+const { wanted } = found;
+if (!found.found) {
   console.error(`::error::${CHANGELOG} has no '## [${wanted}]' section — write the release notes first`);
   process.exit(1);
 }
-let end = lines.length;
-for (let i = start + 1; i < lines.length; i++) {
-  if (lines[i].startsWith('## ') || /^\[[^\]]+\]:\s/.test(lines[i])) { end = i; break; }
-}
-
-const body = lines.slice(start + 1, end);
-const prose = body.join('\n').trim();
+const { start, body, prose } = found;
 
 if (arg === '--unreleased' && prose === '') {
   console.log('slop: ## [Unreleased] is empty, nothing to check');

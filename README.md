@@ -136,7 +136,7 @@ Top-right sink `[ ↻ sync / ↥ import ▼ ]` lives every route, mirrors ghost 
 ## Repo shape
 
 - `WarbandPro.toc`, `Init.lua`, `Core.lua`, `Store.lua`, `Scan.lua`, `Instances.lua`, `Bundle.lua`, `Export.lua`, `UI.lua`, `Vendor/LibDeflate.lua`
-- `tools/validate.mjs`, `tools/vector.mjs`, `tools/sample.mjs`, `CHANGELOG.md`, `.pkgmeta`, `.github/workflows/ci.yml` + `release.yml`
+- `tools/validate.mjs`, `tools/vector.mjs`, `tools/sample.mjs`, `tools/slop.mjs`, `tools/notes.mjs` (+ the `tools/changelog.mjs` parser they share), `CHANGELOG.md`, `.pkgmeta`, `.github/workflows/ci.yml` + `release.yml`
 - `docs/` — coding reference, trimmed before CurseForge zip via `.pkgmeta` ignore. See `docs/README.md` read order: FLOW → RESEARCH-REFERENCE → CONTRACT → UI → TESTING → QA → CI → PROMPT → EXECUTION-READY.
 
 When shipping light, flat root, no badges clutter, per your rule Problem→Install→Use→What it catches→Inside 4-6 files (this README already does it).

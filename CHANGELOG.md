@@ -1,8 +1,16 @@
 # Changelog
 
-Release notes for Warband.pro Companion. The packager sends the section matching the tag to CurseForge, Wago, and WoWInterface verbatim, so this is what players read — not the commit log.
+Release notes for Warband.pro Companion. This is what players read, not the commit log.
 
-**The release workflow looks for `## [1.0.1]` exactly.** A tag without a matching heading here fails the release before anything is published. Write the section first, then tag.
+**One section goes out, not this file.** `tools/notes.mjs` cuts the section matching the tag out of here, and the release workflow hands the packager that and nothing else — so the GitHub release body, the CurseForge and Wago description and the Discord embed all carry one version's notes. See exactly what will publish:
+
+```
+node tools/notes.mjs 1.5.0
+```
+
+Until 1.5.0 the packager was given this whole file and shipped it whole, header and all history included, and Discord cut it off mid-sentence at 4096 characters. The paragraph you are reading now used to be the first thing every release said.
+
+**The release workflow looks for `## [1.5.0]` exactly.** A tag without a matching heading here fails the release before anything is published. Write the section first, then tag.
 
 It also reads the section for machine-written marketing voice and fails on that — same check, so run it yourself before you tag:
 
@@ -22,6 +30,13 @@ Versions follow [semver](https://semver.org/), with the wire format as the thing
 The wire contract itself is specified in [docs/CONTRACT.md](docs/CONTRACT.md).
 
 ## [Unreleased]
+
+### Fixed
+
+- Release descriptions on CurseForge and Wago carry one version's notes now.
+  Every release up to and including 1.5.0 published this entire file — the
+  instructions at the top, then every version back to 1.0.0 — and Discord cut
+  that off partway through.
 
 ## [1.5.0] — 2026-08-25 — one window, and three ways into it
 

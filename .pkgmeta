@@ -14,6 +14,13 @@ license-output: LICENSE.txt
 # Release notes come from the hand-written changelog, not from the commit log.
 # What a player wants to read is "gold now updates when you sell", not
 # "fix(scan): guard nil on C_Bank tab 5".
+#
+# The packager ships this file WHOLE — it does not split it by tag, whatever
+# the name suggests. So release.yml rewrites CHANGELOG.md down to the tagged
+# section (tools/notes.mjs) in the checkout before the packager runs, and this
+# filename stays pointed at the same place it always did. Do not "fix" that by
+# naming a second file here; one changelog, one filename, one step that trims
+# it. See the comment on that step.
 manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown
