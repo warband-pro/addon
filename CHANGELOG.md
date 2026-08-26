@@ -43,6 +43,14 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-08-26 — best in bags, and the set comes back
+
+**warband.pro can now tell you what to equip, and hand you a string that
+equips it.** Two halves of the same loop: your bags start reporting what each
+item's stats actually are, which is what lets the site rank two pieces against
+each other rather than trusting item level; and the answer comes back as one
+string you paste into the same box the clear-out list uses.
+
 ### Added
 
 - Gear in your bags, bank and warband bank now carries its stat values on the

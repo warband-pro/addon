@@ -85,6 +85,56 @@ Pass 3 — edge + combat
 
 Result paste back format (pasteable to AI loop):
 
+## The gear set — equip and save (1.6.0)
+
+**This is the first thing this addon has ever done that moves gear on your
+character**, and like the merchant pass above, nothing in CI can reach it: the
+equip path calls `PickupContainerItem`, `EquipCursorItem` and
+`C_EquipmentSet.SaveEquipmentSet`, none of which exist outside a live client.
+`tools/gearset-test.lua` pins the decode, the three-bucket resolve, the
+equips-before-save order and the combat refusals against a fake client — the
+order especially, because saving in the same frame as the equips snapshots the
+kit you were wearing before. What it cannot check is whether the real API
+behaves the way the fake one does. Run this on a character whose kit you do not
+mind rearranging, and take the backup line seriously.
+
+- [ ] Back up WTF/.../SavedVariables/WarbandPro.lua before the first pass —
+      the set this writes is a real Equipment Manager set
+- [ ] Note your existing Equipment Manager sets first; none of them is called
+      "warband.pro" unless a previous pass made it
+- [ ] Export from `/warband`, paste into warband.pro, open `/gear` → `[ slots ]`
+- [ ] Select your character — the inspector lists every slot that changes, with
+      item names, and `copy equip string` sits under the list
+- [ ] Press it, paste into the addon's Import tab — the gear-set row appears
+      above the junk list and names the same slots the website listed
+- [ ] The counts agree with the site: `N to equip`, `already worn`, `missing`
+- [ ] An item the site named that you have since moved to the bank reads as
+      missing, and says it is in your bank rather than vanishing
+- [ ] Press `Equip N & save set` — the items equip, one receipt line prints,
+      and it names the same numbers the row did
+- [ ] `/dump C_EquipmentSet.GetEquipmentSetID("warband.pro")` — a real id
+- [ ] Open the Equipment Manager — the set exists and its icon is the addon's;
+      switching to it re-equips what you are wearing now
+- [ ] Press it a second time with nothing left to change — the button reads
+      `Save set` and the receipt says everything was already worn
+- [ ] **The order check**: equip something different by hand first, then apply
+      a set — the saved set must contain what the site chose, NOT what you were
+      wearing when you pressed the button
+- [ ] A ring the site aimed at finger 2 lands in finger 2, not finger 1
+- [ ] Paste a `wbc1!` cleanup string into the same box — it still reads as a
+      cleanup list; paste `wbg1!` — it reads as a gear set. Neither says
+      "invalid"
+- [ ] Paste a `wbg1!` string from a DIFFERENT account — the panel says the set
+      is for characters this account has not scanned
+- [ ] Enter combat with a set pending — the panel closes; the receipt says to
+      press equip again after the fight, and nothing equips mid-fight
+- [ ] Start an apply, then immediately move one of the named items in your bags
+      — after three seconds the receipt says how many did not equip, and the
+      set saved is what you are actually wearing
+- [ ] `/console taintLog 1` — repeat the whole equip pass — `/reload` —
+      `Logs/taint.log` has no WarbandPro line
+- [ ] BugSack empty after all of the above
+
 ```
 PASS BugSack empty
 PASS taint 0
@@ -100,6 +150,7 @@ PASS vault matches (4/8 vs 4/8)
 PASS gear 18 pieces, bonus IDs distinct
 PASS talents 2 specs known, loadout non-empty
 PASS gear toggle off/on
+PASS gear set equipped 4, saved, order correct
 FAIL? notes...
 ```
 
