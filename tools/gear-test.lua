@@ -38,6 +38,16 @@ local ITEMS = {
 local EQUIPPED_LEVELS = { [1] = 639, [16] = 645 }
 local CONTAINER_LEVELS = { ["0:1"] = 626, ["0:2"] = 580, ["-1:1"] = 619 }
 
+-- id → GetItemStats answer. 101 has stats; 102 answers an empty table (a
+-- stat-less read must omit the field, not send {}); 105 answers junk-typed
+-- pairs beside a real one (only the real one survives); everything else is
+-- nil, the uncached-item case on a cold login.
+local STATS = {
+  [101] = { ITEM_MOD_INTELLECT_SHORT = 1204, ITEM_MOD_CRIT_RATING_SHORT = 581, ITEM_MOD_STAMINA_SHORT = 2100 },
+  [102] = {},
+  [105] = { ITEM_MOD_STAMINA_SHORT = 1800, [7] = 99, ITEM_MOD_BROKEN = "yes" },
+}
+
 _G.C_Item = {
   GetItemInfoInstant = function(id)
     local t = ITEMS[id]
@@ -47,6 +57,10 @@ _G.C_Item = {
   GetCurrentItemLevel = function(loc)
     if loc.equip then return EQUIPPED_LEVELS[loc.equip] end
     return CONTAINER_LEVELS[loc.bag .. ":" .. loc.slot]
+  end,
+  GetItemStats = function(link)
+    local id = tonumber(type(link) == "string" and link:match("item:(%d+)"))
+    return id and STATS[id] or nil
   end,
 }
 _G.ItemLocation = {
@@ -150,6 +164,19 @@ eq(banked.ilvl, 619, "bank ilvl reads the bank container slot")
 local weird = visit(106, { name = "Grim-Veiled \"Edge\"" })
 eq(weird.n, "Grim-Veiled \"Edge\"", "a name with punctuation survives the bracket match")
 
+-- ── st: stat values, verbatim tokens, absence over emptiness ────────────────
+
+local statted = visit(101)
+check(type(statted.st) == "table", "an item with stats carries st")
+eq(statted.st and statted.st.ITEM_MOD_INTELLECT_SHORT, 1204, "st keeps GetItemStats tokens verbatim")
+eq(statted.st and statted.st.ITEM_MOD_CRIT_RATING_SHORT, 581, "every stat pair rides along")
+eq(visit(102).st, nil, "an empty stats read omits st entirely — absence, never {}")
+eq(visit(103).st, nil, "a nil stats read (uncached item) omits st")
+local scrubbed = visit(105)
+eq(scrubbed.st and scrubbed.st.ITEM_MOD_STAMINA_SHORT, 1800, "a real pair survives beside junk-typed ones")
+eq(scrubbed.st and scrubbed.st[7], nil, "a numeric key never reaches the wire")
+eq(scrubbed.st and scrubbed.st.ITEM_MOD_BROKEN, nil, "a non-number value never reaches the wire")
+
 -- ── equipped entries stay lean ──────────────────────────────────────────────
 
 local eq_out = ns.Gear.Equipped()
@@ -160,6 +187,7 @@ for _, row in ipairs(eq_out) do
   eq(row.q, nil, "equipped rows never carry q")
   eq(row.cls, nil, "equipped rows never carry cls")
   eq(row.b, nil, "equipped rows never carry b")
+  eq(row.st, nil, "equipped rows never carry st — the Profile API resolves them")
 end
 eq(eq_out[1].slot, 1, "equipped head keeps its real slot number")
 eq(eq_out[1].ilvl, 639, "equipped ilvl reads the equipment slot location")

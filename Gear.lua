@@ -121,6 +121,12 @@ function Gear.Visit(where, bagID, slot, info, out)
   --        reports 1 as well and every class wears one, so a consumer
   --        testing sub against a class proficiency has to check the slot
   --        first. See docs/CONTRACT.md; this is sent, never interpreted.
+  --   st   the item's stat values, C_Item.GetItemStats tokens verbatim
+  --        (ITEM_MOD_* → number), same posture as sub: sent, never
+  --        interpreted, never compacted — a token this addon has not heard
+  --        of still reaches the wire, and the website ignores what it does
+  --        not know. Omitted when the client could not answer (an uncached
+  --        item on a cold login), which absence means — never "no stats".
   local entry = {
     slot = canonicalSlot,
     where = where,
@@ -133,6 +139,20 @@ function Gear.Visit(where, bagID, slot, info, out)
     sub = itemInfo.subclassID,
   }
   if info.isBound then entry.b = true end
+  local stats = ns.safe(C_Item.GetItemStats, info.hyperlink)
+  if type(stats) == "table" then
+    -- Copy only string-token → number pairs: verbatim on the wire, but the
+    -- canonical encoder is owed clean types, and a stat value is a number or
+    -- it is not a stat.
+    local st
+    for k, v in pairs(stats) do
+      if type(k) == "string" and type(v) == "number" then
+        st = st or {}
+        st[k] = v
+      end
+    end
+    entry.st = st
+  end
   out[#out + 1] = entry
 end
 

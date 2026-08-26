@@ -26,12 +26,14 @@
        "s":"item:212050:7228::::::80:251::7:6:12053:10390:1520:10255:9:1:28:::"},
       {"slot":11,"where":"bag","id":215135,"ilvl":626,
        "n":"Seal of the Poisoned Pact","q":3,"cls":4,"sub":0,
+       "st":{"ITEM_MOD_CRIT_RATING_SHORT":581,"ITEM_MOD_HASTE_RATING_SHORT":702,"ITEM_MOD_STAMINA_SHORT":2100},
        "s":"item:215135::::::::80:250::4:6:12053:1:28:::"},
       {"slot":16,"where":"bank","id":222446,"ilvl":619,
        "n":"Vagabond's Cleaver","q":4,"b":true,"cls":2,"sub":0,
        "s":"item:222446::::::::80:250::3:6:12053:1:::"},
       {"slot":1,"where":"bag","id":221151,"ilvl":610,
        "n":"Ironclaw Warhelm","q":3,"b":true,"cls":4,"sub":4,
+       "st":{"ITEM_MOD_AGILITY_SHORT":890,"ITEM_MOD_MASTERY_RATING_SHORT":420,"ITEM_MOD_STAMINA_SHORT":1650},
        "s":"item:221151::::::::80:250::4:6:12053:1:28:::"}
     ],
     "talents": {

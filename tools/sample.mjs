@@ -79,12 +79,19 @@ function gear(spec, ilvlBase) {
     };
   });
   // A couple of unequipped pieces so a preview of best-in-bags has something to
-  // compare against — a spare ring and a spare trinket.
+  // compare against — a spare ring and a spare trinket, stats and all (`st` is
+  // what the ordering reads; a sample without it exercises the ilvl fallback
+  // instead of the ranker).
   const spare = [11, 13].map((slot) => {
     const id = 210000 + rnd(20000);
     return {
       slot, where: 'bag', id, ilvl: ilvlBase - 10 + rnd(20), s: itemString(id, spec),
       n: itemName(), q: 3 + rnd(2), b: true, cls: 4, sub: 0,
+      st: {
+        ITEM_MOD_CRIT_RATING_SHORT: 400 + rnd(400),
+        ITEM_MOD_HASTE_RATING_SHORT: 400 + rnd(400),
+        ITEM_MOD_STAMINA_SHORT: 1500 + rnd(800),
+      },
     };
   });
   // Two pieces well below the equipped kit, one of them the wrong armor class:

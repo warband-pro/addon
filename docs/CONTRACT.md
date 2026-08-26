@@ -199,6 +199,7 @@ against an equipment document that only refreshes at the wearer's last logout.
 | `b` | Soulbound. **Emitted only when true** — absence means NOT bound, never "unknown", matching `items[].isBound`. The website's BoE guard depends on that reading. Added in 1.3.0; bag/bank/warbank entries only. |
 | `cls` | Item class id (2 Weapon, 4 Armor), `GetItemInfoInstant` position 6. Added in 1.3.0; bag/bank/warbank entries only. |
 | `sub` | Item subclass id, `GetItemInfoInstant` position 7, **verbatim and uninterpreted**. For armor it is 1 Cloth … 4 Plate *on the eight slots that have an armor weight* — and **a cloak reports 1 as well**, which is not a weight and not a claim that only cloth wearers may equip it. Necks, rings and trinkets report 0. With `cls` this is what lets the website call an item unwearable by this class, and the slot is what says whether the question is answerable at all — see the note below. Added in 1.3.0; bag/bank/warbank entries only. |
+| `st` | The item's stat values: `C_Item.GetItemStats` tokens **verbatim**, a map of `ITEM_MOD_*` string → number (e.g. `{"ITEM_MOD_CRIT_RATING_SHORT":581,"ITEM_MOD_INTELLECT_SHORT":1204}`). Never compacted, never interpreted — a token this addon has not heard of still reaches the wire, and a consumer ignores what it does not know. Omitted when the client could not answer (an uncached item on a cold login); absence means "not read", never "no stats". Added in 1.6.0; bag/bank/warbank entries only. |
 
 **`sub` is a subclass, not an armor weight, and `slot` is what tells them
 apart.** Subclass 1 means Cloth on head, shoulders, chest, waist, legs, feet,
@@ -245,6 +246,24 @@ does not guess. A character can therefore have more than one `gear[]` entry at
 website reading a newer bundle simply does not see them, and a newer website
 reading an older bundle must treat their absence as "not looked at" rather
 than as a value — the same rule every other optional field carries.
+
+**`st` was added in 1.6.0 for best-in-bags.** Ordering two owned items needs
+their stat values, and the Profile API only has stats for *equipped* items —
+the same asymmetry that made `gear[]` exist at all. The alternative was a Game
+Data call per owned item id on the website, and that trade has now been
+declined three times for the same reason (`ilvl` in 1.1.0, `n` in 1.3.0): a
+per-item resolution cost grows with the warband, a per-question one does not.
+The tokens repeat across every entry of every character, which is exactly what
+deflate folds — measured with `tools/sample.mjs`, the field costs roughly
+half a kilobyte of wire per character against a 150KB paste guard.
+
+One tradeoff is priced in rather than solved: a best-in-bags comparison reads
+the *owned* side's stats from this field, captured moments ago, and the
+*equipped* side's from a Profile API document that refreshes at last logout.
+The two can be one logout apart. That is the same staleness `ilvl` has carried
+since 1.1.0, and the remedy when it matters is a fresh logout, not a wire
+change — equipped entries do not carry `st` for the same reason they carry
+none of the 1.3.0 fields.
 
 The name is the load-bearing one. The website has no item-id-to-name lookup at
 all: resolving one means a Game Data call per item id, which is exactly the

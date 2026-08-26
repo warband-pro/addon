@@ -43,6 +43,15 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+- Gear in your bags, bank and warband bank now carries its stat values on the
+  export — crit, haste, mastery and the rest, read straight off the item. This
+  is what lets warband.pro rank two owned pieces against each other instead of
+  trusting item level alone. Equipped gear is unchanged; the website already
+  reads its stats from Blizzard. Costs about half a kilobyte per character on
+  the wire.
+
 ### Fixed
 
 - Release descriptions on CurseForge and Wago carry one version's notes now.
