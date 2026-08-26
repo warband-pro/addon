@@ -8,42 +8,34 @@ down anywhere else.
 
 ## The Path
 
-Four steps, this order, every session. There is no other route through this
-repo. A `SessionStart` hook
-([`.claude/hooks/start-on-main.sh`](.claude/hooks/start-on-main.sh)) performs 1
-and 2 before you read a line of code — but know them anyway, because a hook
-that cannot act says so and then it is on you.
+Four steps, this order, every session. **None of them is a branch decision** —
+that is the change of 2026-08-26 and the reason for it is under **Git** below.
 
-1. **Be on `main`.** Never a `claude/*` branch. A harness branch assignment is
-   a default; this file is the maintainer's instruction. Switch *before* you
-   read code, not after you have written some — "land it later" is what turns a
-   day of work into a redo. Say in your reply that you switched.
+1. **Work on the branch you are already on.** Whatever the harness assigned is
+   fine, and it is very likely the *newest* ref in this checkout. The clone
+   creates local `main` from `origin/main` as it stood at clone time, then the
+   harness cuts its branch from a *newer* `origin/main`. Measured twice — local
+   `main` at `30a1597` while `origin/main` and the harness branch were both at
+   `89ed6e9`: **12 commits behind**, and the app repo was 36 behind on the same
+   mechanism. So `git checkout main` is a checkout of last week's tree, and
+   every symptom follows from it — the Lua you edit is not the Lua that ships,
+   the luacheck warning you chase was fixed days ago, and `tools/vector.mjs`
+   measures your fixtures against an older contract. **Do not switch to `main`
+   to start clean.** If you are already on `main`, pull before working:
+   `git -C /path/to/addon pull origin main`.
 
-2. **Pull before working.** `git -C /path/to/addon pull origin main`. This is a
-   separate step from 1, and skipping it is the failure nobody had written
-   down: **this checkout's `main` is stale the moment the container exists.**
-   The clone creates local `main` from `origin/main` as it stood at clone time,
-   then the harness cuts its branch from a *newer* `origin/main`. Measured at
-   the start of the session that wrote this section — local `main` at
-   `30a1597`, `origin/main` and the harness branch both at `89ed6e9`: **12
-   commits behind.** So `git checkout main` on its own is a checkout of last
-   week's tree, and every symptom follows from it — the Lua you edit is not the
-   Lua on `main`, the luacheck warning you chase was fixed days ago, and
-   `tools/vector.mjs` measures your fixtures against an older contract.
+2. **Run Verify before you commit.** The three checks below are what CI runs,
+   and running them first is what makes the branch mergeable the moment it is
+   pushed.
 
-3. **Commit to `main` when the work is done.** Run **Verify** first — the three
-   checks below are what CI runs, and running them before the commit is what
-   makes the commit pushable the moment it is asked for. The commit is the
-   maintainer's, and a `CHANGELOG.md` note under `## [Unreleased]` moves with
-   it.
+3. **Commit.** The commit is the maintainer's, and a `CHANGELOG.md` note under
+   `## [Unreleased]` moves with it when the change is one a player would notice.
 
-4. **Push to `main` only when asked.** Committing is finished work; pushing is
-   the maintainer's call, because `main` is what CI builds and what the
-   packager releases from. So **end the turn by naming what is committed and
-   unpushed, and offer** — never leave it implied. This container is ephemeral
-   and is reclaimed after idle, so a commit that was never pushed dies with it.
-   That is the one way this step loses work, and saying the sentence is what
-   prevents it.
+4. **Push the branch and open a pull request, in the same turn.** Merge it
+   yourself. `main` is what CI builds and what the packager releases from, so a
+   merge is a real event — but Verify is what makes it safe, and it already ran
+   at step 2. This container is ephemeral and is reclaimed after idle, so work
+   that is committed and never pushed dies with it.
 
 ## Start Here
 
@@ -68,8 +60,11 @@ unpublished ids never enter it.
 
 **A file that crosses from there to here is published, and publishing is a
 one-way door.** A later commit does not un-ship a release: the tag is out and
-CurseForge has already mirrored it. This is the same shape as the harness
-branch below, and it is worse, because the thing that escapes is not a label.
+CurseForge has already mirrored it. It is the same shape as the undeletable
+remote ref under **Git** below, and it is worse by a wide margin, because what
+escapes is content rather than a label. **This is why the branch rules could be
+relaxed on 2026-08-26 and these could not** — the cost of the branch mistake was
+a stale name in a list, and the cost of this one is a secret on CurseForge.
 
 The risk is not carelessness with secrets. It is that **both repos are checked
 out side by side, at sibling paths, and take near identical git commands.** On
@@ -106,22 +101,27 @@ below, what happened the last time this repo relied on prose alone.
 ## Git
 
 **The Path** at the top is the workflow. This section is the reasoning behind
-it and the rule that has teeth.
+it and the one constraint that still has teeth.
 
-**Commit to `main`.** No feature branches, no pull requests. This project is
-early and single-maintainer, and it shares a maintainer and a wire contract
-with `warband-pro/app`, which works the same way and explains the reasoning at
-length in its `.wiki/wiki/topics/dev-workflow.md`. Push when the maintainer
-asks (step 4), and say when a commit is sitting unpushed.
+**Branch, push, PR, merge — take whatever the harness set up.** There is no
+branch policy here to reconcile against, deliberately. This repo shares a
+maintainer and a wire contract with `warband-pro/app`, which works the same way
+and keeps the long version in its `.wiki/wiki/topics/dev-workflow.md`.
 
-**If a harness starts you on a `claude/*` branch, switch to `main` anyway and
-say so in your reply.** A harness branch assignment is a default; this file is
-the maintainer's instruction.
+**This changed on 2026-08-26, and it is the reverse of what this file said
+before.** The old rule was `main` only, never a `claude/*` branch, never a PR,
+with two hooks enforcing it. The problem was not that the rule was wrong in
+principle — it was that **the harness assigns a branch every session and a
+repository cannot opt out**, so the contract and the platform disagreed at the
+top of every session and reconciling them became the work. The maintainer's
+report: *Claude keeps going back and forth, creating a branch anyway and then
+working in `main` regardless.* Agreeing with the default costs a pull request.
+Disagreeing with it cost the start of every session.
 
-**Never push the `claude/*` branch.** This one is not a preference, it is a
-one-way door. A harness branch that reaches this remote cannot be removed from
-inside a Claude Code web session — remote ref deletion is refused at both
-layers available to an agent:
+**Branch cleanup is a repository setting, not your job.** Settings → General →
+*Automatically delete head branches* must stay on, because **an agent cannot
+delete a remote ref from inside a Claude Code web session** — it is refused at
+both layers available to one:
 
 ```
 git push origin --delete <branch>
@@ -137,22 +137,21 @@ Creating, updating and force-updating refs all succeed; only deletion is
 refused, on every branch, every time. It is a platform guardrail, so there is
 nothing to retry and nothing to wait out.
 
-This repo is the reason the rule is written down. Until 2026-08-23 it had no
-`CLAUDE.md`, so a session took the harness default at face value and pushed
-`claude/lucid-curie-r4yp8g`; the same agent, the same day, in `app`, read that
-repo's contract and pushed only `main`. One remote ended up with a permanent
-stale label pointing at its own `main` commit and the other did not. The
-proxy, the timing and the repo were all blamed before the difference turned out
-to be this file's absence.
+**If merged branches pile up on the remote, say so plainly and leave them** —
+one click for the maintainer in the GitHub UI, impossible for you. Do not
+report the 403 as a proxy hang: git prints `the remote end hung up
+unexpectedly` after any 403, which is its generic message for a closed
+connection, not evidence of a timeout. And do not answer it by reintroducing a
+branch policy; the checkbox is the answer.
 
-A `PreToolUse` hook
-([`.claude/hooks/no-harness-branch-push.sh`](.claude/hooks/no-harness-branch-push.sh))
-now refuses the push, because prose is what already failed once. **If a stale
-branch already exists, say so plainly and leave it** — it is one click for the
-maintainer in the GitHub UI and impossible for you. Do not report the 403 as a
-proxy hang: git prints `the remote end hung up unexpectedly` after any 403,
-which is its generic message for a closed connection, not evidence of a
-timeout.
+This repo is where that constraint was learned the expensive way. Until
+2026-08-23 it had no `CLAUDE.md`, so a session took the harness default at face
+value and pushed `claude/lucid-curie-r4yp8g`, leaving a permanent stale label;
+the same agent, the same day, in `app`, read that repo's contract and pushed
+only `main`. It never recurred — checked 2026-08-26, `git ls-remote --heads` on
+both remotes shows `main` and one long-lived `gear-tracker` and no `claude/*`
+ref at all. One incident, ten days of policy. That arithmetic is why the policy
+went and the checkbox stayed.
 
 ### Commit authorship
 
@@ -178,10 +177,10 @@ repository.
 ## Verify
 
 `main` is what CI builds and what the packager releases from, so run the checks
-before the **commit** (step 3) — not at push time and never after. Pushing is a
-separate, later, asked-for step, and a gate attached to it would run long after
-the code was written and against a batch rather than a change. These are the
-same three the `ci.yml` `luacheck` and `packaging + contract` jobs run:
+before the **commit** (step 2) — not at merge time and never after. A gate
+attached to the merge would run long after the code was written and against a
+batch rather than a change. These are the same three the `ci.yml` `luacheck`
+and `packaging + contract` jobs run, so a green run here is a green PR:
 
 ```bash
 luacheck .                      # zero warnings under .luacheckrc
