@@ -102,6 +102,7 @@ jobs:
           lua5.1 tools/import-test.lua
           lua5.1 tools/junk-test.lua
           lua5.1 tools/gear-test.lua
+          lua5.1 tools/gearset-test.lua
 
       # A drifted fixture means /app is testing against a string this addon no
       # longer produces. Regenerate with `node tools/vector.mjs --write`.

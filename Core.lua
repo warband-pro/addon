@@ -181,7 +181,13 @@ handlers.SKILL_LINES_CHANGED = function()
 end
 
 ns.onDirty("equipped", Gear.All)
-handlers.PLAYER_EQUIPMENT_CHANGED = function() ns.dirty("equipped") end
+handlers.PLAYER_EQUIPMENT_CHANGED = function()
+  ns.dirty("equipped")
+  -- A pending gear-set apply verifies off this event rather than a poll: each
+  -- equip is a server round-trip that lands here, and the throttle collapses
+  -- a burst of them into one check. GearSet.Verify no-ops without a pending.
+  if ns.GearSet.pending then ns.throttle("gearset", 0.5, ns.GearSet.Verify) end
+end
 handlers.PLAYER_AVG_ITEM_LEVEL_UPDATE = function() ns.dirty("equipped") end
 
 ns.onDirty("talents", Gear.Talents)

@@ -41,6 +41,7 @@ local JUNK_ROWS = 12
 local frame, panels, tabs
 local editBox, header, footer, rows, help
 local junkPaste, junkHeader, junkFooter, junkRows, junkChild
+local gsHeader, gsButton
 local optionChecks = {}
 
 UI.mode = "bundle"
@@ -327,7 +328,7 @@ local function buildImport()
   intro:SetPoint("TOPLEFT")
   intro:SetPoint("TOPRIGHT")
   intro:SetJustifyH("LEFT")
-  intro:SetText("paste the cleanup string from warband.pro/gear — it reads itself")
+  intro:SetText("paste a string from warband.pro/gear — cleanup or equip, the box reads either")
 
   -- The native single-line input, not a bare EditBox: InputBoxTemplate carries
   -- the recessed border every stock text field wears.
@@ -348,6 +349,28 @@ local function buildImport()
     if not userInput then return end
     local text = self:GetText()
     if text == "" then return end
+    -- One box, two inbound wires: the prefix says which decoder the paste
+    -- belongs to, and each decoder still refuses the other's string by name
+    -- so a misrouted call fails toward a sentence rather than "invalid".
+    local trimmed = text:gsub("^%s+", "")
+    if trimmed:sub(1, #ns.GEARSET_WIRE) == ns.GEARSET_WIRE then
+      local gs, gsCode = ns.Import.DecodeGearSet(text)
+      if not gs then
+        junkHeader:SetText("|cff" .. BAD .. ns.Import.GearSetMessage(gsCode) .. "|r")
+        return
+      end
+      local kept = ns.GearSet.Save(gs)
+      self:SetText("")
+      self:ClearFocus()
+      if kept == 0 then
+        junkHeader:SetText("|cff" .. WARN .. "that set is for characters this account has not scanned yet|r")
+        return
+      end
+      UI.RenderGearSet()
+      junkHeader:SetText(format("|cff%sread a gear set for %d character%s — equip is below|r", GOOD, kept,
+        kept == 1 and "" or "s"))
+      return
+    end
     local decoded, code = ns.Import.DecodeCleanup(text)
     if not decoded then
       -- Only complain once the paste looks finished. A prefix typed one
@@ -390,8 +413,26 @@ local function buildImport()
   junkHeader:SetPoint("TOPRIGHT", 0, -46)
   junkHeader:SetJustifyH("LEFT")
 
+  -- The gear-set row: one status line and one button, above the junk list —
+  -- both halves of the same paste box, so they share the tab. The button is
+  -- an ordinary button, not a secure one: equipping out of combat is not
+  -- protected, and the tab is already gone before combat can make it so.
+  gsButton = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  gsButton:SetSize(150, 18)
+  gsButton:SetPoint("TOPRIGHT", -2, -62)
+  gsButton:SetScript("OnClick", function()
+    if ns.GearSet.Apply() then UI.RenderGearSet() end
+  end)
+  gsButton:Hide()
+
+  gsHeader = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  gsHeader:SetPoint("TOPLEFT", 0, -64)
+  gsHeader:SetPoint("RIGHT", gsButton, "LEFT", -6, 0)
+  gsHeader:SetJustifyH("LEFT")
+  gsHeader:SetWordWrap(false)
+
   local well = makeWell(p)
-  well:SetPoint("TOPLEFT", 0, -62)
+  well:SetPoint("TOPLEFT", 0, -84)
   well:SetPoint("BOTTOMRIGHT", -20, 18)
 
   local scroll = CreateFrame("ScrollFrame", "WarbandProJunkScroll", p, "UIPanelScrollFrameTemplate")
@@ -413,6 +454,48 @@ local function buildImport()
   junkFooter:SetJustifyH("LEFT")
 end
 
+--- Redraw the gear-set row from the live paperdoll and bags.
+---
+--- Same freshness rule as the junk list below: every count comes from the
+--- resolve this call just made. The line reads as a receipt of what pressing
+--- the button would do, and the button carries the number so the click is
+--- never a surprise.
+function UI.RenderGearSet()
+  if not frame or not gsHeader then return end
+  if InCombatLockdown() then return end
+  local r = ns.GearSet.Resolve()
+  if not r then
+    gsHeader:SetText("")
+    gsButton:Hide()
+    return
+  end
+  local parts = {}
+  if #r.ready > 0 then parts[#parts + 1] = format("%d to equip", #r.ready) end
+  if #r.already > 0 then parts[#parts + 1] = format("|cff%s%d already worn|r", MUTED, #r.already) end
+  if #r.missing > 0 then
+    local bank = 0
+    for _, it in ipairs(r.missing) do
+      if it.w == "bank" or it.w == "warbank" then bank = bank + 1 end
+    end
+    parts[#parts + 1] = format("|cff%s%d missing%s|r", WARN, #r.missing,
+      bank > 0 and format(" (%d in your bank)", bank) or "")
+  end
+  if r.generatedAt then parts[#parts + 1] = format("|cff%sset from %s|r", MUTED, ns.ago(r.generatedAt)) end
+  gsHeader:SetText("gear set:  " .. table.concat(parts, "  ·  "))
+  if #r.ready > 0 then
+    gsButton:SetText(format("Equip %d & save set", #r.ready))
+    gsButton:Enable()
+    gsButton:Show()
+  elseif #r.already > 0 then
+    -- Everything wearable is worn; the button's remaining job is the save.
+    gsButton:SetText("Save set")
+    gsButton:Enable()
+    gsButton:Show()
+  else
+    gsButton:Hide()
+  end
+end
+
 --- Redraw the junk list from the live bags.
 ---
 --- Every coordinate a button carries comes from the walk this function just
@@ -424,6 +507,7 @@ function UI.RenderJunk()
   -- Secure attributes may not be written in combat. The tab hides itself on
   -- PLAYER_REGEN_DISABLED, so this is the belt to that braces.
   if InCombatLockdown() then return end
+  UI.RenderGearSet()
 
   local rowsData, missing, generatedAt = ns.Junk.Resolve()
   local canDE = ns.Junk.CanDisenchant()

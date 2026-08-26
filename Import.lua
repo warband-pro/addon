@@ -231,9 +231,11 @@ function Import.DecodeCleanup(paste)
   if str == "" then return nil, "empty" end
 
   -- Checked before the wbc1! test rather than after: a bundle is a perfectly
-  -- good string that belongs in the other direction, and telling someone it is
+  -- good string that belongs in the other direction, and an equip string is a
+  -- perfectly good string for the box next door — telling someone either is
   -- invalid would send them looking for a problem that does not exist.
   if str:sub(1, #ns.WIRE) == ns.WIRE then return nil, "is_export" end
+  if str:sub(1, #ns.GEARSET_WIRE) == ns.GEARSET_WIRE then return nil, "is_gearset" end
   if str:sub(1, #ns.CLEANUP_WIRE) ~= ns.CLEANUP_WIRE then return nil, "wrong_prefix" end
   if #str > Import.MAX_WIRE then return nil, "too_large" end
 
@@ -281,11 +283,85 @@ function Import.DecodeCleanup(paste)
   return { generatedAt = payload.generatedAt, chars = chars, count = count }
 end
 
+-- ── the gear-set string ─────────────────────────────────────────────────────
+-- wbg1! — the second inbound direction, added in 1.6.0: the set warband.pro's
+-- best-in-bags picked, one entry per slot that CHANGES. Slots already right
+-- are omitted (SaveEquipmentSet snapshots the live paperdoll, so keepers join
+-- the set for free), and the wire carries no bag coordinates for the same
+-- reason wbc1! never has: an item is named by its verbatim item string and
+-- found by a live walk at click time. One asymmetry with gear[], stated in
+-- CONTRACT.md: `slot` here is the REAL inventory slot (12 means finger 2),
+-- uncollapsed, because the website knows which twin its solve replaces and
+-- this addon cannot.
+
+--- A pasted string -> { generatedAt, chars = { [guid] = { name, spec, set, items } } }.
+--- Same caps, same envelope, same fail-closed posture as DecodeCleanup.
+function Import.DecodeGearSet(paste)
+  if type(paste) ~= "string" then return nil, "empty" end
+  local str = paste:gsub("^%s+", ""):gsub("%s+$", "")
+  if str == "" then return nil, "empty" end
+
+  if str:sub(1, #ns.WIRE) == ns.WIRE then return nil, "is_export" end
+  if str:sub(1, #ns.CLEANUP_WIRE) == ns.CLEANUP_WIRE then return nil, "is_cleanup" end
+  if str:sub(1, #ns.GEARSET_WIRE) ~= ns.GEARSET_WIRE then return nil, "wrong_prefix" end
+  if #str > Import.MAX_WIRE then return nil, "too_large" end
+
+  local raw = Import.Base64URLDecode(str:sub(#ns.GEARSET_WIRE + 1))
+  if not raw or raw == "" then return nil, "not_base64" end
+
+  local json = ns.safe(function() return ns.LibDeflate:DecompressDeflate(raw) end)
+  if not json or json == "" then return nil, "not_deflate" end
+  if #json > Import.MAX_DECODED then return nil, "too_large" end
+
+  local payload = Import.JSONDecode(json)
+  if type(payload) ~= "table" then return nil, "not_json" end
+  if payload.v ~= 1 then return nil, "wrong_version" end
+  if type(payload.generatedAt) ~= "number" then return nil, "not_json" end
+  if type(payload.chars) ~= "table" then return nil, "not_json" end
+
+  local chars, count = {}, 0
+  for _, c in ipairs(payload.chars) do
+    if type(c) == "table" and type(c.guid) == "string" and c.guid ~= "" and type(c.items) == "table" then
+      local items, n = {}, 0
+      for _, it in ipairs(c.items) do
+        -- `s` is the identity, `slot` is the destination. A real slot only:
+        -- 1-17 minus 4 (shirt) — the collapsed representatives gear[] uses
+        -- outbound are never valid here, and 18/19 hold nothing equippable
+        -- this addon should touch.
+        local slot = type(it) == "table" and it.slot
+        if type(slot) == "number" and slot >= 1 and slot <= 17 and slot ~= 4
+          and type(it.s) == "string" and it.s ~= "" then
+          n = n + 1
+          items[n] = {
+            slot = slot,
+            s = it.s,
+            id = type(it.id) == "number" and it.id or nil,
+            w = type(it.w) == "string" and it.w or nil,
+          }
+        end
+      end
+      if n > 0 then
+        chars[c.guid] = {
+          name = type(c.name) == "string" and c.name or "?",
+          spec = type(c.spec) == "number" and c.spec or nil,
+          set = type(c.set) == "string" and c.set ~= "" and c.set or "warband.pro",
+          items = items,
+        }
+        count = count + 1
+      end
+    end
+  end
+
+  if count == 0 then return nil, "no_items" end
+  return { generatedAt = payload.generatedAt, chars = chars, count = count }
+end
+
 --- One rejection code -> the line the panel prints. Written for the person who
 --- just pasted the wrong thing, not for a log.
 local MESSAGES = {
   empty = "paste the cleanup string from warband.pro/gear",
-  is_export = "that is your export string — this box takes the cleanup string warband.pro gives back",
+  is_export = "that is your export string — this box takes the strings warband.pro gives back",
+  is_gearset = "that is an equip string — it reads itself in this same box",
   wrong_prefix = "a cleanup string starts with " .. "wbc1!" .. " — copy it from warband.pro/gear",
   too_large = "that string is too big to be a cleanup list",
   not_base64 = "that does not decode — copy the whole string, all on one line",
@@ -297,4 +373,21 @@ local MESSAGES = {
 
 function Import.Message(code)
   return MESSAGES[code] or "that string could not be read"
+end
+
+--- The gear-set codes that read differently from their cleanup twins. The
+--- rest fall through to MESSAGES, so the two maps cannot drift on the shared
+--- failures.
+local GEARSET_MESSAGES = {
+  is_cleanup = "that is a cleanup string — it reads itself in this same box",
+  wrong_prefix = "an equip string starts with " .. "wbg1!" .. " — copy it from warband.pro/gear",
+  too_large = "that string is too big to be an equip string",
+  not_deflate = "that string is damaged — copy it again from warband.pro/gear",
+  not_json = "that decoded to something that is not a gear set",
+  wrong_version = "that equip string is from a newer warband.pro — update this addon",
+  no_items = "no slots change in that string — the set is already what you are wearing",
+}
+
+function Import.GearSetMessage(code)
+  return GEARSET_MESSAGES[code] or MESSAGES[code] or "that string could not be read"
 end

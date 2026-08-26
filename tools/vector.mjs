@@ -99,24 +99,58 @@ export function decodeCleanup(str) {
   return payload;
 }
 
+/**
+ * The second return wire, added in 1.6.0: the gear set best-in-bags picked.
+ * Same caps as the cleanup string — Import.lua reads both with the same
+ * guards — and the same no-coordinates doctrine. `slot` is the REAL
+ * inventory slot (12 = finger 2), uncollapsed, which is the one deliberate
+ * asymmetry with the outbound gear[]; see CONTRACT.md.
+ */
+const GEARSET_PREFIX = 'wbg1!';
+
+export function decodeGearSet(str) {
+  if (!str.startsWith(GEARSET_PREFIX)) throw new Error(`expected ${GEARSET_PREFIX} prefix`);
+  if (str.length > CLEANUP_MAX_WIRE) throw new Error('equip string over 40KB');
+  const raw = inflateRawSync(unb64url(str.slice(GEARSET_PREFIX.length)));
+  if (raw.length > CLEANUP_MAX_DECODED) throw new Error('equip payload over 512KB');
+  const payload = JSON.parse(raw.toString('utf8'));
+  if (payload.v !== 1) throw new Error(`unsupported gear-set version ${payload.v}`);
+  if (typeof payload.generatedAt !== 'number') throw new Error('generatedAt missing');
+  if (!Array.isArray(payload.chars)) throw new Error('chars is not an array');
+  for (const c of payload.chars) {
+    if (!c.guid) throw new Error('gear-set character has no guid to match on');
+    if (!Array.isArray(c.items)) throw new Error(`items is not an array for ${c.guid}`);
+    for (const i of c.items) {
+      if (!Number.isInteger(i.slot) || i.slot < 1 || i.slot > 17 || i.slot === 4) {
+        throw new Error(`gear-set slot out of range: ${i.slot}`);
+      }
+      if (typeof i.s !== 'string' || !i.s) throw new Error('gear-set item has no item string');
+    }
+  }
+  return payload;
+}
+
 const isCleanup = (file) => file.startsWith('wbc1-');
+const isGearSet = (file) => file.startsWith('wbg1-');
 
 const write = process.argv.includes('--write');
 let failed = 0;
 
 for (const file of readdirSync(DIR).filter((f) => f.endsWith('.json'))) {
   const cleanup = isCleanup(file);
+  const gearset = isGearSet(file);
+  const prefix = cleanup ? CLEANUP_PREFIX : gearset ? GEARSET_PREFIX : PREFIX;
   const source = JSON.parse(readFileSync(join(DIR, file), 'utf8'));
-  const wire = encode(source, cleanup ? CLEANUP_PREFIX : PREFIX);
+  const wire = encode(source, prefix);
   try {
-    const back = cleanup ? decodeCleanup(wire) : decode(wire);
+    const back = cleanup ? decodeCleanup(wire) : gearset ? decodeGearSet(wire) : decode(wire);
     const same = canonical(back) === canonical(source);
     if (!same) throw new Error('round-trip changed the payload');
     const ratio = ((wire.length / canonical(source).length) * 100).toFixed(0);
-    const count = cleanup ? `chars=${back.chars.length}` : `chars=${back.characters.length}`;
+    const count = cleanup || gearset ? `chars=${back.chars.length}` : `chars=${back.characters.length}`;
     console.log(`PASS ${file}  ${canonical(source).length}B json -> ${wire.length}B wire (${ratio}%)  ${count}`);
     if (write) {
-      const ext = cleanup ? '.wbc1' : '.wb1';
+      const ext = cleanup ? '.wbc1' : gearset ? '.wbg1' : '.wb1';
       writeFileSync(join(DIR, file.replace(/\.json$/, ext)), wire + '\n');
       console.log(`     wrote ${file.replace(/\.json$/, ext)}`);
     }
@@ -136,6 +170,12 @@ const bad = [
   ['a cleanup string in the bundle decoder', 'wbc1!AAAA', decode],
   ['a bundle in the cleanup decoder', 'wb1!AAAA', decodeCleanup],
   ['garbage cleanup body', 'wbc1!not-a-deflate-stream', decodeCleanup],
+  // Three wires now — every decoder refuses both of the other prefixes.
+  ['an equip string in the bundle decoder', 'wbg1!AAAA', decode],
+  ['an equip string in the cleanup decoder', 'wbg1!AAAA', decodeCleanup],
+  ['a bundle in the gear-set decoder', 'wb1!AAAA', decodeGearSet],
+  ['a cleanup string in the gear-set decoder', 'wbc1!AAAA', decodeGearSet],
+  ['garbage gear-set body', 'wbg1!not-a-deflate-stream', decodeGearSet],
 ];
 for (const [label, input, fn] of bad) {
   try {

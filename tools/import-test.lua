@@ -153,6 +153,7 @@ check("rejects empty", codeFor("") == "empty")
 check("rejects whitespace only", codeFor("   ") == "empty")
 -- The one that matters most: an export string is VALID, just not here.
 check("names an export string rather than calling it broken", codeFor("wb1!AAAA") == "is_export")
+check("names an equip string rather than calling it broken", codeFor("wbg1!AAAA") == "is_gearset")
 check("rejects a foreign prefix", codeFor("nope") == "wrong_prefix")
 check("rejects an oversize input before inflating it", codeFor("wbc1!" .. string.rep("A", 41 * 1024)) == "too_large")
 check("rejects a body that is not base64url", codeFor("wbc1!***") == "not_base64")

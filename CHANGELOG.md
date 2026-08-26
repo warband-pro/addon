@@ -51,6 +51,15 @@ MAJOR has to be a wire break.**
   trusting item level alone. Equipped gear is unchanged; the website already
   reads its stats from Blizzard. Costs about half a kilobyte per character on
   the wire.
+- The equip string. warband.pro's best-in-bags now hands back a `wbg1!` string
+  naming the set it picked; paste it into the same box the clear-out list
+  uses, and a new row on that tab says what would change — `3 to equip · 1
+  already worn · 1 missing (1 in your bank)` — with one button that equips
+  the lot and saves it as an Equipment Manager set called "warband.pro".
+  Items are found in your bags by identity at the moment you click, never by
+  a remembered position, and the set is saved only after the server confirms
+  what you are actually wearing. Nothing happens in combat, ever; if a fight
+  starts mid-swap the addon says to press the button again after.
 
 ### Fixed
 

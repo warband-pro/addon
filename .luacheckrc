@@ -63,6 +63,9 @@ read_globals = {
   -- gear and talents
   "GetInventoryItemLink", "GetInventoryItemID", "ItemLocation",
   "C_ClassTalents", "C_Traits", "GetSpecialization", "GetSpecializationInfo",
+  -- the gear-set apply (GearSet.lua): equip under the player's click, then
+  -- snapshot the paperdoll into an Equipment Manager set
+  "C_EquipmentSet", "EquipCursorItem", "ClearCursor",
 
   -- lockouts, keystone, vault
   "GetNumSavedInstances", "GetSavedInstanceInfo", "GetSavedInstanceEncounterInfo",

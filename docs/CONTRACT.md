@@ -547,6 +547,84 @@ string carries only what that account's own export already carried.
 `loadstring` — `tools/validate.mjs` fails the build on that, and executing a
 pasted string would be the single worst thing this addon could do.
 
+## `wbg1!` — the equip direction, added in addon 1.6.0
+
+The second inbound wire: the gear set warband.pro's best-in-bags picked for a
+character. The addon decodes it, equips the named items under the player's
+click, and saves the result as an Equipment Manager set. Same envelope as
+everything else, its own prefix, versioning independently — `wbc1!`'s
+precedent exactly, and for the same reason it did not spend `wb2!`: a break in
+one direction is not a break in the others.
+
+### Payload
+
+```json
+{
+  "v": 1,
+  "generatedAt": 1724001000,
+  "chars": [{
+    "guid": "Player-1-TEST",
+    "name": "Vocnar",
+    "spec": 103,
+    "set": "warband.pro",
+    "items": [
+      {"slot": 1,  "id": 221151, "s": "item:221151:...", "w": "bag"},
+      {"slot": 12, "id": 215135, "s": "item:215135:..."}
+    ]
+  }]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `generatedAt` | Unix seconds, when the site built the string. |
+| `chars[].guid` | **The match key**, exactly as `wb1!` sent it. Only guids in `WarbandProDB.chars` are kept, same as `wbc1!`. |
+| `chars[].name` | Display only. |
+| `chars[].spec` | The specialization id the solve ran for. Display and sanity only, never matched. Optional. |
+| `chars[].set` | The Equipment Manager set name to create or update. Defaults to `warband.pro` when absent — one set per character, updated in place. |
+| `items[].slot` | **The REAL inventory slot, 1-17 minus 4, uncollapsed.** `12` means finger 2. This is the one deliberate asymmetry with `gear[]`: outbound, the addon collapses paired slots because it cannot know which twin a bagged ring would fill; inbound, the website's solve knows exactly which twin it replaces, and this field is how it says so. `EquipCursorItem(slot)` is what honors it — `EquipItemByName` guarantees nothing about twins. |
+| `items[].id` | Item id, display and sanity. Optional. |
+| `items[].s` | **The identity key.** The verbatim item string, as `gear[]` sent it. An entry without one is dropped at decode. |
+| `items[].w` | Where the site last saw the item (`bag`/`bank`/`warbank`). Optional — it powers the "in your bank — retrieve it first" line when the item is not in the carried bags. |
+
+**Only the slots that change ride the wire.** Slots the solve left alone are
+omitted: `C_EquipmentSet.SaveEquipmentSet` snapshots the live paperdoll, so
+everything already worn joins the set for free — and the website has no
+verbatim item string for an API-sourced equipped item anyway, so a keeper
+entry would be an identity key the addon might mis-resolve. Locked slots on
+the site simply never appear. An empty `items` list is a rejection
+(`no_items`): a set that changes nothing has nothing to say.
+
+### Matching, applying, and when the set is saved
+
+Matching is by item string against a live walk of the **carried bags**, the
+`wbc1!` doctrine unchanged — no coordinates on the wire, ever. Each stored
+item resolves to one of three buckets: **already** (the target slot's
+`GetInventoryItemLink` string equals `s`), **ready** (matched in a carried
+bag, with coordinates from the walk that just happened), or **missing** (with
+`w` naming where to fetch it from).
+
+The apply order matters and is pinned by `tools/gearset-test.lua`: every ready
+item is equipped first (`PickupContainerItem` at the walked coordinates, then
+`EquipCursorItem` at the wire's slot), and the set is saved only after
+`PLAYER_EQUIPMENT_CHANGED` confirms the equips landed — `SaveEquipmentSet`
+snapshots whatever is worn *at that moment*, so saving in the equip's frame
+would save the old kit. A three-second deadline saves what actually verified
+and the receipt says which equips never landed. Combat fails closed at every
+step: no equip starts in combat, and combat mid-apply drops the pending save
+with a line saying to press the button again — never a deferred queue.
+
+Partial application is the normal case and is honest: the set saved is the
+paperdoll as it actually stands, and a missing item costs a receipt line,
+never a wrong equip.
+
+### Reader caps
+
+Identical to `wbc1!`'s: 40KB input wire, 512KB decoded, JSON depth 16, same
+hand-rolled strict decoder, no `loadstring`. Every decoder refuses the other
+two prefixes **by name** — a misfiled paste is valid somewhere else, and the
+refusal says where it belongs.
+
 ## When the prefix moves
 
 This section is about **the wire**, and only the wire. The addon's own release
@@ -574,9 +652,9 @@ A prefix move is a MAJOR release of the addon, because the player has to act.
 The reverse does not follow — a MAJOR can happen for a reason that never touches
 the wire.
 
-**Both directions version independently.** `wbc1!` is a separate channel, added
-in 1.4.0, and it deliberately did not spend `wb2!`. A break in one is not a
-break in the other.
+**All directions version independently.** `wbc1!` (1.4.0) and `wbg1!` (1.6.0)
+are separate channels, and neither spent `wb2!`. A break in one is not a break
+in the others.
 
 ## v1 as implemented — four shape changes
 

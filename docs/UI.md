@@ -60,15 +60,28 @@ rename costs the title or the icon, never the window.
 
 ### Import tab
 
-The clear-out list — the string warband.pro sends back (`wbc1!`), decoded by
-Import.lua, resolved against the live bags by Junk.lua:
+Everything warband.pro sends back, in one box — the clear-out list (`wbc1!`)
+and, since 1.6.0, the equip string (`wbg1!`). The paste field dispatches on
+the prefix; each decoder still refuses the other's string *by name*, so a
+misrouted call fails toward a sentence rather than "invalid":
 
 - A native `InputBoxTemplate` paste field at the top. It decodes on paste and
   clears itself; rejections print the decoder's sentence for that failure.
   No revert rule here — this box is pasted *into*, its text is the player's.
-- One row per resolved item: quality-colored name, item level, the reason
-  (`cannot wear` / `N behind` / `grey`), then `[Sell]` and, for enchanters,
-  a secure `[Disenchant]`.
+- **The gear-set row**, between the paste field and the junk list: one status
+  line (`gear set:  3 to equip · 1 already worn · 1 missing (1 in your bank)
+  · set from 2h ago`) and one `[Equip N & save set]` button. The counts come
+  from a resolve made at render time — the same freshness rule as the junk
+  rows — so the button never promises an equip it cannot find. When
+  everything wearable is worn the button reads `[Save set]`; when nothing is
+  actionable it hides. The equip itself is GearSet.lua's job: equip every
+  ready item under this click, verify off `PLAYER_EQUIPMENT_CHANGED`, save
+  the Equipment Manager set only after the server confirms, and print one
+  receipt. An ordinary button, not a secure one — equipping out of combat is
+  not protected, and the tab is gone before combat can make it so.
+- One row per resolved junk item: quality-colored name, item level, the
+  reason (`cannot wear` / `N behind` / `grey`), then `[Sell]` and, for
+  enchanters, a secure `[Disenchant]`.
 
 **One window did not merge the two paste rules.** 1.4.0 ran two frames
 specifically so "revert what the user types" could never apply to the box the
@@ -119,8 +132,8 @@ the tab and `/warband gear on|off` are two doors to one switch:
   tabs meanwhile, which makes the window theirs. It never auto-opens in
   combat, and never over a window already open. This is the one AMR
   convenience worth porting whole ("automatically show junk list at
-  vendors"); their auto-equip and gear-set halves depend on a gear-set import
-  that does not exist on this wire yet.
+  vendors"); their auto-equip and gear-set halves arrived in 1.6.0 as the
+  `wbg1!` equip string and the gear-set row above.
 
 No UI-scale option, deliberately: AMR needs one because its window is skinned
 from scratch; this window inherits the player's scale by being made of the
