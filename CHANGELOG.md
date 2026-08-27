@@ -43,14 +43,21 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-08-27 — the shield stays on
+
+**Weapons in your bags now say whether they are two-handed.** The export gave a
+two-hander and a one-hander the same slot number, so warband.pro could offer you
+a 2H as a main-hand upgrade without noticing the shield beside it — and
+equipping that puts the shield in your bags. Tanks, and anyone who holds an
+off-hand, were the ones paying for it.
+
 ### Added
 
-- Weapons in your bags now say whether they are two-handed. The export
-  collapsed a two-hander and a one-hander into the same slot number, so
-  warband.pro could offer you a 2H as a main-hand upgrade without noticing the
-  shield next to it — and equipping it puts that shield in your bags. Tanks and
-  anyone who holds an off-hand were the ones paying for it. Costs a few bytes,
-  and only on weapons.
+- Two-handed weapons are marked as such on the export, for bags, bank and
+  warband bank. warband.pro reads it already: a suggested two-hander now names
+  the off-hand it would unequip, on the slot itself rather than after the fact.
+  Fury warriors are left alone, since they wield two. Costs a few bytes, and
+  only on weapons.
 
 ## [1.6.0] — 2026-08-26 — best in bags, and the set comes back
 
