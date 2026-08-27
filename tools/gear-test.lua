@@ -29,6 +29,11 @@ local ITEMS = {
   [105] = { "Armor", "Shields", "INVTYPE_SHIELD", "INVTYPE_WEAPON", 4, 6 },
   [106] = { "Weapon", "Two-Handed Axes", "INVTYPE_2HWEAPON", "INVTYPE_HOLDABLE", 2, 1 },
   [107] = { "Armor", "Leather", "INVTYPE_CLOAK", "INVTYPE_CHEST", 4, 2 },
+  -- A one-hander and a two-hander both collapse to slot 16, which is the
+  -- ambiguity `th` exists to undo. The icon column carries the OPPOSITE
+  -- equip location on each, so a drifted read reports the handedness
+  -- backwards rather than merely dropping it.
+  [108] = { "Weapon", "One-Handed Swords", "INVTYPE_WEAPON", "INVTYPE_2HWEAPON", 2, 7 },
   -- not gear: a consumable (no equip location)
   [201] = { "Consumable", "Potion", "", "INVTYPE_HEAD", 0, 1 },
   -- gear-shaped but with a nil equipLoc, as a broken client might answer
@@ -127,6 +132,14 @@ eq(visit(104).slot, 13, "any trinket lands on trinket 1 (13)")
 eq(visit(105).slot, 17, "a shield lands on the off-hand family (17)")
 eq(visit(106).slot, 16, "a two-hander lands on main hand (16)")
 eq(visit(107).slot, 15, "a cloak lands on back (15)")
+eq(visit(108).slot, 16, "a one-hander lands on main hand (16) — same slot as the two-hander")
+
+-- ── th: the handedness `slot` collapses away ────────────────────────────────
+
+eq(visit(106).th, true, "a two-hander reports th = true")
+eq(visit(108).th, false, "a one-hander reports th = FALSE, not nil — absence dates the bundle")
+eq(visit(105).th, false, "a shield is a weapon-slot entry and reports th = false")
+eq(visit(101).th, nil, "a head is not a weapon slot and carries no th at all")
 
 local _, dropped = visit(201)
 eq(dropped, 0, "a consumable is not gear and is dropped")
