@@ -153,26 +153,28 @@ both remotes shows `main` and one long-lived `gear-tracker` and no `claude/*`
 ref at all. One incident, ten days of policy. That arithmetic is why the policy
 went and the checkbox stayed.
 
-### Commit authorship
+### Commit authorship is not a rule — removed 2026-08-26
 
-**Every commit in this repo is the maintainer's.** Author is `Vocino
-<travis@vocino.com>`, and the message carries no agent attribution — no
-`Co-Authored-By: Claude` trailer, no `Generated with Claude Code` footer, no
-model name, no session link, in the subject, the body or the trailers. A commit
-message describes the change; it does not sign it.
+**Whatever identity the session arrives with is fine.** Nothing to check, pin or
+amend, and no reason to stop and ask about the author or an "Unverified" badge.
 
-The defaults run the other way: a web session arrives with `user.name` already
-set to `Claude <noreply@anthropic.com>`. Check before the first commit of a
-session:
+This said the reverse from 2026-08-23 until 2026-08-26: every commit had to be
+`Vocino <travis@vocino.com>`, with no agent attribution in the message. **It
+worked** — 49 commits here and 111 in the app, not one authored by an agent.
 
-```bash
-git config user.name "Vocino"
-git config user.email "travis@vocino.com"
-```
+It was removed because it bought little against what it cost to carry, and
+because the record it protected is muddied in the one place a stranger looks
+anyway. **This repo is the example**: GitHub's contributors panel lists `claude`
+beside `vocino`, and nothing here supports it — `git log` across every ref and
+all seven tags returns 57 commits by `Vocino` and `vocino` only, and GitHub's
+own commit search returns zero for `author:claude`. It is a cache of history
+that no longer exists, plausibly the pre-`CLAUDE.md` `claude/lucid-curie-r4yp8g`
+merge. **No repo-side rule reaches it**; only GitHub Support can force a
+recompute.
 
-The same rule applies to anything else a change publishes — code comments,
-release notes, `CHANGELOG.md`. Attribution belongs in the session, not in the
-repository.
+`CHANGELOG.md` is a separate question and unchanged — it is what players read,
+so it stays written for them, and `tools/slop.mjs` still fails CI on notes that
+do not read like a person wrote them.
 
 ## Verify
 
