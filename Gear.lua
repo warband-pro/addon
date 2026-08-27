@@ -41,6 +41,30 @@ local EQUIPLOC_SLOT = {
   INVTYPE_SHIELD = 17, INVTYPE_WEAPONOFFHAND = 17, INVTYPE_HOLDABLE = 17,
 }
 
+-- The collapse above is lossy in one way that matters: INVTYPE_2HWEAPON and
+-- INVTYPE_WEAPON both become 16, so a consumer reading `slot` alone cannot
+-- tell a two-hander from a one-hander and will happily call a 2H an upgrade
+-- over a main hand while the shield beside it goes quietly to the bags. This
+-- addon knows the answer — it is holding equipLoc when it throws it away —
+-- so `th` carries it, and nothing here interprets it beyond the one fact.
+--
+-- Only INVTYPE_2HWEAPON is claimed. INVTYPE_RANGED and INVTYPE_RANGEDRIGHT
+-- cover bows and guns (two-handed) but also wands (not), and no spec that
+-- equips any of the three carries an off-hand anyway, so the distinction is
+-- unreachable in practice and is not worth a wrong claim. Wrong-direction:
+-- an equip location missing from this table reports `false` and costs the
+-- consumer a warning it would have shown — quiet and safe — where a wrongly
+-- added one warns about a swap that loses nothing.
+local TWO_HANDED = { INVTYPE_2HWEAPON = true }
+
+-- The slots where `th` is worth sending at all. Sent as a real boolean on
+-- both, never omitted-when-false: `b` is emitted only when true and the
+-- website needs a second field to date the bundle before it can read that
+-- absence as "not bound". A field that is always present on the entries it
+-- describes dates itself — absent means this addon predates it, which is the
+-- reading a consumer needs and the one `b` cannot give.
+local WEAPON_SLOTS = { [16] = true, [17] = true }
+
 -- Everything between |H and |h — the same substring SimC's own addon exports.
 local function itemString(link)
   if type(link) ~= "string" then return nil end
@@ -121,6 +145,10 @@ function Gear.Visit(where, bagID, slot, info, out)
   --        reports 1 as well and every class wears one, so a consumer
   --        testing sub against a class proficiency has to check the slot
   --        first. See docs/CONTRACT.md; this is sent, never interpreted.
+  --   th   two-handed, on weapon-slot entries only (16/17). A real boolean
+  --        on every such entry rather than emitted-only-when-true, so its
+  --        absence dates the bundle instead of needing a second field to do
+  --        it the way `b` does. See TWO_HANDED above for what is claimed.
   --   st   the item's stat values, C_Item.GetItemStats tokens verbatim
   --        (ITEM_MOD_* → number), same posture as sub: sent, never
   --        interpreted, never compacted — a token this addon has not heard
@@ -139,6 +167,7 @@ function Gear.Visit(where, bagID, slot, info, out)
     sub = itemInfo.subclassID,
   }
   if info.isBound then entry.b = true end
+  if WEAPON_SLOTS[canonicalSlot] then entry.th = TWO_HANDED[itemInfo.equipLoc or ""] == true end
   local stats = ns.safe(C_Item.GetItemStats, info.hyperlink)
   if type(stats) == "table" then
     -- Copy only string-token → number pairs: verbatim on the wire, but the

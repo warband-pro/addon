@@ -43,6 +43,15 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+- Weapons in your bags now say whether they are two-handed. The export
+  collapsed a two-hander and a one-hander into the same slot number, so
+  warband.pro could offer you a 2H as a main-hand upgrade without noticing the
+  shield next to it — and equipping it puts that shield in your bags. Tanks and
+  anyone who holds an off-hand were the ones paying for it. Costs a few bytes,
+  and only on weapons.
+
 ## [1.6.0] — 2026-08-26 — best in bags, and the set comes back
 
 **warband.pro can now tell you what to equip, and hand you a string that
