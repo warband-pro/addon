@@ -112,7 +112,7 @@ ns.Gear = {
 ns.MAX_CHARS = 20
 ns.dot = function() return "green" end
 ns.ago = function() return "1h ago" end
-_G.GetBuildInfo = function() return "12.1.0", "60000", "Aug 2026", 120001 end
+_G.GetBuildInfo = function() return "12.1.0", "60000", "Aug 2026", 120100 end
 
 assert(loadfile("Store.lua"))("WarbandPro", ns)
 assert(loadfile("Scan.lua"))("WarbandPro", ns)

@@ -31,7 +31,7 @@ Top-level:
   "addon": "1.0.0",
   "exportedAt": 1724001234,
   "gameVersion": "12.1.0",
-  "interface": 120001,
+  "interface": 120100,
   "bundle": {
     "count": 3,
     "freshestSeenAt": 1724001200,

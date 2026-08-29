@@ -256,13 +256,22 @@ function Store.Forget(name)
       removed = removed + 1
     end
   end
-  if removed > 0 then
-    local wb = Store.db.warbandBank
-    if wb and wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
+  local wb = Store.db.warbandBank
+  local cleared = false
+  if wb then
+    if wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
       wb.seenByGuid = nil
       wb.seenByName = nil
+      cleared = true
+    elseif not wb.seenByGuid and wb.seenByName then
+      wb.seenByName = nil
+      cleared = true
     end
+  end
+  if removed > 0 then
     Store.DropJunk(removedGuids)
+    Store.Touch()
+  elseif cleared then
     Store.Touch()
   end
   return removed
@@ -288,10 +297,15 @@ function Store.Prune()
   end
   local wb = Store.db.warbandBank
   local cleared = false
-  if wb and wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
-    wb.seenByGuid = nil
-    wb.seenByName = nil
-    cleared = true
+  if wb then
+    if wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
+      wb.seenByGuid = nil
+      wb.seenByName = nil
+      cleared = true
+    elseif not wb.seenByGuid and wb.seenByName then
+      wb.seenByName = nil
+      cleared = true
+    end
   end
   Store.DropJunk(removedGuids)
   if removed > 0 or cleared then
