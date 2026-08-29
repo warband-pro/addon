@@ -96,13 +96,21 @@ jobs:
       # question. It is pure, so it can be tested without a game client — and
       # this runs against the golden wbc1! fixture the step above regenerates,
       # so the round trip is checked rather than each half in isolation.
-      - name: Import decoder, junk-matching and gear-classification tests
+      # freshness-test.lua is the odd one here: Scan.lua and Store.lua are
+      # WoW-bound, not pure, so docs/TESTING.md files them under the manual
+      # checklist. What it stands a fake container API in front of is the
+      # bookkeeping either side of the read — which stamp a scan may move, and
+      # what a partial read may overwrite — and that is where being wrong is
+      # invisible, because every failure it guards against leaves a stamp that
+      # looks right on data that is not.
+      - name: Import decoder, junk, gear and freshness tests
         run: |
           sudo apt-get install -y --no-install-recommends lua5.1
           lua5.1 tools/import-test.lua
           lua5.1 tools/junk-test.lua
           lua5.1 tools/gear-test.lua
           lua5.1 tools/gearset-test.lua
+          lua5.1 tools/freshness-test.lua
 
       # A drifted fixture means /app is testing against a string this addon no
       # longer produces. Regenerate with `node tools/vector.mjs --write`.

@@ -43,6 +43,29 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+**Your warband bank stopped losing four tabs out of five.** The game hands the
+addon each tab's contents separately, a moment apart, so the first look after
+you open the bank often finds one tab loaded and the rest still arriving — and
+the addon stored that one tab, threw away the four it already had, and marked
+the result as just-checked. If you copied your bundle in that moment, warband.pro
+showed a one-tab vault and no sign anything was missing. Tabs now update one at
+a time, each carrying its own timestamp, so a tab that did not load keeps what it
+had. `/warband status` prints how many tabs you own against how many have ever
+been read, and the copy panel says "3 of 5 tabs" instead of letting the
+timestamp speak for the whole vault.
+
+**The bank and the reagent bank kept one timestamp between them.** Either one
+loading marked both as fresh, so bank contents from your last visit to a banker
+could show a green dot on the site. They are two timestamps now, and each moves
+only when that container was actually read.
+
+**A bank scan could go missing from the copied string.** The export is rebuilt
+only when something has changed, and a bank walk was not registering as a
+change — so the contents landed in storage and not in the string you pasted.
+Anything that scans now registers.
+
 ## [1.7.0] — 2026-08-27 — the shield stays on
 
 **Weapons in your bags now say whether they are two-handed.** The export gave a

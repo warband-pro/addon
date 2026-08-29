@@ -234,9 +234,14 @@ local function refreshExport()
     UI.current = ""
     editBox:SetText("")
   else
+    -- A vault with a tab missing reads as a vault that small, so the header
+    -- names the gap rather than letting the age stand for completeness: the
+    -- stamp is honest about when we looked and says nothing about how much of
+    -- it we saw.
     local wb = ns.Store.db and ns.Store.db.warbandBank
     local bank = (wb and wb.seenAt)
-      and format("  ·  warband bank %s (by %s)", ns.ago(wb.seenAt), wb.seenByName or "?")
+      and format("  ·  warband bank %s (by %s)%s", ns.ago(wb.seenAt), wb.seenByName or "?",
+        wb.partial and format(", %d of %d tabs", #(wb.tabs or {}), wb.tabsOwned) or "")
       or "  ·  warband bank never seen"
     -- Two warnings the panel used to leave for the far side of the copy.
     --

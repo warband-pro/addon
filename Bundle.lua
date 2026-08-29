@@ -89,6 +89,13 @@ end
 -- back far enough to fold the copies together. One object, one stamp, one
 -- "by Vocnar" credit; each character keeps its own seenAt.warbank so the dots
 -- still say which character last stood at the banker.
+--
+-- Named field by field rather than copied, so a field added to the stored vault
+-- reaches the wire only when it is listed here. That is the point — the store
+-- is free to hold whatever it needs and the payload stays the documented shape
+-- — and it is also the trap: `tabsOwned` and `partial` had to be added here as
+-- well as in Store.lua, or the website would have been told a vault was whole
+-- by a payload that simply omitted the field saying otherwise.
 local function warbandBank(root)
   if not root or not root.seenAt then return nil end
   return {
@@ -96,6 +103,11 @@ local function warbandBank(root)
     seenByGuid = root.seenByGuid,
     seenByName = root.seenByName,
     gold = root.gold,
+    -- How many tabs the account owns, and whether some have never been read.
+    -- Both absent when the client would not say how many are purchased; see
+    -- docs/CONTRACT.md § warbandBank sits at the payload root.
+    tabsOwned = root.tabsOwned,
+    partial = root.partial,
     tabs = root.tabs or {},
   }
 end

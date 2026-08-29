@@ -274,9 +274,21 @@ local function status()
       db.opts.includeGear and "" or "  |cfff1fa8c(off — /warband gear on)|r",
       #specNames > 0 and ("  ·  talents known: " .. table.concat(specNames, ", ")) or ""))
   end
+  -- Two numbers, because the vault has two ages. `seenAt` is when somebody last
+  -- stood at the banker; the oldest tab stamp is how fresh the contents are.
+  -- They diverge exactly when a tab did not load, which used to be invisible
+  -- because a partial read replaced the whole list and stamped it fresh — five
+  -- tabs became one and the dot stayed green. Print the second only when it
+  -- disagrees with the first, and say plainly when a tab has never been seen.
   local wb = db.warbandBank
-  ns.print(format("warband bank: %s%s", ns.ago(wb.seenAt),
-    wb.seenByName and (" (by " .. wb.seenByName .. ")") or ""))
+  local tabs = wb.tabs or {}
+  local oldest = Store.WarbandBankOldestTab()
+  local lag = (oldest and wb.seenAt and oldest < wb.seenAt)
+    and format(", oldest tab %s", ns.ago(oldest)) or ""
+  ns.print(format("warband bank: %s%s, %d%s tab%s%s%s", ns.ago(wb.seenAt),
+    wb.seenByName and (" (by " .. wb.seenByName .. ")") or "",
+    #tabs, wb.tabsOwned and (" of " .. wb.tabsOwned) or "", #tabs == 1 and "" or "s",
+    lag, wb.partial and "  |cfff1fa8cnever opened them all|r" or ""))
   if ns.errorCount > 0 then
     ns.print(format("|cfff1fa8c%d API call%s failed|r, last: %s",
       ns.errorCount, ns.errorCount == 1 and "" or "s", tostring(ns.lastError)))
