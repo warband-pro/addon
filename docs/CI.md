@@ -158,9 +158,11 @@ repo — CI still runs on every push, so the safety net is the same.
 ## Running the checks locally — and the half you cannot
 
 CI installs `lua5.1` and `luarocks` on an Ubuntu runner. **A Windows
-workstation has neither, and deliberately does not** — see below. So the seven
+workstation has neither, and deliberately does not** — see below. So the
 offline checks split cleanly by runtime, and it is worth knowing which half you
-are actually running before you push:
+are actually running before you push. The count is left out on purpose: this
+line said "seven" while the table under it listed eight, because a number in
+prose does not move when a row is added and the row is what CI reads.
 
 | Check | Needs | On a Node-only machine |
 |-------|-------|------------------------|
@@ -172,6 +174,8 @@ are actually running before you push:
 | `lua5.1 tools/gear-test.lua` | lua5.1 | ❌ CI only |
 | `lua5.1 tools/import-test.lua` | lua5.1 | ❌ CI only |
 | `lua5.1 tools/junk-test.lua` | lua5.1 | ❌ CI only |
+| `lua5.1 tools/gearset-test.lua` | lua5.1 | ❌ CI only |
+| `lua5.1 tools/freshness-test.lua` | lua5.1 | ❌ CI only |
 
 ```bash
 node tools/validate.mjs && node tools/vector.mjs && node tools/slop.mjs --unreleased

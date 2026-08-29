@@ -173,7 +173,10 @@ function Scan.Identity()
   end
   local guild, rank, rankIndex = ns.safe(GetGuildInfo, "player")
   c.guild = guild and { name = guild, rank = rank, rankIndex = rankIndex } or nil
-  c.seenAt.lastSeen = ns.now()
+  -- No section: identity says the character was at the keyboard, not that any
+  -- one section was re-read. Store.Stamp rather than a bare stamp write so the
+  -- rev Export.Build caches on moves with it.
+  Store.Stamp(nil, c)
 end
 
 function Scan.Money()
@@ -199,6 +202,13 @@ end
 -- rather than as an empty bank. Only touches the parts it actually read: a
 -- closed reagent bank must not blank out bank gear that was captured earlier,
 -- and vice versa.
+--
+-- Two containers, two stamps. Until 1.8.0 either one landing moved a single
+-- shared `bank` stamp, so a pass that read only the reagent bank reported the
+-- bank bags as freshly seen — a green dot on contents nobody had looked at
+-- since the last banker visit. Each is stamped only if it was actually read;
+-- neither being read leaves both stamps where they were, which is what tells
+-- the website how much to trust the old value.
 function Scan.Bank()
   local bankResult = scanList(BANK, "bank")
   local reagentResult = scanContainer(REAGENT_BANK, "bank", false)  -- reagent bank never holds gear
@@ -209,18 +219,43 @@ function Scan.Bank()
     c.bank = bankResult.bags
     ns.Gear.SetScope("bank", bankResult.gear)
     Scan.consumableParts.bank = bankResult.consumables
+    Store.Stamp("bank", c)
   end
   if reagentResult then
     c.reagentBank = reagentResult.bag
     Scan.consumableParts.reagentBank = reagentResult.consumables
+    Store.Stamp("reagentBank", c)
   end
-  local now = ns.now()
-  c.seenAt.bank, c.seenAt.lastSeen = now, now
   Scan.Consumables()
+end
+
+-- How many warband tabs the account has purchased, or nil when this client will
+-- not say. It is the only denominator that separates a partial read from a
+-- small vault: an unread tab and an unbought tab both report zero slots, so
+-- counting what came back can never tell them apart on its own. Through
+-- ns.safe, so a client without the call costs us the completeness claim rather
+-- than the scan — absent, not guessed.
+function Scan.WarbandTabsOwned()
+  local data = ns.safe(function()
+    return C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
+  end)
+  if type(data) ~= "table" then return nil end
+  local n = #data
+  if n <= 0 then return nil end
+  return n
 end
 
 -- Not part of the consumables rollup — the original rollup only ever read
 -- c.bags/c.bank/c.reagentBank, and this keeps that scope.
+--
+-- The tabs merge in Store.PutWarbandBank, so a pass that saw three of five
+-- updates three and leaves two alone. The gear scope cannot do that: a gear
+-- row records the equip slot it would fill, not the container it was found
+-- in, so there is no key to merge a partial warbank result on. Replacing the
+-- scope from a partial read would drop the gear in every tab that did not
+-- load, so a partial read leaves the gear scope untouched and the next
+-- complete read replaces it — the last walk of a banker visit is the one with
+-- every tab loaded, which is exactly when the replace should happen.
 function Scan.WarbandBank()
   local tabs, gearOut, any = {}, {}, false
   for _, id in ipairs(warbandTabs()) do
@@ -237,8 +272,11 @@ function Scan.WarbandBank()
   local gold = ns.safe(function()
     return C_Bank.FetchDepositedMoney(Enum.BankType.Account)
   end)
-  Store.PutWarbandBank(tabs, gold)
-  ns.Gear.SetScope("warbank", gearOut)
+  local owned = Scan.WarbandTabsOwned()
+  Store.PutWarbandBank(tabs, gold, owned)
+  if not owned or #tabs >= owned then
+    ns.Gear.SetScope("warbank", gearOut)
+  end
 end
 
 function Scan.Consumables()
@@ -253,6 +291,10 @@ function Scan.Consumables()
     end
   end
   c.consumables = out
+  -- Derived from sections that stamped themselves, so it carries no stamp of
+  -- its own — but it does change the bundle, and Export.Build's cache is keyed
+  -- on Store.rev.
+  Store.Touch()
 end
 
 -- isAccountWide never changes for a currency and the list is walked on every

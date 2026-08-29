@@ -123,6 +123,7 @@ Top-level:
     "lastSeen":1724001000,
     "bag":1724001000,
     "bank":1723999000,
+    "reagentBank":1723999000,
     "warbank":1723999000,
     "currency":1724001000,
     "instance":1723998000,
@@ -146,6 +147,13 @@ Top-level:
   file token behind the localized "Undead". Decode against the token.
 - `items` limited to inventory stacks — no bonus IDs, no enchant, no sockets. `gear[]` (below) is where that detail lives, for equipped items and for anything in a bag or bank that could be equipped. link optional but include for debug quality.
 - For bank sections never opened, `free` = null and items = [] so we know "unknown" vs empty.
+- **A stamp moves only if that section was actually read this pass.** The bank
+  and the reagent bank are two containers that can come back independently, so
+  they are two stamps — `seenAt.reagentBank` was added in 1.8.0, and before it
+  a reagent-bank-only read moved the shared `bank` stamp and drew a fresh dot
+  on bank contents from the previous banker visit. A section absent from
+  `seenAt` has never been read; a section whose stamp did not move was looked
+  for and not found, and its stored value is exactly as old as the stamp says.
 - Warband bank `seenByGuid` lets web show "Warband Bank updated 1h ago (by Vocnar)" valid across alts.
 - `currencies.maxQuantity` 0 = no cap, `weeklyMax` 0 = not weekly-capped.
   `earnedThisWeek` is how much of `weeklyMax` this reset period has earned so
@@ -678,6 +686,37 @@ still say which character last stood at the banker, and `seenByName` is the
 credit line for "Warband Bank 1h ago (by Vocnar)".
 
 When that character is forgotten (`/warband clear`) or pruned (`/warband optimize`), the account-wide vault remains — the tabs and gold do not belong to the character — but `seenByGuid`/`seenByName` are cleared so the UI never names a GUID that no longer has a snapshot. Web Import keeps the vault row under `warband_bank_cache`, attribution moves to next seer.
+
+**Each tab carries its own `seenAt`, and the vault carries `tabsOwned` and
+`partial` — added in 1.8.0, additive.** The root `seenAt` is when somebody last
+stood at the banker. It is not how fresh the contents are, and treating it as
+such was wrong in a way nothing could see: `ACCOUNT_BANK_TAB_DATA_CHANGED`
+fires once per tab as the client streams the data in, so the first walk after a
+banker opens routinely sees one tab of five — and the addon replaced the stored
+vault with that one tab and stamped it fresh. Tabs now merge by `bagID` and a
+tab that did not load keeps its own older stamp.
+
+```json
+"warbandBank": {
+  "seenAt": 1724000000, "seenByName": "Vocnar", "gold": 4500000,
+  "tabsOwned": 5, "partial": true,
+  "tabs": [ {"bagID":13,"size":98,"free":12,"seenAt":1724000000,"items":[…]},
+            {"bagID":14,"size":98,"free":40,"seenAt":1723800000,"items":[…]} ]
+}
+```
+
+- `tabs[].seenAt` — when *that tab* was last read. Absent on a vault stored
+  before 1.8.0; fall back to the root `seenAt`. The oldest of these is the age
+  to draw the vault's dot from.
+- `tabsOwned` — how many tabs the account has purchased, from
+  `C_Bank.FetchPurchasedBankTabData`. **Absent when the client would not say**,
+  and then no completeness claim is made at all. It is the only honest
+  denominator: an unread tab and an unbought tab both report zero slots, so
+  counting what came back can never tell them apart.
+- `partial` — `true` when fewer tabs are stored than the account owns, i.e.
+  some tab has never been read. Absent, never `false`, in keeping with the
+  absent-means-unknown rule everywhere else here. A web client should say "4 of
+  5 tabs" rather than presenting the vault as complete.
 
 ### 2. Items carry `{id, count, quality?, isBound?}` — no `link`, no `isCraftingReagent`
 

@@ -14,8 +14,14 @@ ns.Store = Store
 -- Sections that carry their own freshness stamp. The website turns each into a
 -- dot, so a section that is scanned must stamp and a section that is stamped
 -- must be scanned.
+--
+-- `bank` and `reagentBank` are two stamps because they are two reads. The
+-- reagent bank is its own container and can come back while the bank bags do
+-- not (or the reverse), and until 1.8.0 either one landing moved a single
+-- shared `bank` stamp — so a reagent-bank-only read drew a green dot on bank
+-- contents that had not been looked at since the last banker visit.
 local SECTIONS = {
-  "bag", "bank", "warbank", "currency", "instance", "vault", "mail", "auctions",
+  "bag", "bank", "reagentBank", "warbank", "currency", "instance", "vault", "mail", "auctions",
   "profession", "gear", "talents",
 }
 
@@ -92,27 +98,107 @@ function Store.Put(section, key, value)
   local c = Store.Char()
   if not c then return end
   c[key] = value
+  Store.Stamp(section, c)
+end
+
+-- Stamp a section the caller wrote itself, and register the write.
+--
+-- Store.Put covers "one section, one field". Scan.Identity spreads a dozen
+-- loose fields across the character and Scan.Bank writes two containers under
+-- two different stamps, so both built their fields by hand — and by hand meant
+-- neither called Store.Touch. Export.Build caches on Store.rev, so a bank walk
+-- that moved nothing else left the next `/warband copy` serving a bundle
+-- assembled before the bank was read: the contents were in the DB and absent
+-- from the string.
+--
+-- `section` nil stamps lastSeen alone, which is what identity is — it says the
+-- character was at the keyboard, not that any one section was re-read. `c` is
+-- the character when the caller already holds it, so a scan that stamps two
+-- sections does not resolve the same GUID three times. Returns the character so
+-- a caller can keep writing to it.
+function Store.Stamp(section, c)
+  c = c or Store.Char()
+  if not c or not c.seenAt then return nil end
   local now = ns.now()
   c.seenAt.lastSeen = now
   if section then c.seenAt[section] = now end
   Store.Touch()
+  return c
 end
 
 -- The warband bank is one shared vault seen through whichever character
 -- happened to open it, so it is stored once at the root of the DB with the name
 -- of whoever last looked. Each character keeps only its own warbank stamp, so
 -- the dots can still say "Vocnar saw it an hour ago, you have not."
-function Store.PutWarbandBank(tabs, gold)
+--
+-- Tabs merge by bagID and each carries its own stamp; they are not replaced
+-- wholesale. ACCOUNT_BANK_TAB_DATA_CHANGED fires once per tab as the client
+-- streams the data in, so the first walk after a banker opens routinely sees
+-- one tab and not the other four — and a wholesale replace stored that one
+-- tab, dropped four, and put a fresh stamp on the loss. A tab this pass could
+-- not read keeps what we knew and keeps its own older stamp, which is the
+-- whole difference between "that tab is empty" and "nobody has looked in that
+-- tab since Tuesday".
+--
+-- `owned` is how many tabs the account has purchased, when the client will say
+-- so. It is the only honest denominator for "is this the whole vault": an
+-- unread tab and an unbought tab both report zero slots, so without it a
+-- partial read and a small vault are the same reading. nil means the client
+-- would not answer, and then the previous count stands rather than a guess.
+function Store.PutWarbandBank(tabs, gold, owned)
   if not Store.Ready() or tabs == nil then return end
   local wb = Store.db.warbandBank
-  wb.tabs = tabs
+  local now = ns.now()
+
+  local at, merged = {}, {}
+  for _, tab in ipairs(wb.tabs or {}) do
+    if tab.bagID and not at[tab.bagID] then
+      merged[#merged + 1] = tab
+      at[tab.bagID] = #merged
+    end
+  end
+  for _, tab in ipairs(tabs) do
+    tab.seenAt = now
+    local where = tab.bagID and at[tab.bagID]
+    if where then
+      merged[where] = tab
+    else
+      merged[#merged + 1] = tab
+      if tab.bagID then at[tab.bagID] = #merged end
+    end
+  end
+  -- Sorted so the wire is byte-stable whatever order the tabs arrived in —
+  -- Bundle.JSON sorts keys but cannot sort a list, and a bundle that changes
+  -- bytes without changing meaning is one a diff cannot be read against.
+  table.sort(merged, function(a, b) return (a.bagID or 0) < (b.bagID or 0) end)
+
+  wb.tabs = merged
   if gold ~= nil then wb.gold = gold end
-  wb.seenAt = ns.now()
+  if type(owned) == "number" and owned > 0 then wb.tabsOwned = owned end
+  wb.partial = (type(wb.tabsOwned) == "number" and #merged < wb.tabsOwned) or nil
+  wb.seenAt = now
   wb.seenByGuid = UnitGUID("player")
   wb.seenByName = UnitName("player")
   local c = Store.Char()
   if c then c.seenAt.warbank = wb.seenAt end
   Store.Touch()
+end
+
+-- The oldest stamp across the stored tabs, which is how fresh the vault is as
+-- a whole — `warbandBank.seenAt` is only how recently somebody stood at the
+-- banker. They differ exactly when a tab did not load, which is the case this
+-- whole model exists for. nil when no tab carries a stamp, meaning every tab
+-- predates per-tab stamping and only the root stamp is known.
+function Store.WarbandBankOldestTab()
+  local wb = Store.db and Store.db.warbandBank
+  if not wb or not wb.tabs then return nil end
+  local oldest
+  for _, tab in ipairs(wb.tabs) do
+    if type(tab.seenAt) == "number" and (not oldest or tab.seenAt < oldest) then
+      oldest = tab.seenAt
+    end
+  end
+  return oldest
 end
 
 function Store.Count()
