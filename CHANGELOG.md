@@ -57,6 +57,14 @@ for the next 20". Paste each one. The site merges them, so the pages add up to
 your whole warband rather than replacing each other, and the order is stable —
 every character lands on exactly one page.
 
+**Your gear sets are per spec now, and switching spec switches the set.** A
+paste from warband.pro carries a set for every spec it solved, not just the one
+you were last logged out in — so your tank set and your healing set can both
+live in the Equipment Manager instead of one quietly writing over the other.
+The panel and `/warband equip` offer whichever matches the spec you are
+currently in, and say so plainly when you have sets but none for this spec.
+Each one is named for its spec, so you can tell them apart at a glance.
+
 **`/warband equip` puts your gear set on without opening the window.** It does
 exactly what the button in the Import tab does — equips what it can find, saves
 the Equipment Manager set, prints the same receipt — so you can drag it onto an

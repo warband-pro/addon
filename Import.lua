@@ -294,6 +294,48 @@ end
 -- uncollapsed, because the website knows which twin its solve replaces and
 -- this addon cannot.
 
+--- A sanity cap on a pasted set name. **Not** the client's equipment-set
+--- limit, which this addon deliberately does not hardcode — see `GearSet`'s
+--- `saveSet`, which discovers it by asking the client instead. This only stops
+--- a pathological string reaching storage.
+local MAX_SET_NAME = 64
+
+--- A proposed set name, sanity-capped. The website proposes; the client is the
+--- authority on what it will accept, and the retry in `saveSet` is where that
+--- is settled rather than by a constant here guessing at a build it never runs
+--- in.
+function Import.SetName(raw)
+  local name = type(raw) == "string" and raw ~= "" and raw or "warband.pro"
+  if #name > MAX_SET_NAME then name = name:sub(1, MAX_SET_NAME) end
+  return name
+end
+
+--- The wire's `items` -> validated equip rows. Shared by the legacy fields and
+--- by every `sets[]` entry, so one list cannot be checked more loosely than
+--- the other.
+---
+--- `s` is the identity, `slot` is the destination. A real slot only: 1-17
+--- minus 4 (shirt) — the collapsed representatives gear[] uses outbound are
+--- never valid here, and 18/19 hold nothing equippable this addon should touch.
+function Import.GearSetItems(raw)
+  local items, n = {}, 0
+  if type(raw) ~= "table" then return items end
+  for _, it in ipairs(raw) do
+    local slot = type(it) == "table" and it.slot
+    if type(slot) == "number" and slot >= 1 and slot <= 17 and slot ~= 4
+      and type(it.s) == "string" and it.s ~= "" then
+      n = n + 1
+      items[n] = {
+        slot = slot,
+        s = it.s,
+        id = type(it.id) == "number" and it.id or nil,
+        w = type(it.w) == "string" and it.w or nil,
+      }
+    end
+  end
+  return items
+end
+
 --- A pasted string -> { generatedAt, chars = { [guid] = { name, spec, set, items } } }.
 --- Same caps, same envelope, same fail-closed posture as DecodeCleanup.
 function Import.DecodeGearSet(paste)
@@ -322,30 +364,39 @@ function Import.DecodeGearSet(paste)
   local chars, count = {}, 0
   for _, c in ipairs(payload.chars) do
     if type(c) == "table" and type(c.guid) == "string" and c.guid ~= "" and type(c.items) == "table" then
-      local items, n = {}, 0
-      for _, it in ipairs(c.items) do
-        -- `s` is the identity, `slot` is the destination. A real slot only:
-        -- 1-17 minus 4 (shirt) — the collapsed representatives gear[] uses
-        -- outbound are never valid here, and 18/19 hold nothing equippable
-        -- this addon should touch.
-        local slot = type(it) == "table" and it.slot
-        if type(slot) == "number" and slot >= 1 and slot <= 17 and slot ~= 4
-          and type(it.s) == "string" and it.s ~= "" then
-          n = n + 1
-          items[n] = {
-            slot = slot,
-            s = it.s,
-            id = type(it.id) == "number" and it.id or nil,
-            w = type(it.w) == "string" and it.w or nil,
-          }
+      local items = Import.GearSetItems(c.items)
+      if #items > 0 then
+        -- `sets` is additive, added by the website in 1.10.0: one entry per
+        -- spec it solved. The legacy `spec`/`set`/`items` above describe the
+        -- FIRST of them (the spec being played), so a build older than this
+        -- one reads that and behaves exactly as it always did — it simply
+        -- never learns the off-spec setups exist. Nothing here depends on
+        -- `sets` being present.
+        local bySpec
+        if type(c.sets) == "table" then
+          for _, set in ipairs(c.sets) do
+            -- A setup with no spec has no key to be filed under, so it is
+            -- dropped rather than guessed at — the legacy fields already
+            -- carry the unkeyed case.
+            if type(set) == "table" and type(set.spec) == "number" then
+              local setItems = Import.GearSetItems(set.items)
+              if #setItems > 0 then
+                bySpec = bySpec or {}
+                bySpec[set.spec] = {
+                  spec = set.spec,
+                  set = Import.SetName(set.set),
+                  items = setItems,
+                }
+              end
+            end
+          end
         end
-      end
-      if n > 0 then
         chars[c.guid] = {
           name = type(c.name) == "string" and c.name or "?",
           spec = type(c.spec) == "number" and c.spec or nil,
-          set = type(c.set) == "string" and c.set ~= "" and c.set or "warband.pro",
+          set = Import.SetName(c.set),
           items = items,
+          bySpec = bySpec,
         }
         count = count + 1
       end

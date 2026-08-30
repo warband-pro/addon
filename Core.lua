@@ -358,7 +358,14 @@ SlashCmdList.WARBANDPRO = function(msg)
     if InCombatLockdown() then
       ns.print("combat — press equip again after the fight")
     elseif not ns.GearSet.Stored() then
-      ns.print("no gear set for this character — paste an equip string from warband.pro/gear")
+      -- Same two silences the panel tells apart: since 1.10.0 a paste stores a
+      -- setup per spec, so "none for this spec" is the common case after a
+      -- respec and must not read as "you never pasted one".
+      local stored = ns.GearSet.Summary()
+      ns.print(stored > 0
+        and format("no gear set for this spec — %d stored for your other spec%s",
+          stored, stored == 1 and "" or "s")
+        or "no gear set for this character — paste an equip string from warband.pro/gear")
     elseif ns.GearSet.Apply() then
       if UI.JunkIsShown() then UI.RenderGearSet() end
     end
