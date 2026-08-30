@@ -13,6 +13,11 @@ ns.GEARSET_WIRE = "wbg1!"   -- the other return direction: a gear set to equip a
 ns.WIRE_V     = 1
 ns.MAX_CHARS  = 20          -- CONTRACT.md rejects a bundle larger than this
 ns.SOFT_BYTES = 20480       -- past this the panel warns instead of pretending
+-- Saved talent loadouts kept per spec. A ceiling rather than a guess at how
+-- many anybody has: the list rides the wire, and an alt-heavy account with a
+-- dozen builds per spec would spend real bytes on loadouts nothing reads.
+-- Eight is comfortably past the three warband.pro assigns a meaning to.
+ns.MAX_LOADOUTS = 8
 
 -- The addon's face, in one place. It is the window's portrait and the minimap
 -- button, and `WarbandPro.toc` names the same texture again for the addon

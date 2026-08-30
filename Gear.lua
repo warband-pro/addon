@@ -245,6 +245,70 @@ function Gear.All()
   Gear.Commit()
 end
 
+--- Every saved loadout this spec has, merged into what is already stored.
+---
+--- **Two mechanisms, and the second is the one that makes this reliable.**
+---
+--- 1. *Enumeration.* `C_ClassTalents.GetConfigIDsBySpecID` lists the player's
+---    saved loadouts and `C_Traits.GenerateImportString` is asked for each.
+---    When that works, all three of somebody's raid/M+/delve builds arrive in
+---    one pass and warband.pro has them the first time they paste.
+--- 2. *Accumulation.* The loadout the player is actually ON is recorded every
+---    time, name included. This is the guarantee: it uses only the call this
+---    file has always made successfully, so even if `GenerateImportString`
+---    turns out to refuse an inactive config, the list still fills in as the
+---    player switches builds — the same snapshot-accumulates model that fills
+---    `specs` across a spec switch.
+---
+--- The uncertainty is real and unmeasured — nothing in this container runs the
+--- client — so the design does not depend on resolving it. Enumeration is an
+--- accelerator; accumulation is the floor. If (1) never returns anything, this
+--- is strictly better than what came before and nothing regresses.
+---
+--- A read that fails leaves the stored value alone rather than clearing it,
+--- which is Store.Put's rule and matters more here than anywhere: a player who
+--- logs in, gets a failed read, and pastes must not lose the three loadouts
+--- they captured last week.
+local function captureLoadouts(found, specID, activeConfigID, activeName, activeString)
+  local ct, tr = C_ClassTalents, C_Traits
+  found.loadouts = found.loadouts or {}
+  local list = found.loadouts
+
+  --- Merge one (id, name, string) into `list`, newest wins, never with a nil.
+  local function put(id, name, str)
+    if type(id) ~= "number" then return end
+    if not name and not str then return end
+    for i = 1, #list do
+      if list[i].id == id then
+        if name then list[i].name = name end
+        if str then list[i].s = str end
+        list[i].seenAt = ns.now()
+        return
+      end
+    end
+    if #list >= ns.MAX_LOADOUTS then return end
+    list[#list + 1] = { id = id, name = name, s = str, seenAt = ns.now() }
+  end
+
+  -- (1) Everything the client will name and serialize for us.
+  if ct and tr then
+    local ids = ns.safe(ct.GetConfigIDsBySpecID, specID)
+    if type(ids) == "table" then
+      for _, id in ipairs(ids) do
+        local info = ns.safe(tr.GetConfigInfo, id)
+        local name = type(info) == "table" and type(info.name) == "string" and info.name ~= "" and info.name or nil
+        -- Asked per config rather than once: this is the call that may refuse
+        -- an inactive loadout, and one refusal must not lose the others.
+        local str = ns.safe(function() return (tr.GenerateImportString(id)) end)
+        put(id, name, str)
+      end
+    end
+  end
+
+  -- (2) The one the player is on, which is the read that has always worked.
+  put(activeConfigID, activeName, activeString)
+end
+
 -- Only the active spec's loadout is readable at any moment, so entries
 -- accumulate across a spec switch rather than replacing the list — the same
 -- snapshot-accumulates model every other section here already uses.
@@ -288,6 +352,14 @@ function Gear.Talents()
   -- comment in Store.lua for why nil means "leave it alone", not "clear it".
   if heroSpecID then found.heroSpecID = heroSpecID end
   if loadout then found.loadout = loadout end
+  -- `loadout` above stays exactly as it was — it is what the website's
+  -- resolveTalents reads, and this must not move underneath it. `loadouts` is
+  -- additive beside it.
+  local activeName = ns.safe(function()
+    local cfg = C_Traits and C_Traits.GetConfigInfo(configID)
+    return type(cfg) == "table" and cfg.name or nil
+  end)
+  captureLoadouts(found, info.id, configID, activeName, loadout)
   found.seenAt = ns.now()
 
   local now = ns.now()

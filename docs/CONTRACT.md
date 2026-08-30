@@ -386,7 +386,11 @@ SimC exporter (`simc.ts`) already knows how to consume for equipped gear.
   "activeSpecID": 103,
   "specs": [
     {"specID":103,"name":"Feral","role":"DAMAGER","heroSpecID":31,
-     "loadout":"C0PAAA…","seenAt":1723999000}
+     "loadout":"C0PAAA…","seenAt":1723999000,
+     "loadouts":[
+       {"id":31,"name":"Raid","s":"C0PAAA…","seenAt":1723999000},
+       {"id":42,"name":"M+","s":"C0PBBB…","seenAt":1723998000}
+     ]}
   ]
 }
 ```
@@ -403,6 +407,48 @@ Only the **active** spec's loadout is readable at any moment, so a character's
 scan: switch to a second spec and back, and both entries persist, each
 carrying its own `seenAt`. A spec entry the addon has never seen active simply
 never appears — absence means "not yet observed on this spec", not "empty".
+
+#### `loadouts[]` — added in 1.8.0, additive
+
+`loadout` is the string for whichever build was active at the last scan.
+`loadouts` is the player's **named** saved builds for that spec, which is what
+lets warband.pro say "this is your raid build" rather than "this is the build
+you happened to be on".
+
+| field | | |
+|---|---|---|
+| `id` | number | the client's config id, and the identity a merge is keyed on |
+| `name` | string | the name the player gave it in the talent UI — `Raid`, `M+`, `Delve`, or anything else |
+| `s` | string | the import string, same format as `loadout` |
+| `seenAt` | number | when this entry was last read |
+
+**`name` and `s` are each individually optional.** A read that fails leaves
+whatever was stored alone rather than clearing it, so an entry can carry a name
+with no string, or a string with no name, until a later pass fills the other
+in. A consumer must treat a missing `s` as "not readable yet", never as empty.
+
+The list is built by two mechanisms and **only the second is guaranteed**:
+
+1. *Enumeration* — `C_ClassTalents.GetConfigIDsBySpecID` lists the saved
+   loadouts and `C_Traits.GenerateImportString` is asked for each. When this
+   works, every build arrives in one pass.
+2. *Accumulation* — the build the player is actually on is recorded every scan,
+   name included, using only the call this addon has always made successfully.
+
+Whether the client will serialize a config that is not active is **unmeasured**
+— nothing in CI runs the game — so the format does not depend on the answer.
+If (1) returns nothing, `loadouts` still fills in as the player switches
+between their builds, the same way `specs` fills in across a spec switch. The
+website must therefore be correct with a partial list, and must not assume
+three entries because it names three content types.
+
+At most `ns.MAX_LOADOUTS` (8) entries are kept per spec, oldest-capped rather
+than evicted: past the cap a new config id is dropped and existing entries keep
+updating. The cap is a byte ceiling, not a guess at how many builds anyone has.
+
+**Additive, so `wb1!` does not move.** An older website ignores the field and
+reads `loadout` exactly as before. The consequence of a client that drops it is
+that named builds are unavailable — never that a wrong one is applied.
 
 ## Encoding steps — must be identical both sides
 
@@ -939,7 +985,9 @@ of how full the character's bags are — so the per-character delta above should
 carry over to the heavier synthetic warband the 1/6/20 table used: **~512KB
 JSON / ~84KB wire at the 20-character cap**, still well inside the 1MB decoded
 limit. `talents` costs one loadout string per known spec and is small relative
-to gear.
+to gear. 1.8.0's `loadouts[]` multiplies that by however many named builds the
+player has saved, which is why it is capped at eight rather than left open —
+the realistic case is two or three.
 
 ### What 1.3.0's five fields add, measured
 

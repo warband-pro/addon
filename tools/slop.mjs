@@ -30,7 +30,13 @@ const DISCORD_BUDGET = 3900;
 // — everything here fails.
 const RULES = [
   // Vocabulary that arrives with the machine and never with a person.
-  [/\bdelv(e|es|ed|ing)\b/i, 'nobody has ever said "delve" out loud'],
+  // Case-sensitive, and it is the only rule here that is. The tell is the
+  // *verb* — "let us delve into", "delving deeper" — which is always lowercase
+  // mid-sentence. "Delve" and "Delves" capitalised are the name of a WoW
+  // content type, which this changelog now has to say out loud because the
+  // addon carries a talent loadout named after it. An /i rule cannot tell those
+  // apart and was failing the second one.
+  [/\bdelv(e|es|ed|ing)\b/, 'nobody has ever said "delve" out loud'],
   [/\bseamless(ly)?\b/i, 'say what actually happens instead'],
   [/\brobust\b/i, 'means nothing — name the failure it survives'],
   [/\bleverag(e|es|ed|ing)\b/i, 'it is "use"'],
