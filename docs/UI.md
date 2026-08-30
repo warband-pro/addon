@@ -87,6 +87,16 @@ misrouted call fails toward a sentence rather than "invalid":
   the Equipment Manager set only after the server confirms, and print one
   receipt. An ordinary button, not a secure one — equipping out of combat is
   not protected, and the tab is gone before combat can make it so.
+
+  **`/warband equip` (1.9.0) is the same button without the window.** It calls
+  the same `GearSet.Apply`, so the receipt, the verify and the Equipment
+  Manager save are identical — what it removes is having to open a frame
+  first, which is what makes it bindable to an action bar. It tells the two
+  refusals apart rather than sharing one line: in combat is temporary and
+  worth retrying, no stored set means go and paste one, and a single "nothing
+  happened" would send the second player to wait out a fight that was never
+  the problem. (`Apply` returns nil for both, which is why the slash handler
+  checks rather than reporting whatever it gets back.)
 - One row per resolved junk item: quality-colored name, item level, the
   reason (`cannot wear` / `N behind` / `grey`), then `[Sell]` and, for
   enchanters, a secure `[Disenchant]`.

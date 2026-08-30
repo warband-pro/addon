@@ -57,6 +57,13 @@ for the next 20". Paste each one. The site merges them, so the pages add up to
 your whole warband rather than replacing each other, and the order is stable —
 every character lands on exactly one page.
 
+**`/warband equip` puts your gear set on without opening the window.** It does
+exactly what the button in the Import tab does — equips what it can find, saves
+the Equipment Manager set, prints the same receipt — so you can drag it onto an
+action bar as a macro and swap sets between pulls. If you are in combat it says
+so and waits for you; if you have not pasted an equip string yet it says that
+instead, rather than doing nothing quietly.
+
 **The junk panel reads warband.pro's new spare-copy verdict.** The site can now
 tell you when something in your bags is a copy of what you already have on, and
 the row says "already wearing one" beside it. Nothing to set up — paste your
