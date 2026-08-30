@@ -225,9 +225,21 @@ function Junk.VerdictLabel(row, canDisenchant)
 end
 
 --- The one-line reason, built only from what the verdict carried.
+---
+--- An `r` this build does not know reads "" and the row still offers its
+--- action, which is what lets warband.pro add a reason without waiting on an
+--- addon release. It is also the whole reason `dupe` could ship on wbc1! v1:
+--- a spare-copy verdict is one the website only sends when EVERY live match is
+--- surplus — the copy it is measuring against is on the player's body, not in
+--- a bag — so "apply to every match" is already correct and an older build
+--- offering all of them was never going to sell something it should not.
 function Junk.ReasonText(row)
   if row.grey then return "grey" end
   if row.r == "unusable" then return "cannot wear" end
+  -- "already wearing one", not "duplicate": the fact the verdict rests on is
+  -- that a copy is on the body, and that is what the player can check in a
+  -- glance before clicking sell.
+  if row.r == "dupe" then return "already wearing one" end
   if row.r == "gap" and row.g then return row.g .. " behind" end
   return ""
 end

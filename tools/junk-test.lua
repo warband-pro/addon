@@ -209,6 +209,9 @@ check("a gap reason names its number", Junk.ReasonText({ r = "gap", g = 30 }) ==
 check("an unusable reason says why", Junk.ReasonText({ r = "unusable" }) == "cannot wear")
 check("a grey needs no explanation", Junk.ReasonText({ grey = true }) == "grey")
 check("a gap with no number says nothing rather than nil", Junk.ReasonText({ r = "gap" }) == "")
+check("a dupe reason names what is on your body", Junk.ReasonText({ r = "dupe" }) == "already wearing one")
+check("a reason this build does not know reads blank, not nil",
+  Junk.ReasonText({ r = "something-newer" }) == "")
 
 print("")
 print(string.format("%d passed, %d failed", pass, fail))
