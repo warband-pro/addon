@@ -240,6 +240,10 @@ function Junk.ReasonText(row)
   -- that a copy is on the body, and that is what the player can check in a
   -- glance before clicking sell.
   if row.r == "dupe" then return "already wearing one" end
+  -- "you own a better one" rather than "worse": the player is about to sell
+  -- something, and the fact that makes that safe is the other item, not this
+  -- one's shortcoming.
+  if row.r == "dominated" then return "you own a better one" end
   if row.r == "gap" and row.g then return row.g .. " behind" end
   return ""
 end

@@ -210,6 +210,8 @@ check("an unusable reason says why", Junk.ReasonText({ r = "unusable" }) == "can
 check("a grey needs no explanation", Junk.ReasonText({ grey = true }) == "grey")
 check("a gap with no number says nothing rather than nil", Junk.ReasonText({ r = "gap" }) == "")
 check("a dupe reason names what is on your body", Junk.ReasonText({ r = "dupe" }) == "already wearing one")
+check("a dominated reason names the better item, not the worse one",
+  Junk.ReasonText({ r = "dominated" }) == "you own a better one")
 check("a reason this build does not know reads blank, not nil",
   Junk.ReasonText({ r = "something-newer" }) == "")
 

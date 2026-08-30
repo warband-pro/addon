@@ -72,12 +72,13 @@ action bar as a macro and swap sets between pulls. If you are in combat it says
 so and waits for you; if you have not pasted an equip string yet it says that
 instead, rather than doing nothing quietly.
 
-**The junk panel reads warband.pro's new spare-copy verdict.** The site can now
-tell you when something in your bags is a copy of what you already have on, and
-the row says "already wearing one" beside it. Nothing to set up — paste your
-cleanup string as usual. Older versions of the addon show the same rows with no
-reason text beside them, so this is worth updating for rather than something you
-have to update for.
+**The junk panel reads two new verdicts from warband.pro.** It can now tell
+you when something in your bags is a copy of what you already have on ("already
+wearing one"), and when another item in the same bags beats a piece on item
+level and on every stat at once ("you own a better one"). Nothing to set up —
+paste your cleanup string as usual. Older versions of the addon show the same
+rows with no reason text beside them, so this is worth updating for rather than
+something you have to update for.
 
 ### Fixed
 
