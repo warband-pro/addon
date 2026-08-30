@@ -43,6 +43,20 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**If you have more than 20 characters, the rest of them can finally reach the
+site.** One copied string holds 20, and past that the addon used to cut the
+oldest ones off the end — so a 41-character warband arrived at warband.pro as
+your most recent 20, and the other 21 did not exist there. The panel's advice
+was to delete an alt to make room.
+
+Your warband now goes out a page at a time. `/warband copy` is the first 20 as
+before, and the header tells you what is left: "page 1 of 3 — /warband copy 2
+for the next 20". Paste each one. The site merges them, so the pages add up to
+your whole warband rather than replacing each other, and the order is stable —
+every character lands on exactly one page.
+
 ### Fixed
 
 **Your warband bank stopped losing four tabs out of five.** The game hands the

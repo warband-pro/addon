@@ -294,6 +294,73 @@ Scan.WarbandBank()
 check("and stops carrying the gap once there is none",
   Bundle.Build().warbandBank.partial == nil)
 
+-- ── a warband larger than one bundle goes out a page at a time ──────────────
+--
+-- The slicing is arithmetic on a list, which is exactly the kind of thing that
+-- is wrong by one and looks right: an off-by-one here does not error, it
+-- silently omits one character from every page, or repeats one across two.
+-- The stakes are the same as the vault above — past MAX_CHARS the oldest
+-- characters simply did not exist on the website, and the panel's remedy was
+-- `/warband clear`, which deletes an alt to make room.
+
+reset()
+--- `n` stored characters, newest first by lastSeen so the page order is known.
+local function warbandOf(n)
+  reset()
+  for i = 1, n do
+    Store.db.chars["Player-1-" .. i] = {
+      guid = "Player-1-" .. i,
+      name = "Alt" .. i,
+      seenAt = { lastSeen = NOW - i },
+    }
+  end
+end
+
+local function pageNames(page)
+  local out = {}
+  for _, c in ipairs(Bundle.Build({ page = page }).characters) do out[#out + 1] = c.name end
+  return out
+end
+
+warbandOf(41)
+local p1, p3 = Bundle.Build({ page = 1 }), Bundle.Build({ page = 3 })
+check("page 1 of a 41 character warband carries the cap, not the warband",
+  p1.bundle.count == 20, p1.bundle.count)
+check("and says which page of how many", p1.bundle.page == 1 and p1.bundle.pages == 3)
+check("and counts the ones not in it", p1.bundle.droppedOverCap == 21, p1.bundle.droppedOverCap)
+check("the last page carries the remainder", p3.bundle.count == 1, p3.bundle.count)
+
+-- The two failures the arithmetic actually risks, stated as the player's loss:
+-- a character on no page is one the website never hears about again, and a
+-- character on two pages is a page of wire spent saying nothing new.
+local seen, dupes = {}, 0
+for page = 1, 3 do
+  for _, name in ipairs(pageNames(page)) do
+    if seen[name] then dupes = dupes + 1 end
+    seen[name] = true
+  end
+end
+local missing = 0
+for i = 1, 41 do if not seen["Alt" .. i] then missing = missing + 1 end end
+check("every character lands on exactly one page", missing == 0 and dupes == 0,
+  missing .. " missing, " .. dupes .. " repeated")
+check("page 1 is the twenty played most recently", pageNames(1)[1] == "Alt1")
+check("and page 2 picks up where it left off", pageNames(2)[1] == "Alt21")
+
+-- Clamped rather than trusted: the page comes from a slash command, and an
+-- empty bundle is one the website rejects out of hand.
+check("a page past the end clamps to the last one",
+  Bundle.Build({ page = 99 }).bundle.page == 3)
+check("a page below the first clamps up", Bundle.Build({ page = 0 }).bundle.page == 1)
+check("a page that is not a number is page 1",
+  Bundle.Build({ page = "nonsense" }).bundle.page == 1)
+
+warbandOf(20)
+local whole = Bundle.Build()
+check("a warband that fits in one bundle says nothing about pages",
+  whole.bundle.page == nil and whole.bundle.pages == nil)
+check("and reports nothing left out", whole.bundle.droppedOverCap == nil)
+
 -- ── every stamped section is one the store knows about ──────────────────────
 
 reset()

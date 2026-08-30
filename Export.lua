@@ -70,8 +70,9 @@ local cache = { rev = -1, currentOnly = nil, str = nil, bytes = 0, payload = nil
 function Export.Build(opts)
   opts = opts or {}
   local currentOnly = opts.currentOnly and true or false
+  local page = math.max(math.floor(tonumber(opts.page) or 1), 1)
   local rev = ns.Store.rev or 0
-  if cache.str and cache.rev == rev and cache.currentOnly == currentOnly then
+  if cache.str and cache.rev == rev and cache.currentOnly == currentOnly and cache.page == page then
     return cache.str, cache.bytes, cache.payload, cache.rawBytes
   end
 
@@ -88,7 +89,7 @@ function Export.Build(opts)
   if not packed then return nil, 0, payload end
 
   local str = ns.WIRE .. Export.Base64URL(packed)
-  cache.rev, cache.currentOnly, cache.str, cache.bytes, cache.payload, cache.rawBytes =
-    rev, currentOnly, str, #str, payload, #json
+  cache.rev, cache.currentOnly, cache.page, cache.str, cache.bytes, cache.payload, cache.rawBytes =
+    rev, currentOnly, page, str, #str, payload, #json
   return str, #str, payload, #json
 end

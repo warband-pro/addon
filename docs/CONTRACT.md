@@ -35,7 +35,10 @@ Top-level:
   "bundle": {
     "count": 3,
     "freshestSeenAt": 1724001200,
-    "oldestSeenAt": 1723980000
+    "oldestSeenAt": 1723980000,
+    "droppedOverCap": 21,
+    "page": 1,
+    "pages": 3
   },
   "characters": [ CharacterObject, … ]
 }
@@ -777,9 +780,39 @@ difficulty id — raid ids sort LFR (17) above Mythic (16), so the "best" slot i
 named could be the worst one — so **`level` is no longer sent on the `raid`
 bucket**. It was never read. `rows[].d` is what anyone reaching for it wanted.
 
+### A warband larger than the cap is paged, not truncated — added in 1.8.0
+
+The cap is **per bundle**, not per warband. A player with 41 characters sends
+three bundles: `/warband copy` is page 1, `/warband copy 2` is the next twenty,
+and so on. Characters are ordered newest-seen first and that order is stable
+between calls, so the pages partition the warband with no gap and no repeat.
+
+```json
+"bundle": { "count": 20, "droppedOverCap": 21, "page": 1, "pages": 3 }
+```
+
+- `droppedOverCap` — how many characters are **not in this bundle**. Absent, not
+  zero, when the bundle holds the whole warband.
+- `page` / `pages` — which twenty this is, and how many there are. **Both absent
+  when the warband fits in one bundle**, in keeping with absent-means-unknown
+  everywhere else here: a bundle with no `pages` is the whole warband.
+
+**This works only because the importer merges rather than replaces.** The web
+side upserts by character key and never deletes a row the bundle omits, so
+pages accumulate into one roster on the far side. A consumer that treated a
+bundle as the complete roster — deleting what it does not carry — would make
+page 2 erase page 1, and must not.
+
+Before 1.8.0 the addon truncated instead: the oldest characters were cut from
+the wire, `droppedOverCap` said how many, **and nothing on either side read it**,
+so a player's 21st alt did not exist on the website with no line anywhere saying
+why. The in-game remedy offered was `/warband clear <name>` — delete an alt to
+make room — which is the wrong answer for the player who has twenty-one of them.
+
 ## Security / DoS
 
-- Never allow >20 characters in bundle, reject.
+- Never allow >20 characters in **one bundle**, reject. A larger warband arrives
+  as several bundles; see the paging section above.
 - Never stuff borrower data cross-user_id: web writes D1 only under authed user_id.
 - Gold/warbank never in wb0 DNA shares unless user toggles "include gold" — web option, not addon feature.
 
