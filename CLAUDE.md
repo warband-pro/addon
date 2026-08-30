@@ -181,14 +181,28 @@ do not read like a person wrote them.
 `main` is what CI builds and what the packager releases from, so run the checks
 before the **commit** (step 2) — not at merge time and never after. A gate
 attached to the merge would run long after the code was written and against a
-batch rather than a change. These are the same three the `ci.yml` `luacheck`
-and `packaging + contract` jobs run, so a green run here is a green PR:
+batch rather than a change. These are what the `ci.yml` `luacheck` and
+`packaging + contract` jobs run, so a green run here is a green PR:
 
 ```bash
 luacheck .                      # zero warnings under .luacheckrc
 node tools/validate.mjs         # .toc and .pkgmeta agree
-node tools/vector.mjs           # wb1! round-trips, fixtures still match
+node tools/vector.mjs           # wb1! round-trips
+node tools/slop.mjs --unreleased   # the notes read like a person wrote them
+
+for t in import junk gear gearset freshness; do lua5.1 tools/$t-test.lua; done
+
+# The fixture check, which is NOT the line above and fails separately:
+node tools/vector.mjs --write && git diff --exit-code -- docs/contract/vectors
 ```
+
+**`node tools/vector.mjs` does not check that the committed fixtures match** —
+it round-trips the vectors in memory and passes on a tree whose `.wb1` files
+are stale. Matching is the separate `--write` and `git diff` above, and it is
+the one that fails alone. **This block said "the same three" and named the
+round-trip as the fixture check until 2026-08-30**, and a session that ran all
+three green pushed a PR that CI failed on stale fixtures within a minute.
+`--write` is deterministic, so regenerating and committing is the whole fix.
 
 A new luacheck warning is usually a leaked global rather than a style nit —
 `.luacheckrc` lists every global this addon is allowed to touch.

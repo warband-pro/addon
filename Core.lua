@@ -303,6 +303,11 @@ SlashCmdList.WARBANDPRO = function(msg)
     UI.Show("bundle")
   elseif cmd == "copy current" or cmd == "current" then
     UI.Show("current")
+  -- `/warband copy 2` — the second twenty of a warband too large for one
+  -- bundle. Matched before the catch-all so a stray `copy 0` or `copy 99`
+  -- still lands on the export tab; Bundle.Build clamps it to a real page.
+  elseif cmd:match("^copy%s+%d+$") then
+    UI.Show("bundle", tonumber(cmd:match("^copy%s+(%d+)$")))
   elseif cmd == "status" then
     status()
   elseif cmd == "optimize" then
@@ -348,7 +353,8 @@ SlashCmdList.WARBANDPRO = function(msg)
     ns.Perf.Reset()
     ns.print("perf counters reset")
   else
-    ns.print("/warband · /warband copy current · /warband junk · /warband options · /warband status · "
+    ns.print("/warband · /warband copy current · /warband copy <page> · /warband junk · "
+      .. "/warband options · /warband status · "
       .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband minimap on|off · "
       .. "/warband perf")
   end

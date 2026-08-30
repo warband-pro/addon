@@ -139,14 +139,29 @@ function Bundle.Build(opts)
     chars = stripped
   end
 
-  -- CONTRACT.md rejects more than MAX_CHARS, and Store.Characters() is already
-  -- newest-first, so the ones that fall off the end are the ones you have not
-  -- played in longest.
-  local dropped = 0
-  if #chars > ns.MAX_CHARS then
-    dropped = #chars - ns.MAX_CHARS
-    for i = #chars, ns.MAX_CHARS + 1, -1 do chars[i] = nil end
+  -- CONTRACT.md rejects more than MAX_CHARS per bundle, so a warband larger
+  -- than that goes out a page at a time. Store.Characters() is already
+  -- newest-first and its order is stable between calls, so page 1 is the
+  -- twenty you played most recently and page 2 the twenty before those.
+  --
+  -- Paging rather than truncating, because the truncated ones were not a
+  -- rounding error: past MAX_CHARS the oldest simply did not exist on the
+  -- website, and the remedy this panel used to offer was `/warband clear`,
+  -- which is "delete an alt to make room" — the wrong answer for the player
+  -- who has the problem. The website merges by character rather than
+  -- replacing its roster, so pages accumulate there into one warband.
+  local total = #chars
+  local pages = math.max(1, math.ceil(total / ns.MAX_CHARS))
+  local page = math.min(math.max(math.floor(tonumber(opts.page) or 1), 1), pages)
+  if total > ns.MAX_CHARS then
+    local first, last = (page - 1) * ns.MAX_CHARS + 1, math.min(total, page * ns.MAX_CHARS)
+    local slice = {}
+    for i = first, last do slice[#slice + 1] = chars[i] end
+    chars = slice
   end
+  -- How many are not in *this* bundle — the count the header turns into
+  -- "20 of 41". Absent rather than zero when the page holds everything.
+  local dropped = total - #chars
 
   local freshest, oldest
   for i = 1, #chars do
@@ -172,6 +187,10 @@ function Bundle.Build(opts)
       freshestSeenAt = freshest,
       oldestSeenAt = oldest,
       droppedOverCap = dropped > 0 and dropped or nil,
+      -- Absent on a single-page warband, in keeping with absent-means-unknown
+      -- everywhere else here: a bundle with no `pages` is the whole warband.
+      page = pages > 1 and page or nil,
+      pages = pages > 1 and pages or nil,
     },
     warbandBank = warbandBank(db.warbandBank),
     characters = chars,

@@ -47,6 +47,14 @@ rename costs the title or the icon, never the window.
 
 - Header line of freshness: "6 characters · freshest 12m ago · warband bank 1h
   ago (by Vocnar)" — readable before you copy, so you know it's not stale.
+- **The page line, when the warband is larger than one bundle holds** (1.8.0):
+  "page 1 of 3 — /warband copy 2 for the next 20". One bundle carries at most
+  `ns.MAX_CHARS`, so a 41-character warband is three copies, and the header is
+  where the player learns there are two more to make. It replaced a line that
+  reported the count left out and offered `/warband clear <name>` — deleting an
+  alt to make room, which is the wrong answer for the player who has the
+  problem. See [`CONTRACT.md`](CONTRACT.md) § paging for why the pages
+  accumulate on the far side rather than overwriting each other.
 - Character rows with the traffic-light dots, then the string in a
   ScrollFrame + multiline EditBox inside an inset well:
   - `SetMaxLetters(0)` — the default cap would truncate the wire

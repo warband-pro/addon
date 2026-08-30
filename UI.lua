@@ -45,6 +45,10 @@ local gsHeader, gsButton
 local optionChecks = {}
 
 UI.mode = "bundle"
+-- Which page of a warband too large for one bundle is in the box. Always 1
+-- unless `/warband copy 2` asked for another, and reset by any plain open so
+-- the panel cannot sit on page 3 days after the player went looking for it.
+UI.page = 1
 
 -- ── window chrome ───────────────────────────────────────────────────────────
 
@@ -206,7 +210,8 @@ local function renderRows(summary)
 end
 
 local function refreshExport()
-  local str, bytes, payload, rawBytes = ns.Export.Build({ currentOnly = UI.mode == "current" })
+  local str, bytes, payload, rawBytes =
+    ns.Export.Build({ currentOnly = UI.mode == "current", page = UI.page })
   UI.current = str or ""
   editBox:SetText(UI.current)
   -- A new string has not been copied yet, whatever happened to the last one.
@@ -253,15 +258,20 @@ local function refreshExport()
     for i = 1, #summary do
       if summary[i].dot ~= "red" and summary[i].dot ~= "never" then allStale = false break end
     end
-    -- And the cap. Past MAX_CHARS the oldest characters are dropped from the
-    -- wire and `droppedOverCap` is written into the payload — where nothing
-    -- ever read it, so a player's 21st alt simply did not exist on the site
-    -- with no line anywhere saying why. The remedy travels with it.
+    -- And the cap. One bundle holds MAX_CHARS characters, so a larger warband
+    -- goes out a page at a time and the header has to say which page this is
+    -- and how to get the next — the count alone reads as a loss, and the old
+    -- line made that literal by offering `/warband clear <name>` as the
+    -- remedy. Deleting an alt is the wrong answer for the player who has
+    -- twenty-one of them; the site merges pages rather than replacing what it
+    -- holds, so all of them fit if they are all sent.
     local dropped = payload.bundle.droppedOverCap
+    local pages = payload.bundle.pages
     local warnLine = ""
-    if dropped then
-      warnLine = format("  |cff%s·  %d oldest left out (cap %d) — /warband clear <name>|r",
-        WARN, dropped, ns.MAX_CHARS)
+    if dropped and pages then
+      local next_ = (payload.bundle.page or 1) % pages + 1
+      warnLine = format("  |cff%s·  page %d of %d — /warband copy %d for the next %d|r",
+        WARN, payload.bundle.page or 1, pages, next_, math.min(dropped, ns.MAX_CHARS))
     elseif allStale then
       warnLine = format("  |cff%s·  all stale — log those alts in again for fresher numbers|r", WARN)
     end
@@ -786,22 +796,24 @@ end
 
 --- Open the window on a tab. Fails closed in combat: the request is queued and
 --- honored when the fight ends, rather than fighting the taint rules mid-pull.
-function UI.Open(tab, mode)
+function UI.Open(tab, mode, page)
   if InCombatLockdown() then
-    UI.pendingOpen = { tab = tab, mode = mode }
+    UI.pendingOpen = { tab = tab, mode = mode, page = page }
     ns.print("in combat — the window will open when you drop out")
     return
   end
   UI.pendingOpen = nil
   if mode then UI.mode = mode end
+  UI.page = math.max(math.floor(tonumber(page) or 1), 1)
   build()
   frame:Show()
   UI.SelectTab(tab)
 end
 
--- mode: "bundle" (default) or "current"
-function UI.Show(mode)
-  UI.Open(TAB_EXPORT, mode or "bundle")
+-- mode: "bundle" (default) or "current"; page: which twenty, for a warband
+-- larger than one bundle holds.
+function UI.Show(mode, page)
+  UI.Open(TAB_EXPORT, mode or "bundle", page)
 end
 
 function UI.ShowJunk()
@@ -870,7 +882,7 @@ function UI.AfterCombat()
   local p = UI.pendingOpen
   UI.pendingOpen = nil
   if p then
-    UI.Open(p.tab, p.mode)
+    UI.Open(p.tab, p.mode, p.page)
     return
   end
   if UI.reopenTab then
