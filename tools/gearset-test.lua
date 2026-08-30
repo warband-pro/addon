@@ -71,6 +71,11 @@ _G.C_Container = {
 _G.C_Timer = {
   After = function(_, fn) TIMERS[#TIMERS + 1] = fn end,
 }
+-- The spec at the keyboard. `GearSet.Stored` picks the setup matching it, so
+-- every resolve below is implicitly "as Feral" until SPEC is moved.
+local SPEC = 103
+_G.GetSpecialization = function() return SPEC and 1 or nil end
+_G.GetSpecializationInfo = function() return SPEC end
 _G.C_EquipmentSet = {
   GetEquipmentSetID = function(name) return SETS[name] end,
   CreateEquipmentSet = function(name)
@@ -128,7 +133,11 @@ check("golden is keyed by guid", decoded and decoded.chars["Player-1-TEST"] ~= n
 local entry = decoded and decoded.chars["Player-1-TEST"]
 check("golden carries all three items", entry and #entry.items == 3)
 check("golden keeps the real finger-2 slot", entry and entry.items[2].slot == 12)
-check("golden carries the set name", entry and entry.set == "warband.pro")
+check("golden carries the set name", entry and entry.set == "warband.pro Feral")
+check("golden carries a setup per spec", entry and entry.bySpec ~= nil
+  and entry.bySpec[103] ~= nil and entry.bySpec[105] ~= nil)
+check("each setup carries its own items", entry and #entry.bySpec[105].items == 1)
+check("each setup carries its own name", entry and entry.bySpec[105].set == "warband.pro Restoration")
 check("golden carries the spec", entry and entry.spec == 103)
 check("golden keeps w for the missing line", entry and entry.items[3].w == "bank")
 
@@ -189,7 +198,7 @@ check("resolve finds the bagged helm with live coordinates",
   r and #r.ready == 1 and r.ready[1].bag == 0 and r.ready[1].bagSlot == 2)
 check("resolve aims the helm at its real slot", r and r.ready[1].slot == 1)
 check("resolve names the missing cleaver", r and #r.missing == 1 and r.missing[1].w == "bank")
-check("resolve carries the set name", r and r.set == "warband.pro")
+check("resolve carries the set name", r and r.set == "warband.pro Feral")
 
 -- ── apply: equips land before the save, and the save snapshots after ────────
 
@@ -204,7 +213,7 @@ check("apply armed a pending verify", GearSet.pending ~= nil)
 
 -- The fake client equipped instantly, so the event-driven verify confirms.
 GearSet.Verify(false)
-check("verify created the set", ORDER[3] == "create:warband.pro")
+check("verify created the set", ORDER[3] == "create:warband.pro Feral")
 check("verify saved it after every equip", ORDER[4] == "save:41")
 check("verify cleared the pending", GearSet.pending == nil)
 check("the receipt names the equip, the worn item and the missing one",
@@ -212,7 +221,7 @@ check("the receipt names the equip, the worn item and the missing one",
     and printed[1]:find("equipped 1", 1, true) ~= nil
     and printed[1]:find("1 already worn", 1, true) ~= nil
     and printed[1]:find("1 missing (1 in your bank)", 1, true) ~= nil
-    and printed[1]:find('saved as "warband.pro"', 1, true) ~= nil,
+    and printed[1]:find('saved as "warband.pro Feral"', 1, true) ~= nil,
   printed[1])
 
 -- ── apply: an equip the server never confirms ───────────────────────────────
@@ -242,6 +251,55 @@ GearSet.Verify(false)
 check("combat mid-apply drops the pending save", GearSet.pending == nil)
 check("and says to press the button again", printed[1] ~= nil and printed[1]:find("combat", 1, true) ~= nil, printed[1])
 inCombat = false
+
+-- ── a setup per spec (1.10.0) ───────────────────────────────────────────────
+-- The website can solve any spec since it learned to, so one set per character
+-- became wrong: a stored Feral set is not an answer to a Restoration
+-- paperdoll. A record that names specs answers only for the one being played.
+
+SPEC = 105
+local resto = GearSet.Stored()
+check("standing in another spec finds that spec's setup", resto ~= nil and resto.spec == 105)
+check("and it is that setup's items, not the primary's", resto and #resto.items == 1)
+check("and that setup's own set name", resto and resto.set == "warband.pro Restoration")
+
+SPEC = 102   -- Balance: nothing was ever solved for it
+check("a spec with no setup gets nothing rather than another spec's gear", GearSet.Stored() == nil)
+local n, mine = GearSet.Summary()
+check("but the panel still knows setups exist", n == 2 and mine == false)
+
+SPEC = 103
+local _, ferMine = GearSet.Summary()
+check("and knows when one is for the spec being played", ferMine == true)
+
+-- An older website sends no `sets`, so the record names no spec per setup and
+-- applies to whoever is standing there — which is also the downgrade path.
+inflated = '{"v":1,"generatedAt":1,"chars":[{"guid":"Player-1-TEST","items":[{"slot":1,"s":"item:1"}]}]}'
+GearSet.Save(Import.DecodeGearSet("wbg1!AAAA"))
+SPEC = 102
+check("an unkeyed record applies to any spec", GearSet.Stored() ~= nil)
+SPEC = 103
+
+-- ── the set name is discovered, never assumed ───────────────────────────────
+-- C_EquipmentSet enforces a length this addon cannot read, so the full name is
+-- tried and shorter ones after it. Here the stub refuses anything over 16.
+
+local LIMIT = 16
+_G.C_EquipmentSet.CreateEquipmentSet = function(name)
+  ORDER[#ORDER + 1] = "create:" .. name
+  if #name > LIMIT then return end
+  SETS[name] = nextSetID
+  nextSetID = nextSetID + 1
+end
+
+SETS, ORDER, printed = {}, {}, {}
+GearSet.pending = { set = "warband.pro Restoration", items = {}, readyCount = 0,
+  alreadyCount = 0, missingCount = 0, bankCount = 0 }
+GearSet.Verify(true)
+check("tries the full name first", ORDER[1] == "create:warband.pro Restoration", tostring(ORDER[1]))
+check("falls back until the client accepts one", SETS["warband.pro Rest"] ~= nil)
+check("the receipt names the set that actually exists",
+  printed[1] ~= nil and printed[1]:find('saved as "warband.pro Rest"', 1, true) ~= nil, printed[1])
 
 -- ── verdict ─────────────────────────────────────────────────────────────────
 

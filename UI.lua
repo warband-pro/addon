@@ -480,7 +480,15 @@ function UI.RenderGearSet()
   if InCombatLockdown() then return end
   local r = ns.GearSet.Resolve()
   if not r then
-    gsHeader:SetText("")
+    -- Two silences, and they are different things to tell somebody. Since
+    -- 1.10.0 a paste stores a setup per spec, so having sets and having none
+    -- for the spec you are standing in is the common case after a respec —
+    -- and "nothing here" would send that player back to the website for a
+    -- string they already pasted.
+    local stored = ns.GearSet.Summary()
+    gsHeader:SetText(stored > 0
+      and format("|cff%sgear set: none for this spec — %d stored for others|r", MUTED, stored)
+      or "")
     gsButton:Hide()
     return
   end
@@ -496,7 +504,10 @@ function UI.RenderGearSet()
       bank > 0 and format(" (%d in your bank)", bank) or "")
   end
   if r.generatedAt then parts[#parts + 1] = format("|cff%sset from %s|r", MUTED, ns.ago(r.generatedAt)) end
-  gsHeader:SetText("gear set:  " .. table.concat(parts, "  ·  "))
+  -- The set's own name leads, because with a setup per spec it is the thing
+  -- that says WHICH set this row is about — and it is the same name the
+  -- Equipment Manager will show.
+  gsHeader:SetText(format("%s:  ", r.set or "gear set") .. table.concat(parts, "  ·  "))
   if #r.ready > 0 then
     gsButton:SetText(format("Equip %d & save set", #r.ready))
     gsButton:Enable()

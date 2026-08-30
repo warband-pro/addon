@@ -34,8 +34,8 @@ local C = C_Container
 -- How long Verify waits for the server before saving what actually verified.
 local DEADLINE_SEC = 3
 
---- The stored gear set for the character at the keyboard, or nil.
-function GearSet.Stored()
+--- The whole stored record for the character at the keyboard, or nil.
+local function storedRecord()
   local db = Store.db
   if not db or not db.gearset then return nil end
   local guid = ns.safe(UnitGUID, "player")
@@ -43,9 +43,72 @@ function GearSet.Stored()
   return db.gearset[guid]
 end
 
+--- The spec this character is playing right now, or nil.
+local function activeSpecID()
+  local index = ns.safe(GetSpecialization)
+  if not index then return nil end
+  return ns.safe(function()
+    local id = GetSpecializationInfo(index)
+    return id
+  end)
+end
+
+--- The stored setup for the spec at the keyboard, or nil.
+---
+--- **Per spec since 1.10.0, and the nil is the point.** One set per character
+--- was fine while the website could only solve the spec you were logged out
+--- in; it can solve any of them now, so a stored Feral set is not an answer to
+--- a Restoration paperdoll and equipping it would be actively wrong. So a
+--- record that names specs answers only for the one being played.
+---
+--- The exception is a record with no spec at all, which is what an older
+--- website sends and what a character with no resolvable spec still gets:
+--- it makes no claim, so it applies to whoever is standing there. That is
+--- also the downgrade path — the legacy fields are still written, so a player
+--- who reverts this addon finds exactly the record the old code expects.
+function GearSet.Stored()
+  local rec = storedRecord()
+  if not rec then return nil end
+  if rec.bySpec then
+    local spec = activeSpecID()
+    local mine = spec and rec.bySpec[spec]
+    if mine then
+      return {
+        generatedAt = rec.generatedAt,
+        spec = mine.spec,
+        set = mine.set,
+        items = mine.items,
+      }
+    end
+    -- A record that names specs and has none for this one says nothing.
+    return nil
+  end
+  -- No `bySpec` at all: an unkeyed record, which applies to anyone.
+  if rec.spec and activeSpecID() and rec.spec ~= activeSpecID() then return nil end
+  return rec
+end
+
+--- How many stored setups this character has, and whether any is for the spec
+--- being played. Read by the UI so "no set at all" and "a set, for another
+--- spec" can be different sentences — the same reason the junk panel names its
+--- empty states rather than sharing one.
+function GearSet.Summary()
+  local rec = storedRecord()
+  if not rec then return 0, false end
+  if not rec.bySpec then return 1, GearSet.Stored() ~= nil end
+  local n = 0
+  for _ in pairs(rec.bySpec) do n = n + 1 end
+  return n, GearSet.Stored() ~= nil
+end
+
 --- Store a decoded equip payload. Junk.Save's rule verbatim: only guids this
 --- account has scanned are kept — the rest of the string belongs to
 --- characters that will read it when they log in.
+---
+--- The legacy `spec`/`set`/`items` are written alongside `bySpec` rather than
+--- replaced by it, and not out of caution: they are what a downgraded addon
+--- reads, and they describe the spec the player was on when they pasted, which
+--- is the only one a build that cannot choose should be handed.
 function GearSet.Save(decoded)
   local db = Store.db
   if not db or type(decoded) ~= "table" then return 0 end
@@ -58,6 +121,7 @@ function GearSet.Save(decoded)
         spec = entry.spec,
         set = entry.set,
         items = entry.items,
+        bySpec = entry.bySpec,
       }
       kept = kept + 1
     end
@@ -124,19 +188,52 @@ function GearSet.Resolve()
   }
 end
 
+--- How short a set name is retried down to before giving up. Each step is one
+--- create attempt, so the list is short on purpose.
+local NAME_FALLBACKS = { 24, 16, 11 }
+
 --- Find-or-create the named Equipment Manager set and snapshot the paperdoll
 --- into it. Out-of-combat only; callers guard.
+---
+--- **The client's name-length limit is discovered, never assumed.** Set names
+--- gained a spec suffix in 1.10.0 (`warband.pro Restoration`), which is longer
+--- than anything this ever asked for before, and `C_EquipmentSet` enforces a
+--- maximum this addon has no API to read. Hardcoding a guess fails in the
+--- worst direction — `CreateEquipmentSet` simply does nothing and the player
+--- gets equipped gear with no saved set and no explanation. So the full name
+--- is tried first and shorter ones after, and whichever the client actually
+--- accepts is the one used. A create that works costs exactly one attempt.
+---
+--- Truncation drops the spec before the brand: two specs colliding on one
+--- truncated name means a player watching one set update twice, where losing
+--- `warband.pro` leaves a set they cannot identify among their own.
 local function saveSet(name)
   local es = C_EquipmentSet
-  if not es then return false end
-  local id = ns.safe(es.GetEquipmentSetID, name)
-  if not id then
-    ns.safe(es.CreateEquipmentSet, name, ns.ICON)
-    id = ns.safe(es.GetEquipmentSetID, name)
+  if not es then return false, nil end
+
+  local function tryName(candidate)
+    if not candidate or candidate == "" then return nil end
+    local id = ns.safe(es.GetEquipmentSetID, candidate)
+    if id then return id end
+    ns.safe(es.CreateEquipmentSet, candidate, ns.ICON)
+    return ns.safe(es.GetEquipmentSetID, candidate)
   end
-  if not id then return false end
+
+  local id = tryName(name)
+  if not id then
+    for _, len in ipairs(NAME_FALLBACKS) do
+      if #name > len then
+        id = tryName(name:sub(1, len))
+        if id then
+          name = name:sub(1, len)
+          break
+        end
+      end
+    end
+  end
+  if not id then return false, nil end
   ns.safe(es.SaveEquipmentSet, id)
-  return true
+  return true, name
 end
 
 GearSet.pending = nil
@@ -174,7 +271,11 @@ function GearSet.Verify(fromDeadline)
   end
   if verified < p.readyCount and not fromDeadline then return end
   GearSet.pending = nil
-  p.saved = saveSet(p.set)
+  -- The name the client accepted, which may be shorter than the one asked
+  -- for — the receipt must say what is actually in the Equipment Manager.
+  local saved, savedName = saveSet(p.set)
+  p.saved = saved
+  if savedName then p.set = savedName end
   receipt(p, verified)
   if ns.UI and ns.UI.RenderGearSet then ns.UI.RenderGearSet() end
 end

@@ -520,6 +520,61 @@ A payload that merely decodes the same would only prove the decoder works.
 | `items[].g` | Item levels below the equipped item it would replace. Present only when `r` is `gap`. |
 | `items[].ilvl` | The item's own level, for the row. Optional. |
 
+### `sets[]` — a setup per spec, added in 1.10.0
+
+`wbg1!` carried one set per character until 1.10.0, because the website could
+only solve the spec you were logged out in. It can solve any of them now, and
+one set per character became actively wrong: a stored Feral set is not an
+answer to a Restoration paperdoll, and pasting an off-spec solve silently
+overwrote the set you sent an hour ago, under a name that gave you no way to
+notice.
+
+So a character entry may carry `sets`, one entry per spec the website solved:
+
+```json
+{"guid":"Player-1-TEST","name":"Vocnar",
+ "spec":103,"set":"warband.pro Feral","items":[ ...the Feral set... ],
+ "sets":[
+   {"spec":103,"set":"warband.pro Feral","items":[ ... ]},
+   {"spec":105,"set":"warband.pro Rest","items":[ ... ]}
+ ]}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `sets[].spec` | **Required.** The specialization id this setup was solved for, and the key it is stored under. An entry without one is dropped — it has nothing to be filed as. |
+| `sets[].set` | The Equipment Manager set name for this setup. Proposed, not final — see below. |
+| `sets[].items` | Exactly the same shape as `items` above, validated by the same code. |
+
+**`sets` is additive, and safely so.** `spec`, `set` and `items` at the
+character level still describe the **first** setup — the spec being played — so
+an addon older than 1.10.0 reads those, behaves exactly as it always did, and
+simply never learns the off-spec setups exist. That is the opposite of the
+`keep` field the cleanup wire deliberately does not have: dropping `sets` costs
+a stale client setups it never had, where dropping `keep` would have had it
+sell a ring it should not. Neither prefix nor `v` moves.
+
+**A record that names specs answers only for the spec being played.** With
+`sets` present, `GearSet.Stored()` returns the setup matching the active spec
+or nothing at all — never another spec's gear. A record with no spec anywhere
+(an older website, or a character whose spec could not be resolved) makes no
+claim and still applies to whoever is standing there.
+
+### The set name is proposed here and settled by the client
+
+`set` is what the website would like the Equipment Manager set called. It is
+not authoritative, because **`C_EquipmentSet` enforces a name length this addon
+has no API to read**, and a constant in the website would be a guess about a
+client it never runs in. Guessing high fails in the worst direction:
+`CreateEquipmentSet` does nothing and the player gets equipped gear, no saved
+set, and no explanation.
+
+So `saveSet` tries the proposed name, then progressively shorter ones, and uses
+whichever the client actually accepts — the receipt names that one. Truncation
+drops the spec before the brand: two specs colliding on one truncated name is a
+player watching one set update twice, where losing `warband.pro` leaves a set
+they cannot pick out from their own.
+
 ### Matching is by item string, and nothing else
 
 **The wire carries no bag coordinates, deliberately.** A bag position captured
