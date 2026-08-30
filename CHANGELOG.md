@@ -72,6 +72,12 @@ action bar as a macro and swap sets between pulls. If you are in combat it says
 so and waits for you; if you have not pasted an equip string yet it says that
 instead, rather than doing nothing quietly.
 
+**Your named talent loadouts go out with the rest of it.** Keep a "Raid", an
+"M+" and a "Delve" build in the talent UI and the export carries all three under
+the names you gave them, not just the one you were standing in. If the game
+will only hand over the build you are on, the list fills in as you switch
+between them, the way your second spec appears the first time you play it.
+
 **The junk panel reads two new verdicts from warband.pro.** It can now tell
 you when something in your bags is a copy of what you already have on ("already
 wearing one"), and when another item in the same bags beats a piece on item

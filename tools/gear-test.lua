@@ -216,6 +216,112 @@ eq(a and a.equipLoc, "INVTYPE_HEAD", "the memo holds equipLoc from position 4")
 eq(a and a.classID, 4, "the memo holds classID from position 6")
 eq(a and a.subclassID, 1, "the memo holds subclassID from position 7")
 
+-- ── saved talent loadouts ───────────────────────────────────────────────────
+-- Two mechanisms and the second is the floor: enumeration fills the list at
+-- once when the client allows it, and the loadout the player is ON is recorded
+-- every pass regardless. These tests exercise both, and the case that matters
+-- most is enumeration failing entirely.
+
+local CHAR
+ns.Store.Char = function() return CHAR end
+ns.now = function() return 1724000000 end
+
+-- The fake talent client. CONFIGS is what the player has saved; STRINGS is
+-- what GenerateImportString will answer for, so a config id absent from it
+-- models the call refusing an inactive loadout.
+local CONFIGS, STRINGS, ACTIVE_CONFIG = {}, {}, 1
+_G.GetSpecialization = function() return 1 end
+_G.GetSpecializationInfo = function() return 73, "Protection", nil, nil, "TANK" end
+_G.C_ClassTalents = {
+  GetActiveConfigID = function() return ACTIVE_CONFIG end,
+  GetActiveHeroTalentSpec = function() return 31 end,
+  GetConfigIDsBySpecID = function() return CONFIGS.ids end,
+}
+_G.C_Traits = {
+  GenerateImportString = function(id)
+    local v = STRINGS[id]
+    if v == nil then error("cannot serialize an inactive config") end
+    return v
+  end,
+  GetConfigInfo = function(id) return CONFIGS.names[id] and { name = CONFIGS.names[id] } or nil end,
+}
+
+local function freshChar()
+  CHAR = { seenAt = {} }
+  return CHAR
+end
+
+local function loadouts()
+  local specs = CHAR and CHAR.talents and CHAR.talents.specs
+  return specs and specs[1] and specs[1].loadouts or {}
+end
+
+local function byName(name)
+  for _, l in ipairs(loadouts()) do
+    if l.name == name then return l end
+  end
+  return nil
+end
+
+-- Everything enumerable: all three arrive in one pass.
+freshChar()
+CONFIGS = { ids = { 1, 2, 3 }, names = { [1] = "Raid", [2] = "M+", [3] = "Delve" } }
+STRINGS = { [1] = "RAIDSTR", [2] = "MPLUSSTR", [3] = "DELVESTR" }
+ns.Gear.Talents()
+eq(#loadouts(), 3, "enumeration captures every saved loadout in one pass")
+eq(byName("M+") and byName("M+").s, "MPLUSSTR", "each carries its own import string")
+eq(byName("Raid") and byName("Raid").id, 1, "each carries its config id")
+
+-- The case the design is actually built for: the client refuses to serialize
+-- anything but the active config. The active one must still land.
+freshChar()
+CONFIGS = { ids = { 1, 2, 3 }, names = { [1] = "Raid", [2] = "M+", [3] = "Delve" } }
+STRINGS = { [1] = "RAIDSTR" }
+ACTIVE_CONFIG = 1
+ns.Gear.Talents()
+eq(byName("Raid") and byName("Raid").s, "RAIDSTR", "the active loadout lands even when the others refuse")
+check(byName("M+") and byName("M+").s == nil, "a refused loadout is named but carries no string")
+
+-- …and switching to it later fills it in, which is the accumulate guarantee.
+ACTIVE_CONFIG = 2
+STRINGS = { [2] = "MPLUSSTR" }
+ns.Gear.Talents()
+eq(byName("M+") and byName("M+").s, "MPLUSSTR", "switching to a loadout captures its string")
+eq(byName("Raid") and byName("Raid").s, "RAIDSTR", "and the one captured earlier is not lost")
+eq(#loadouts(), 3, "still three, merged by config id rather than appended")
+
+-- Enumeration absent entirely — an older client, or an API that is not there.
+freshChar()
+CONFIGS = { ids = nil, names = {} }
+STRINGS = { [7] = "ONLYSTR" }
+ACTIVE_CONFIG = 7
+ns.Gear.Talents()
+eq(#loadouts(), 1, "with no enumeration at all the active loadout is still captured")
+eq(loadouts()[1].s, "ONLYSTR", "and carries its string")
+
+-- The field the website already depends on must not move.
+eq(CHAR.talents.specs[1].loadout, "ONLYSTR", "the active `loadout` field is unchanged")
+eq(CHAR.talents.activeSpecID, 73, "and activeSpecID still rides")
+
+-- A failed read never clears what is stored.
+STRINGS = {}
+ns.Gear.Talents()
+eq(loadouts()[1].s, "ONLYSTR", "a failed read leaves the stored string alone")
+
+-- The ceiling holds.
+freshChar()
+local manyIds, manyNames, manyStrings = {}, {}, {}
+for i = 1, 20 do
+  manyIds[i] = i
+  manyNames[i] = "Build " .. i
+  manyStrings[i] = "S" .. i
+end
+CONFIGS = { ids = manyIds, names = manyNames }
+STRINGS = manyStrings
+ACTIVE_CONFIG = 1
+ns.Gear.Talents()
+eq(#loadouts(), ns.MAX_LOADOUTS, "the list is capped so a build-hoarder cannot flood the wire")
+
 -- ── verdict ─────────────────────────────────────────────────────────────────
 
 print(string.format("gear-test: %d passed, %d failed", passed, failed))
