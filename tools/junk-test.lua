@@ -166,8 +166,8 @@ ns.Store.db.junk = nil
 local kept = Junk.Save({
   generatedAt = 99,
   chars = {
-    ["Player-1-TEST"] = { name = "Vocnar", items = { { k = "sell", s = S_HELM } } },
-    ["Player-9-OTHER"] = { name = "Someone", items = { { k = "sell", s = S_RING } } },
+    ["Player-1-TEST"] = { name = "Vocnar", junk = { { k = "sell", s = S_HELM } } },
+    ["Player-9-OTHER"] = { name = "Someone", junk = { { k = "sell", s = S_RING } } },
   },
 })
 check("saves the list for a character this account has", kept == 1, kept)
@@ -175,6 +175,36 @@ check("stores it under the guid", ns.Store.db.junk["Player-1-TEST"] ~= nil)
 -- A cleanup string covers a whole warband, and most of it belongs to alts this
 -- install may never have seen. Keeping those would be storing somebody else's.
 check("ignores a guid this account has never scanned", ns.Store.db.junk["Player-9-OTHER"] == nil)
+
+-- The failure the one-string change could have introduced, and the reason
+-- Save guards on its own section: since 1.11.0 one paste carries the clear-out
+-- list, the gear setups and the build assignments, and a character can
+-- legitimately have setups and nothing to sell. Writing an absent section
+-- would delete a list the player still wants, silently.
+check("a paste carrying no clear-out list leaves the stored one alone", (function()
+  local before = ns.Store.db.junk["Player-1-TEST"]
+  Junk.Save({
+    generatedAt = 100,
+    chars = { ["Player-1-TEST"] = { name = "Vocnar", gear = { items = {} } } },
+  })
+  return ns.Store.db.junk["Player-1-TEST"] == before
+end)())
+
+check("and reports it kept nothing, rather than counting a character it skipped", (function()
+  return Junk.Save({
+    generatedAt = 100,
+    chars = { ["Player-1-TEST"] = { name = "Vocnar", builds = { [103] = { raid = 7 } } } },
+  }) == 0
+end)())
+
+check("a paste that does carry one still replaces it", (function()
+  Junk.Save({
+    generatedAt = 101,
+    chars = { ["Player-1-TEST"] = { name = "Vocnar", junk = { { k = "de", s = S_RING } } } },
+  })
+  local rec = ns.Store.db.junk["Player-1-TEST"]
+  return rec ~= nil and rec.generatedAt == 101 and #rec.items == 1 and rec.items[1].k == "de"
+end)())
 
 -- ── selling ─────────────────────────────────────────────────────────────────
 

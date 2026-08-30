@@ -41,17 +41,25 @@ function Junk.Stored()
   return db.junk[guid]
 end
 
---- Store a decoded cleanup payload. Only the entry for a guid this account
---- actually has is kept: a string is per-warband, and the rest of it belongs to
---- characters that will read it when they log in.
+--- Store the cleanup half of a decoded plan. Only the entry for a guid this
+--- account actually has is kept: a string is per-warband, and the rest of it
+--- belongs to characters that will read it when they log in.
+---
+--- **A character with no `junk` section is skipped, not cleared.** Since
+--- 1.11.0 one string carries the clear-out list, the gear setups and the build
+--- assignments together, and a character can legitimately have setups and
+--- nothing to sell. Writing an absent section would make pasting a
+--- gear-and-talents string silently delete a cleanup list the player still
+--- wants — the same "absent means unknown, not empty" rule the whole outbound
+--- wire runs on, applied on the way back in.
 function Junk.Save(decoded)
   local db = Store.db
-  if not db or type(decoded) ~= "table" then return 0 end
+  if not db or type(decoded) ~= "table" or type(decoded.chars) ~= "table" then return 0 end
   db.junk = db.junk or {}
   local kept = 0
   for guid, entry in pairs(decoded.chars) do
-    if db.chars[guid] then
-      db.junk[guid] = { generatedAt = decoded.generatedAt, items = entry.items }
+    if db.chars[guid] and entry.junk then
+      db.junk[guid] = { generatedAt = decoded.generatedAt, items = entry.junk }
       kept = kept + 1
     end
   end

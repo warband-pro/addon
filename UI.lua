@@ -364,30 +364,14 @@ local function buildImport()
     if not userInput then return end
     local text = self:GetText()
     if text == "" then return end
-    -- One box, two inbound wires: the prefix says which decoder the paste
-    -- belongs to, and each decoder still refuses the other's string by name
-    -- so a misrouted call fails toward a sentence rather than "invalid".
-    local trimmed = text:gsub("^%s+", "")
-    if trimmed:sub(1, #ns.GEARSET_WIRE) == ns.GEARSET_WIRE then
-      local gs, gsCode = ns.Import.DecodeGearSet(text)
-      if not gs then
-        junkHeader:SetText("|cff" .. BAD .. ns.Import.GearSetMessage(gsCode) .. "|r")
-        return
-      end
-      local kept = ns.GearSet.Save(gs)
-      self:SetText("")
-      self:ClearFocus()
-      if kept == 0 then
-        junkHeader:SetText("|cff" .. WARN .. "that set is for characters this account has not scanned yet|r")
-        return
-      end
-      UI.RenderGearSet()
-      junkHeader:SetText(format("|cff%sread a gear set for %d character%s — equip is below|r", GOOD, kept,
-        kept == 1 and "" or "s"))
-      return
-    end
-    local decoded, code = ns.Import.DecodeCleanup(text)
-    if not decoded then
+    -- **One decode, whichever string this is.** Two wires still reach this box
+    -- — `wbc1!`, which carries everything since 1.11.0, and the equip-only
+    -- `wbg1!` the site sent before it — but the prefix dispatch and the two
+    -- receipts collapsed into `DecodeInbound`, which normalises both into one
+    -- plan. The panel below used to be two code paths that had to agree about
+    -- what "kept" counted.
+    local plan, code, kind = ns.Import.DecodeInbound(text)
+    if not plan then
       -- Only complain once the paste looks finished. A prefix typed one
       -- character at a time would otherwise scold on every keystroke.
       --
@@ -397,30 +381,59 @@ local function buildImport()
       -- nothing, which is indistinguishable from a broken addon. A paste is
       -- one event, so anything arriving at once is finished by definition.
       if #text >= #ns.CLEANUP_WIRE or #text > 24 then
-        junkHeader:SetText("|cff" .. BAD .. ns.Import.Message(code) .. "|r")
+        junkHeader:SetText("|cff" .. BAD .. ns.Import.InboundMessage(code, kind) .. "|r")
       end
       return
     end
+
     -- What was there before, so the receipt can say this replaced something.
     -- Pasting a second list over a first was silent, and the two lists are
     -- usually for different characters — "nothing happened" and "your previous
     -- list is gone" looked identical.
     local had = ns.Junk.Count()
-    local kept = ns.Junk.Save(decoded)
+    local keptJunk = ns.Junk.Save(plan)
+    local keptSets = ns.GearSet.Save(plan)
+    local keptBuilds = ns.GearSet.SaveBuilds(plan)
     self:SetText("")
     self:ClearFocus()
-    if kept == 0 then
-      junkHeader:SetText("|cff" .. WARN .. "that list is for characters this account has not scanned yet|r")
+
+    if keptJunk + keptSets + keptBuilds == 0 then
+      junkHeader:SetText("|cff" .. WARN .. "that string is for characters this account has not scanned yet|r")
       return
     end
+
     UI.RenderJunk()
-    -- After RenderJunk, which writes this same line from the resolved list —
+    UI.RenderGearSet()
+    -- After both renders, which write this same line from the resolved state —
     -- the receipt is about the paste and has to win.
-    -- `kept` is characters, not items: Save stores one list per GUID and skips
-    -- any this account has never scanned. Saying "items" here would report the
-    -- wrong unit for the one number the paste produced.
-    junkHeader:SetText(format("|cff%sread a list for %d character%s%s|r", GOOD, kept,
-      kept == 1 and "" or "s", had > 0 and ", replacing the last one" or ""))
+    --
+    -- One sentence naming what actually arrived, rather than one of two
+    -- fixed sentences. Every count is CHARACTERS, not items: each Save stores
+    -- one section per GUID and skips any this account has never scanned, so
+    -- "12 items" would report the wrong unit for the number the paste
+    -- produced. A section that arrived for nobody is left out entirely — a
+    -- zero would read as a failure rather than as a string that was never
+    -- about that.
+    local parts, counts = {}, {}
+    local function part(n, clause)
+      if n > 0 then
+        parts[#parts + 1] = clause
+        counts[#counts + 1] = n
+      end
+    end
+    part(keptJunk, "a clear-out list for %d")
+    part(keptSets, "gear for %d")
+    part(keptBuilds, "talent builds for %d")
+    -- The unit rides the FIRST clause and the rest inherit it, which is how
+    -- the sentence is said out loud: "gear for 2" after "a list for 3
+    -- characters" is unambiguous, and repeating the noun three times is not
+    -- how anyone writes a receipt.
+    parts[1] = format(parts[1] .. " character%s", counts[1], counts[1] == 1 and "" or "s")
+    for i = 2, #parts do
+      parts[i] = format(parts[i], counts[i])
+    end
+    junkHeader:SetText(format("|cff%sread %s%s|r", GOOD, table.concat(parts, ", "),
+      (had > 0 and keptJunk > 0) and ", replacing the last list" or ""))
   end)
 
   junkHeader = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")

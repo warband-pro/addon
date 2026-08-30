@@ -87,16 +87,67 @@ export function decodeCleanup(str) {
   if (!Array.isArray(payload.chars)) throw new Error('chars is not an array');
   for (const c of payload.chars) {
     if (!c.guid) throw new Error('cleanup character has no guid to match on');
-    if (!Array.isArray(c.items)) throw new Error(`items is not an array for ${c.guid}`);
-    for (const i of c.items) {
-      if (!CLEANUP_VERDICTS.has(i.k)) throw new Error(`unknown verdict ${i.k}`);
-      // `s` is the whole identity mechanism — an entry without one names no
-      // item the addon can find, so it is a malformed entry rather than a
-      // lenient one.
-      if (typeof i.s !== 'string' || !i.s) throw new Error('cleanup item has no item string');
+    // Since 1.11.0 this wire carries three sections and a character needs only
+    // one of them: a character with setups and nothing to sell is normal.
+    // `items` is still the clear-out list and still validated when present.
+    if (c.items !== undefined) {
+      if (!Array.isArray(c.items)) throw new Error(`items is not an array for ${c.guid}`);
+      for (const i of c.items) {
+        if (!CLEANUP_VERDICTS.has(i.k)) throw new Error(`unknown verdict ${i.k}`);
+        // `s` is the whole identity mechanism — an entry without one names no
+        // item the addon can find, so it is a malformed entry rather than a
+        // lenient one.
+        if (typeof i.s !== 'string' || !i.s) throw new Error('cleanup item has no item string');
+      }
+    }
+    // `gear` nests the equip setups because `items` at this level already
+    // means the clear-out list. Same shape as a wbg1! character entry, so the
+    // same validator reads it — one gear-set format on two wires.
+    if (c.gear !== undefined) validateGearEntry(c.gear, c.guid);
+    if (c.builds !== undefined) {
+      if (!Array.isArray(c.builds)) throw new Error(`builds is not an array for ${c.guid}`);
+      for (const b of c.builds) {
+        if (!Number.isInteger(b.spec)) throw new Error('a build assignment has no spec to file it under');
+        for (const key of Object.keys(b)) {
+          if (key === 'spec') continue;
+          if (!CONTENT_KEYS.has(key)) throw new Error(`unknown content type ${key}`);
+          if (!Number.isInteger(b[key])) throw new Error(`${key} must be a config id`);
+        }
+      }
+    }
+    if (c.items === undefined && c.gear === undefined && c.builds === undefined) {
+      throw new Error(`${c.guid} carries none of items, gear or builds`);
     }
   }
   return payload;
+}
+
+/** The three kinds of night a saved talent build can be assigned to. */
+const CONTENT_KEYS = new Set(['raid', 'mplus', 'delve']);
+
+/**
+ * One gear-set character entry — `spec`, `set`, `items` and `sets` — wherever
+ * it appears. Shared by both wires deliberately: `wbg1!` carries it at the
+ * character level and `wbc1!` nests it under `gear`, and a second copy of
+ * these rules is a second copy to keep in step.
+ */
+function validateGearEntry(gear, guid) {
+  const lists = [];
+  if (gear.items !== undefined) lists.push(gear.items);
+  for (const set of Array.isArray(gear.sets) ? gear.sets : []) {
+    if (!Number.isInteger(set.spec)) throw new Error('a setup has no spec to file it under');
+    lists.push(set.items);
+  }
+  if (lists.length === 0) throw new Error(`gear for ${guid} carries neither items nor sets`);
+  for (const list of lists) {
+    if (!Array.isArray(list)) throw new Error(`gear items is not an array for ${guid}`);
+    for (const i of list) {
+      if (!Number.isInteger(i.slot) || i.slot < 1 || i.slot > 17 || i.slot === 4) {
+        throw new Error(`gear-set slot out of range: ${i.slot}`);
+      }
+      if (typeof i.s !== 'string' || !i.s) throw new Error('gear-set item has no item string');
+    }
+  }
 }
 
 /**
