@@ -502,8 +502,49 @@ Both were found while writing Export.lua, and the code is right.
 ## `wbc1!` — the return direction, added in addon 1.4.0
 
 Everything above describes the addon talking to the website. This is the one
-string that goes the other way: the cleanup list warband.pro's `/gear` view
-produces, which the player pastes into `/warband junk`.
+string that goes the other way.
+
+**It carries everything warband.pro has to say, since 1.11.0.** Three sections
+per character: `items`, the clear-out list; `gear`, the setups best-in-bags
+picked; and `builds`, which saved talent build the player assigned to which
+kind of night. The prefix is `wbc1!` for history rather than description — it
+was the cleanup wire when it was named — and moving it now would cost every
+un-updated client its clear-out list to buy a better word.
+
+### Three strings became one — 1.11.0
+
+Until 1.11.0 the site handed back two strings from two pages: a `wbc1!`
+cleanup list from `/gear` and a `wbg1!` equip string from a character page.
+Talent builds would have been a third. The player's job was copy, alt-tab,
+paste, alt-tab, copy again — and doing half of it left a set with no cleanup
+list and nothing anywhere saying so.
+
+There is one button and one paste now. The addon's box already read either
+prefix, so the visible change is on the website; what changed here is that
+`wbc1!` grew the other two sections and `Import.DecodeInbound` became the one
+entry point, normalising the legacy `wbg1!` into the same shape so the panel
+has one code path rather than two that must agree about what "kept" counts.
+
+**Additive, so the prefix does not move**, and as everywhere on these wires the
+*consequence* decides that rather than the shape. An addon older than 1.11.0
+reads `items` exactly as it always did and never learns the rest exists: it
+loses setups it never had. Compare the `keep` field the cleanup wire
+deliberately does not have, where an old client dropping it would have sold a
+good ring. Same shape of change, opposite consequence.
+
+One thing genuinely degrades: a character carrying **only** `gear` or `builds`
+has no `items`, and the pre-1.11.0 reader required one, so such a character is
+skipped there. A string in which *no* character has a clear-out list is
+rejected outright by that reader with "nothing to clean up". That is a stale
+client reading a string it half understands, and it fails toward saying so.
+
+### `wbg1!` is still read, and no longer written
+
+The equip-only wire is not deleted and not deprecated in the sense that would
+break anything: a player may have one on the clipboard, in a note, or in a
+guild-chat scrollback from last week, and it must still work. The website
+stopped emitting it in 1.11.0. Its section below stands unchanged, and
+`DecodeInbound` maps it into a plan carrying only `gear`.
 
 ### Why not `wb2!`
 
@@ -566,60 +607,78 @@ A payload that merely decodes the same would only prove the decoder works.
 | `items[].g` | Item levels below the equipped item it would replace. Present only when `r` is `gap`. |
 | `items[].ilvl` | The item's own level, for the row. Optional. |
 
-### `sets[]` — a setup per spec, added in 1.10.0
+**A character needs only one of the three sections.** `items` is no longer
+required: a character with setups and nothing to sell is a normal entry, and
+was the case the cleanup-only reader could not express. A character carrying
+none of the three is dropped; a string in which every character is dropped is
+`no_items`.
 
-`wbg1!` carried one set per character until 1.10.0, because the website could
-only solve the spec you were logged out in. It can solve any of them now, and
-one set per character became actively wrong: a stored Feral set is not an
-answer to a Restoration paperdoll, and pasting an off-spec solve silently
-overwrote the set you sent an hour ago, under a name that gave you no way to
-notice.
-
-So a character entry may carry `sets`, one entry per spec the website solved:
+### `gear` — the setups, nested — added in 1.11.0
 
 ```json
 {"guid":"Player-1-TEST","name":"Vocnar",
- "spec":103,"set":"warband.pro Feral","items":[ ...the Feral set... ],
- "sets":[
-   {"spec":103,"set":"warband.pro Feral","items":[ ... ]},
-   {"spec":105,"set":"warband.pro Rest","items":[ ... ]}
- ]}
+ "items":[ ...the clear-out list... ],
+ "gear":{
+   "spec":103,"set":"warband.pro Feral","items":[ ...the Feral setup... ],
+   "sets":[
+     {"spec":103,"set":"warband.pro Feral","items":[ ... ]},
+     {"spec":105,"set":"warband.pro Rest","items":[ ... ]}
+   ]}}
+```
+
+**Nested, and that is not tidiness.** `items` at the character level has meant
+the clear-out list since 1.4.0. A gear list sharing that key would be one word
+meaning two things in one object, which is the kind of collision a reader gets
+wrong silently rather than loudly. `gear.items` is the equip list; `items` is
+the clear-out list.
+
+Inside, the shape is a `wbg1!` character entry **verbatim** — same `spec`,
+`set`, `items` and `sets`, read by the same functions on both sides
+(`Import.GearSetItems`, and `validateGearEntry` in `tools/vector.mjs`). One
+gear-set format carried on two wires, rather than two that must be kept in
+step. Its rules are under [`wbg1!`](#wbg1--the-equip-direction-added-in-addon-160)
+below and are not restated here.
+
+`gear` with neither `items` nor `sets` is nothing, and is dropped rather than
+stored as an empty setup.
+
+### `builds` — which build for which night — added in 1.11.0
+
+```json
+"builds":[{"spec":103,"raid":7,"mplus":8,"delve":9},
+          {"spec":105,"raid":11}]
 ```
 
 | Field | Meaning |
 | --- | --- |
-| `sets[].spec` | **Required.** The specialization id this setup was solved for, and the key it is stored under. An entry without one is dropped — it has nothing to be filed as. |
-| `sets[].set` | The Equipment Manager set name for this setup. Proposed, not final — see below. |
-| `sets[].items` | Exactly the same shape as `items` above, validated by the same code. |
+| `builds[].spec` | **Required.** The specialization these assignments belong to. An entry without one is dropped — a config id belongs to a spec, and filing it under the wrong one would offer another spec's build. |
+| `builds[].raid` / `.mplus` / `.delve` | The **config id** of the saved talent build the player assigned to that kind of night, as `talents.specs[].loadouts[].id` sent it out. Absent means unassigned. |
 
-**`sets` is additive, and safely so.** `spec`, `set` and `items` at the
-character level still describe the **first** setup — the spec being played — so
-an addon older than 1.10.0 reads those, behaves exactly as it always did, and
-simply never learns the off-spec setups exist. That is the opposite of the
-`keep` field the cleanup wire deliberately does not have: dropping `sets` costs
-a stale client setups it never had, where dropping `keep` would have had it
-sell a ring it should not. Neither prefix nor `v` moves.
+**Three numbers, not three talent strings**, and that is the whole point: the
+addon already holds every loadout's name and import string, because it captured
+them. What it does not know is which one the player calls their raid build —
+that decision is made on the website. So only the *decision* crosses, and the
+addon resolves it against its own capture (`GearSet.BuildName`). Sending the
+strings back would be handing the client something it exported an hour ago.
 
-**A record that names specs answers only for the spec being played.** With
-`sets` present, `GearSet.Stored()` returns the setup matching the active spec
-or nothing at all — never another spec's gear. A record with no spec anywhere
-(an older website, or a character whose spec could not be resolved) makes no
-claim and still applies to whoever is standing there.
+The three keys are fixed rather than free-form for the reason the website's own
+`CONTENT_TYPES` is: the point of the list is that both sides can *act* on it,
+and they can only act on categories they understand. An unknown key is ignored,
+not rejected, so the website can propose a fourth without an addon release —
+the same door `dominated` came through.
 
-### The set name is proposed here and settled by the client
+A `builds` entry naming a spec but no content at all is dropped rather than
+stored as an empty assignment, so it cannot overwrite a good one with nothing.
 
-`set` is what the website would like the Equipment Manager set called. It is
-not authoritative, because **`C_EquipmentSet` enforces a name length this addon
-has no API to read**, and a constant in the website would be a guess about a
-client it never runs in. Guessing high fails in the worst direction:
-`CreateEquipmentSet` does nothing and the player gets equipped gear, no saved
-set, and no explanation.
+### Absent is not empty, on the way in too
 
-So `saveSet` tries the proposed name, then progressively shorter ones, and uses
-whichever the client actually accepts — the receipt names that one. Truncation
-drops the spec before the brand: two specs colliding on one truncated name is a
-player watching one set update twice, where losing `warband.pro` leaves a set
-they cannot pick out from their own.
+Each section is saved by its own function — `Junk.Save`, `GearSet.Save`,
+`GearSet.SaveBuilds` — and **each skips a character whose section is absent
+rather than clearing it.** This is the outbound wire's "a stamp moves only if
+that section was read" rule, applied in the other direction, and it is the one
+thing the one-string change could have broken quietly: without it, pasting a
+string that carried gear and no verdicts would delete a clear-out list the
+player still wanted, with no line anywhere saying so.
 
 ### Matching is by item string, and nothing else
 
@@ -738,6 +797,61 @@ verbatim item string for an API-sourced equipped item anyway, so a keeper
 entry would be an identity key the addon might mis-resolve. Locked slots on
 the site simply never appear. An empty `items` list is a rejection
 (`no_items`): a set that changes nothing has nothing to say.
+
+### `sets[]` — a setup per spec, added in 1.10.0
+
+`wbg1!` carried one set per character until 1.10.0, because the website could
+only solve the spec you were logged out in. It can solve any of them now, and
+one set per character became actively wrong: a stored Feral set is not an
+answer to a Restoration paperdoll, and pasting an off-spec solve silently
+overwrote the set you sent an hour ago, under a name that gave you no way to
+notice.
+
+So a character entry may carry `sets`, one entry per spec the website solved:
+
+```json
+{"guid":"Player-1-TEST","name":"Vocnar",
+ "spec":103,"set":"warband.pro Feral","items":[ ...the Feral set... ],
+ "sets":[
+   {"spec":103,"set":"warband.pro Feral","items":[ ... ]},
+   {"spec":105,"set":"warband.pro Rest","items":[ ... ]}
+ ]}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `sets[].spec` | **Required.** The specialization id this setup was solved for, and the key it is stored under. An entry without one is dropped — it has nothing to be filed as. |
+| `sets[].set` | The Equipment Manager set name for this setup. Proposed, not final — see below. |
+| `sets[].items` | Exactly the same shape as `items` above, validated by the same code. |
+
+**`sets` is additive, and safely so.** `spec`, `set` and `items` at the
+character level still describe the **first** setup — the spec being played — so
+an addon older than 1.10.0 reads those, behaves exactly as it always did, and
+simply never learns the off-spec setups exist. That is the opposite of the
+`keep` field the cleanup wire deliberately does not have: dropping `sets` costs
+a stale client setups it never had, where dropping `keep` would have had it
+sell a ring it should not. Neither prefix nor `v` moves.
+
+**A record that names specs answers only for the spec being played.** With
+`sets` present, `GearSet.Stored()` returns the setup matching the active spec
+or nothing at all — never another spec's gear. A record with no spec anywhere
+(an older website, or a character whose spec could not be resolved) makes no
+claim and still applies to whoever is standing there.
+
+### The set name is proposed here and settled by the client
+
+`set` is what the website would like the Equipment Manager set called. It is
+not authoritative, because **`C_EquipmentSet` enforces a name length this addon
+has no API to read**, and a constant in the website would be a guess about a
+client it never runs in. Guessing high fails in the worst direction:
+`CreateEquipmentSet` does nothing and the player gets equipped gear, no saved
+set, and no explanation.
+
+So `saveSet` tries the proposed name, then progressively shorter ones, and uses
+whichever the client actually accepts — the receipt names that one. Truncation
+drops the spec before the brand: two specs colliding on one truncated name is a
+player watching one set update twice, where losing `warband.pro` leaves a set
+they cannot pick out from their own.
 
 ### Matching, applying, and when the set is saved
 
@@ -1015,6 +1129,13 @@ cap.
 `vectors/v1-min.json` is one minimal character, and `v1-min.wb1` beside it is
 that vector encoded — the fixture the web decoder tests against.
 `vectors/v1-gear.json`/`v1-gear.wb1` add `gear[]` and `talents`. Regenerate
-all four with `node tools/vector.mjs --write`. All four are hand-written, not
+them all with `node tools/vector.mjs --write`. Every one is hand-written, not
 captured from the game — see the item-string correction above for what that
 means for `v1-gear`'s `s` values specifically.
+
+The return direction has two: `wbc1-min` is the cleanup-only string as it stood
+before 1.11.0, kept precisely so the additive change stays tested against the
+shape it was additive *to*; `wbc1-all` exercises all three sections at once and
+carries a second character with `gear` and no `items`, which is the entry the
+pre-1.11.0 reader could not express. `wbg1-min` covers the equip-only wire the
+website no longer writes and both sides still read.

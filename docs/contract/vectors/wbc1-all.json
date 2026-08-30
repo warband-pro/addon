@@ -1,0 +1,41 @@
+{
+  "v": 1,
+  "generatedAt": 1724000000,
+  "chars": [{
+    "guid": "Player-1-TEST",
+    "name": "Vocnar",
+    "items": [
+      {"k":"de","id":221151,"s":"item:221151::::::::80:250::4:6:12053:1:28:::",
+       "r":"unusable","ilvl":610}
+    ],
+    "gear": {
+      "spec": 103,
+      "set": "warband.pro Feral",
+      "items": [
+        {"slot":1,"id":221151,"s":"item:221151::::::::80:250::4:6:12053:1:28:::","w":"bag"}
+      ],
+      "sets": [
+        {"spec":103,"set":"warband.pro Feral","items":[
+          {"slot":1,"id":221151,"s":"item:221151::::::::80:250::4:6:12053:1:28:::","w":"bag"}
+        ]},
+        {"spec":105,"set":"warband.pro Restoration","items":[
+          {"slot":12,"id":215135,"s":"item:215135::::::::80:250::4:6:12053:1:28:::","w":"bank"}
+        ]}
+      ]
+    },
+    "builds": [
+      {"spec":103,"raid":7,"mplus":8,"delve":9},
+      {"spec":105,"raid":11}
+    ]
+  }, {
+    "guid": "Player-1-SETSONLY",
+    "name": "Setsonly",
+    "gear": {
+      "spec": 66,
+      "set": "warband.pro Protection",
+      "items": [
+        {"slot":16,"id":212050,"s":"item:212050:7228::::::80:251::7:1:28:::"}
+      ]
+    }
+  }]
+}

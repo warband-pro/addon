@@ -45,38 +45,38 @@ MAJOR has to be a wire break.**
 
 ### Added
 
-**If you have more than 20 characters, the rest of them can finally reach the
-site.** One copied string holds 20, and past that the addon used to cut the
-oldest ones off the end — so a 41-character warband arrived at warband.pro as
-your most recent 20, and the other 21 did not exist there. The panel's advice
-was to delete an alt to make room.
+**One string comes back from warband.pro now, not two.** The site handed you a
+clear-out list on one page and an equip string on another, and you pasted each
+separately — so doing half the trip left you with gear and no clear-out list,
+and nothing said so. Copy once, paste once, and the panel says what arrived:
+"read a clear-out list for 3 characters, gear for 2, talent builds for 2".
+Equip strings you already have still read exactly as they did.
 
-Your warband now goes out a page at a time. `/warband copy` is the first 20 as
-before, and the header tells you what is left: "page 1 of 3 — /warband copy 2
-for the next 20". Paste each one. The site merges them, so the pages add up to
-your whole warband rather than replacing each other, and the order is stable —
-every character lands on exactly one page.
+**If you have more than 20 characters, the rest of them can finally reach the
+site.** One copied string holds 20, and past that the addon cut the oldest ones
+off the end — a 41-character warband arrived as your most recent 20, and the
+other 21 did not exist there. It goes out a page at a time now: `/warband copy`
+is the first 20, and the header says "page 1 of 3 — /warband copy 2 for the
+next 20". The site merges the pages, so they add up to your whole warband
+rather than replacing each other.
 
 **Your gear sets are per spec now, and switching spec switches the set.** A
-paste from warband.pro carries a set for every spec it solved, not just the one
-you were last logged out in — so your tank set and your healing set can both
-live in the Equipment Manager instead of one quietly writing over the other.
-The panel and `/warband equip` offer whichever matches the spec you are
-currently in, and say so plainly when you have sets but none for this spec.
-Each one is named for its spec, so you can tell them apart at a glance.
+paste carries a set for every spec warband.pro solved, not just the one you
+were last logged out in — so your tank set and your healing set can both live
+in the Equipment Manager instead of one quietly writing over the other. Each is
+named for its spec, and the panel says plainly when you have sets but none for
+the spec you are in.
 
 **`/warband equip` puts your gear set on without opening the window.** It does
-exactly what the button in the Import tab does — equips what it can find, saves
-the Equipment Manager set, prints the same receipt — so you can drag it onto an
-action bar as a macro and swap sets between pulls. If you are in combat it says
-so and waits for you; if you have not pasted an equip string yet it says that
-instead, rather than doing nothing quietly.
+what the button in the Import tab does — equips what it can find, saves the
+Equipment Manager set, prints the same receipt — so you can drag it onto an
+action bar and swap sets between pulls. In combat it says so and waits; with
+nothing pasted yet it says that instead of doing nothing quietly.
 
 **Your named talent loadouts go out with the rest of it.** Keep a "Raid", an
 "M+" and a "Delve" build in the talent UI and the export carries all three under
-the names you gave them, not just the one you were standing in. If the game
-will only hand over the build you are on, the list fills in as you switch
-between them, the way your second spec appears the first time you play it.
+the names you gave them, not just the one you were standing in. If the game will
+only hand over the build you are on, the list fills in as you switch.
 
 **The junk panel reads two new verdicts from warband.pro.** It can now tell
 you when something in your bags is a copy of what you already have on ("already

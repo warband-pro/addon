@@ -114,17 +114,17 @@ end
 -- The .json beside the .wbc1 is the same payload the encoder compressed, so
 -- handing it back is exactly what a real inflate would return.
 inflated = goldenJson
-local out, code = Import.DecodeCleanup((goldenWire:gsub("%s+$", "")))
+local out, code = Import.DecodePlan((goldenWire:gsub("%s+$", "")))
 check("golden vector decodes", out ~= nil, code)
 if out then
   check("golden generatedAt is seconds", out.generatedAt == 1724000000, out.generatedAt)
-  check("golden character count", out.count == 1, out.count)
+  check("golden character count", out.nJunk == 1, out.nJunk)
   local c = out.chars["Player-1-TEST"]
   check("golden is keyed by guid", c ~= nil and c.name == "Vocnar")
-  check("golden carries both items", c and #c.items == 2, c and #c.items)
+  check("golden carries both items", c and #c.junk == 2, c and #c.junk)
   if c then
     local byS = {}
-    for _, it in ipairs(c.items) do
+    for _, it in ipairs(c.junk) do
       byS[it.s] = it
     end
     local unusable = byS["item:221151::::::::80:250::4:6:12053:1:28:::"]
@@ -144,7 +144,7 @@ end
 -- Each code is a different sentence in the panel, so each is asserted by name
 -- rather than by "it returned nil".
 local function codeFor(input)
-  local _, c = Import.DecodeCleanup(input)
+  local _, c = Import.DecodePlan(input)
   return c
 end
 
@@ -177,8 +177,8 @@ check("drops a character with no guid to match on", codeFor("wbc1!AAAA") == "no_
 -- A good item alongside a bad one keeps the good one: one malformed row must
 -- not cost the whole list.
 inflated = '{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N","items":[{"k":"sell"},{"k":"de","s":"item:2"}]}]}'
-local partial = Import.DecodeCleanup("wbc1!AAAA")
-check("keeps the good item beside a malformed one", partial ~= nil and #partial.chars["G"].items == 1)
+local partial = Import.DecodePlan("wbc1!AAAA")
+check("keeps the good item beside a malformed one", partial ~= nil and #partial.chars["G"].junk == 1)
 
 check("every code has a message", (function()
   for _, c in ipairs({
@@ -189,6 +189,124 @@ check("every code has a message", (function()
     if type(m) ~= "string" or m == "" or m == "that string could not be read" then return false end
   end
   return true
+end)())
+
+-- ── the one string: three sections on wbc1! ─────────────────────────────────
+-- Added 1.11.0. `items` is the clear-out list as it always was; `gear` nests
+-- the equip setups (nested, because `items` at the character level was already
+-- taken); `builds` says which saved talent build is for which kind of night.
+
+local function plan(json)
+  inflated = json
+  return Import.DecodePlan("wbc1!AAAA")
+end
+
+local GEAR = '"gear":{"spec":103,"set":"warband.pro Feral",' ..
+  '"items":[{"slot":1,"s":"item:9","id":9}],' ..
+  '"sets":[{"spec":103,"set":"warband.pro Feral","items":[{"slot":1,"s":"item:9"}]},' ..
+  '{"spec":105,"set":"warband.pro Rest","items":[{"slot":1,"s":"item:8"}]}]}'
+local BUILDS = '"builds":[{"spec":103,"raid":7,"mplus":8,"delve":9}]'
+local JUNK = '"items":[{"k":"sell","s":"item:1"}]'
+
+local all = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N",' ..
+  JUNK .. ',' .. GEAR .. ',' .. BUILDS .. '}]}')
+check("one string carries all three sections", all ~= nil and
+  all.nJunk == 1 and all.nSets == 1 and all.nBuilds == 1,
+  all and (all.nJunk .. "/" .. all.nSets .. "/" .. all.nBuilds))
+if all then
+  local c = all.chars["G"]
+  check("the clear-out list is under junk", c and c.junk and #c.junk == 1)
+  check("the equip list is under gear, not items", c and c.gear and #c.gear.items == 1)
+  check("setups are keyed by spec", c and c.gear.bySpec and c.gear.bySpec[105] ~= nil)
+  check("the legacy spec and name ride along for a downgrade",
+    c and c.gear.spec == 103 and c.gear.set == "warband.pro Feral", c and c.gear.set)
+  check("builds are keyed by spec then content",
+    c and c.builds and c.builds[103] and c.builds[103].raid == 7 and c.builds[103].delve == 9)
+end
+
+-- The case the cleanup-only reader could not express: it required `items` and
+-- dropped every character without one.
+local gearOnly = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N",' .. GEAR .. '}]}')
+check("a character with setups and nothing to sell is kept", gearOnly ~= nil and
+  gearOnly.nSets == 1 and gearOnly.nJunk == 0)
+check("that character carries no junk section at all",
+  gearOnly ~= nil and gearOnly.chars["G"].junk == nil)
+
+local buildsOnly = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G",' .. BUILDS .. '}]}')
+check("builds alone are enough to keep a character", buildsOnly ~= nil and buildsOnly.nBuilds == 1)
+
+check("a string empty of all three is still no_items", (function()
+  inflated = '{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N"}]}'
+  local _, c = Import.DecodePlan("wbc1!AAAA")
+  return c == "no_items"
+end)())
+
+-- Absent is not empty, in both directions — this is what stops a paste
+-- carrying only gear from deleting a clear-out list the player still wants.
+check("an absent section reads as nil, never as an empty table", (function()
+  local p = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G",' .. JUNK .. '}]}')
+  local c = p and p.chars["G"]
+  return c ~= nil and c.junk ~= nil and c.gear == nil and c.builds == nil
+end)())
+
+check("a spec naming no content at all is not stored as an empty assignment", (function()
+  local p = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G",' .. JUNK ..
+    ',"builds":[{"spec":103}]}]}')
+  return p ~= nil and p.nBuilds == 0 and p.chars["G"].builds == nil
+end)())
+
+check("a build for an unknown content key is ignored", (function()
+  local p = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G",' .. JUNK ..
+    ',"builds":[{"spec":103,"pvp":4}]}]}')
+  return p ~= nil and p.nBuilds == 0
+end)())
+
+check("a setup with no spec is dropped rather than guessed at", (function()
+  local p = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G","gear":{"sets":' ..
+    '[{"set":"x","items":[{"slot":1,"s":"item:9"}]}]}}]}')
+  return p == nil
+end)())
+
+check("a gear section with neither items nor sets is nothing", (function()
+  local p = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G",' .. JUNK .. ',"gear":{"spec":103}}]}')
+  return p ~= nil and p.nSets == 0 and p.chars["G"].gear == nil
+end)())
+
+-- ── DecodeInbound: one entry point, two wires ───────────────────────────────
+
+check("DecodeInbound reads the current string", (function()
+  inflated = '{"v":1,"generatedAt":9,"chars":[{"guid":"G",' .. JUNK .. '}]}'
+  local p, why, kind = Import.DecodeInbound("wbc1!AAAA")
+  return p ~= nil and why == nil and kind == "plan"
+end)())
+
+-- The equip-only string the site sent before 1.11.0, normalised into the same
+-- shape so the panel has one code path rather than two that must agree.
+check("DecodeInbound normalises a legacy equip string", (function()
+  inflated = '{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N",' ..
+    '"items":[{"slot":1,"s":"item:9"}]}]}'
+  local p, _, kind = Import.DecodeInbound("wbg1!AAAA")
+  return p ~= nil and kind == "gearset" and p.nSets == 1 and p.nJunk == 0
+    and p.chars["G"].gear ~= nil and #p.chars["G"].gear.items == 1
+    and p.chars["G"].junk == nil
+end)())
+
+-- Only for the codes the equip wire words differently — the shared failures
+-- deliberately fall through to one table so the two cannot drift.
+check("a legacy rejection still reads in that wire's own words", (function()
+  local _, why, kind = Import.DecodeInbound("wbg1!" .. string.rep("A", 41 * 1024))
+  return why == "too_large" and kind == "gearset"
+    and Import.InboundMessage(why, kind) ~= Import.Message(why)
+end)())
+
+check("a shared failure reads the same on both wires, by design", (function()
+  local _, why, kind = Import.DecodeInbound("wbg1!***")
+  return why == "not_base64" and Import.InboundMessage(why, kind) == Import.Message(why)
+end)())
+
+check("DecodeInbound still names an export string rather than calling it broken", (function()
+  local _, why = Import.DecodeInbound("wb1!AAAA")
+  return why == "is_export"
 end)())
 
 print("")

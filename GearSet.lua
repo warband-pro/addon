@@ -109,25 +109,102 @@ end
 --- replaced by it, and not out of caution: they are what a downgraded addon
 --- reads, and they describe the spec the player was on when they pasted, which
 --- is the only one a build that cannot choose should be handed.
+--- **A character with no `gear` section is skipped, not cleared** — Junk.Save's
+--- rule and for the same reason. One string carries three things since 1.11.0,
+--- and a character can legitimately have a clear-out list and no setups.
 function GearSet.Save(decoded)
   local db = Store.db
-  if not db or type(decoded) ~= "table" then return 0 end
+  if not db or type(decoded) ~= "table" or type(decoded.chars) ~= "table" then return 0 end
   db.gearset = db.gearset or {}
   local kept = 0
   for guid, entry in pairs(decoded.chars) do
-    if db.chars[guid] then
+    local gear = entry.gear
+    if db.chars[guid] and gear then
       db.gearset[guid] = {
         generatedAt = decoded.generatedAt,
-        spec = entry.spec,
-        set = entry.set,
-        items = entry.items,
-        bySpec = entry.bySpec,
+        spec = gear.spec,
+        set = gear.set,
+        items = gear.items,
+        bySpec = gear.bySpec,
+        -- Carried on the same record rather than a fourth top-level table:
+        -- a build assignment is about which setup to wear on which night, so
+        -- it belongs beside the setups, and one record means one write.
+        builds = (db.gearset[guid] or {}).builds,
       }
       kept = kept + 1
     end
   end
   Store.Touch()
   return kept
+end
+
+--- Store the build assignments — which saved talent build is for raid, for m+,
+--- for delves — per spec.
+---
+--- Written separately from the setups so each section survives the other being
+--- absent: a `wbg1!` string from before 1.11.0 carries setups and no builds,
+--- and must not erase assignments the player made on the site.
+function GearSet.SaveBuilds(decoded)
+  local db = Store.db
+  if not db or type(decoded) ~= "table" or type(decoded.chars) ~= "table" then return 0 end
+  db.gearset = db.gearset or {}
+  local kept = 0
+  for guid, entry in pairs(decoded.chars) do
+    if db.chars[guid] and entry.builds then
+      local rec = db.gearset[guid]
+      if not rec then
+        rec = { generatedAt = decoded.generatedAt }
+        db.gearset[guid] = rec
+      end
+      rec.builds = entry.builds
+      kept = kept + 1
+    end
+  end
+  Store.Touch()
+  return kept
+end
+
+--- Which saved talent build the player assigned to this kind of night, for the
+--- spec at the keyboard. Returns the config id, or nil.
+---
+--- Spec-scoped for the reason the setups are: a config id belongs to a spec,
+--- and answering with another spec's build would be worse than answering with
+--- nothing.
+function GearSet.BuildFor(content)
+  local rec = storedRecord()
+  local spec = activeSpecID()
+  if not rec or not spec or type(rec.builds) ~= "table" then return nil end
+  local forSpec = rec.builds[spec]
+  if type(forSpec) ~= "table" then return nil end
+  local id = forSpec[content]
+  return type(id) == "number" and id or nil
+end
+
+--- The name of the saved build assigned to this kind of night, or nil.
+---
+--- Read out of `Gear`'s own capture rather than the wire: the addon already
+--- holds every loadout's name and string, so only the *assignment* has to
+--- cross. That is the whole reason `builds` is three numbers rather than three
+--- talent strings — the site is telling the addon which of its own builds it
+--- means, not handing it back something it exported an hour ago.
+function GearSet.BuildName(content)
+  local id = GearSet.BuildFor(content)
+  if not id then return nil end
+  local db = Store.db
+  local guid = ns.safe(UnitGUID, "player")
+  local spec = activeSpecID()
+  if not db or not guid or not spec then return nil end
+  local c = db.chars[guid]
+  local specs = c and c.talents and c.talents.specs
+  if type(specs) ~= "table" then return nil end
+  for _, s in ipairs(specs) do
+    if s.specID == spec and type(s.loadouts) == "table" then
+      for _, l in ipairs(s.loadouts) do
+        if l.id == id then return l.name, l.s end
+      end
+    end
+  end
+  return nil
 end
 
 local function itemString(link)

@@ -126,6 +126,9 @@ inflated = readAll(DIR .. "wbg1-min.json")
 -- acceptance, our JSON decoder and our validation, same as import-test.
 inflated = inflated
 
+-- DecodeGearSet directly, not through DecodeInbound: this block is about the
+-- wbg1! decoder's own shape, and the normalisation into a plan is tested where
+-- it lives, in import-test.
 local decoded, code = Import.DecodeGearSet(wire)
 check("golden vector decodes", decoded ~= nil, code)
 check("golden generatedAt is seconds", decoded and decoded.generatedAt == 1724001000)
@@ -168,17 +171,80 @@ check("every gear-set code has a message", Import.GearSetMessage("is_cleanup") ~
 
 -- ── the cleanup decoder refuses the new prefix by name ──────────────────────
 
-local cd, cc = Import.DecodeCleanup("wbg1!AAAA")
-check("DecodeCleanup names an equip string", cd == nil and cc == "is_gearset", tostring(cc))
+local cd, cc = Import.DecodePlan("wbg1!AAAA")
+check("DecodePlan names an equip string", cd == nil and cc == "is_gearset", tostring(cc))
 
 -- ── save: guid gating ───────────────────────────────────────────────────────
 
 inflated = readAll(DIR .. "wbg1-min.json")
-decoded = Import.DecodeGearSet(wire)
+decoded = Import.DecodeInbound(wire)
 check("saves the set for a character this account has", GearSet.Save(decoded) == 1)
 check("stores it under the guid", ns.Store.db.gearset["Player-1-TEST"] ~= nil)
 check("ignores a guid this account has never scanned",
-  GearSet.Save({ generatedAt = 1, chars = { ["Player-9-NOPE"] = { items = {} } } }) == 0)
+  GearSet.Save({ generatedAt = 1, chars = { ["Player-9-NOPE"] = { gear = { items = {} } } } }) == 0)
+
+-- Junk.Save's guard, the other way round: one string carries three sections
+-- since 1.11.0, and a character can have a clear-out list and no setups.
+check("a paste carrying no setups leaves the stored ones alone", (function()
+  local before = ns.Store.db.gearset["Player-1-TEST"]
+  GearSet.Save({
+    generatedAt = 500,
+    chars = { ["Player-1-TEST"] = { name = "Vocnar", junk = { { k = "sell", s = "item:1" } } } },
+  })
+  return ns.Store.db.gearset["Player-1-TEST"] == before
+end)())
+
+-- ── builds: which saved talent build is for which night ─────────────────────
+
+check("stores the build assignments", (function()
+  local kept = GearSet.SaveBuilds({
+    generatedAt = 600,
+    chars = { ["Player-1-TEST"] = { builds = { [103] = { raid = 7, mplus = 8 } } } },
+  })
+  return kept == 1 and ns.Store.db.gearset["Player-1-TEST"].builds[103].raid == 7
+end)())
+
+check("answers for the spec being played", GearSet.BuildFor("raid") == 7)
+check("and says nothing for a content type with no assignment", GearSet.BuildFor("delve") == nil)
+
+check("never answers with another spec's build", (function()
+  SPEC = 105
+  local out = GearSet.BuildFor("raid")
+  SPEC = 103
+  return out == nil
+end)())
+
+-- Saving setups must not drop assignments, and saving assignments must not
+-- drop setups: an equip string from before 1.11.0 carries no builds at all.
+check("a legacy equip string does not erase the assignments", (function()
+  inflated = readAll(DIR .. "wbg1-min.json")
+  GearSet.Save(Import.DecodeInbound(wire))
+  return GearSet.BuildFor("raid") == 7
+end)())
+
+check("and saving assignments does not erase the setups", (function()
+  GearSet.SaveBuilds({
+    generatedAt = 700,
+    chars = { ["Player-1-TEST"] = { builds = { [103] = { delve = 9 } } } },
+  })
+  return GearSet.Stored() ~= nil and GearSet.BuildFor("delve") == 9
+end)())
+
+-- The name comes out of the addon's own capture, never the wire: the site
+-- sends three numbers, not three talent strings, because the addon already
+-- holds the loadouts it exported.
+check("names the build out of this character's own loadouts", (function()
+  local c = ns.Store.db.chars["Player-1-TEST"]
+  c.talents = { specs = { { specID = 103, loadouts = { { id = 9, name = "Delve", s = "CODE" } } } } }
+  local name, str = GearSet.BuildName("delve")
+  return name == "Delve" and str == "CODE"
+end)())
+
+check("says nothing when the assigned build is not one this character has saved", (function()
+  local c = ns.Store.db.chars["Player-1-TEST"]
+  c.talents = { specs = { { specID = 103, loadouts = { { id = 1, name = "Other" } } } } }
+  return GearSet.BuildName("delve") == nil
+end)())
 
 -- ── resolve: already / ready / missing ──────────────────────────────────────
 
@@ -275,7 +341,7 @@ check("and knows when one is for the spec being played", ferMine == true)
 -- An older website sends no `sets`, so the record names no spec per setup and
 -- applies to whoever is standing there — which is also the downgrade path.
 inflated = '{"v":1,"generatedAt":1,"chars":[{"guid":"Player-1-TEST","items":[{"slot":1,"s":"item:1"}]}]}'
-GearSet.Save(Import.DecodeGearSet("wbg1!AAAA"))
+GearSet.Save(Import.DecodeInbound("wbg1!AAAA"))
 SPEC = 102
 check("an unkeyed record applies to any spec", GearSet.Stored() ~= nil)
 SPEC = 103
