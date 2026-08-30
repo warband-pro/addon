@@ -345,6 +345,23 @@ SlashCmdList.WARBANDPRO = function(msg)
     end
   elseif cmd == "junk" or cmd == "clean" then
     UI.ToggleJunk()
+  -- The equip that the Import tab's button does, reachable from a macro.
+  -- Both paths run the same GearSet.Apply, so the receipt, the verify and the
+  -- Equipment Manager save are identical — this only removes the window from
+  -- in front of it, which is the whole point of binding it to an action bar.
+  --
+  -- The two refusals are told apart rather than sharing one line: in combat is
+  -- temporary and worth retrying, no stored set means go and paste one, and a
+  -- single "nothing happened" would send the second person to wait out a
+  -- fight that was never the problem. Apply() returns nil for both.
+  elseif cmd == "equip" then
+    if InCombatLockdown() then
+      ns.print("combat — press equip again after the fight")
+    elseif not ns.GearSet.Stored() then
+      ns.print("no gear set for this character — paste an equip string from warband.pro/gear")
+    elseif ns.GearSet.Apply() then
+      if UI.JunkIsShown() then UI.RenderGearSet() end
+    end
   elseif cmd == "options" then
     UI.ShowOptions()
   elseif cmd == "perf" then
@@ -354,7 +371,7 @@ SlashCmdList.WARBANDPRO = function(msg)
     ns.print("perf counters reset")
   else
     ns.print("/warband · /warband copy current · /warband copy <page> · /warband junk · "
-      .. "/warband options · /warband status · "
+      .. "/warband equip · /warband options · /warband status · "
       .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband minimap on|off · "
       .. "/warband perf")
   end

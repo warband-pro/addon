@@ -104,6 +104,7 @@ compartment — nothing else changes.
 /warband copy           same
 /warband copy current   single-char only
 /warband junk           Import tab — the clear-out list
+/warband equip          equip the stored gear set, no window — macro-friendly
 /warband options        Options tab
 /warband clear <name>   prune from DB, clears its junk list and warbank credit
 /warband status         debug counts/len/lastSeen
