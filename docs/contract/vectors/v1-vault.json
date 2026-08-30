@@ -3,7 +3,7 @@
   "addon": "0.0.0-test",
   "exportedAt": 1724000000,
   "gameVersion": "12.1.0",
-  "interface": 120001,
+  "interface": 120100,
   "bundle": {"count":1,"freshestSeenAt":1724000000,"oldestSeenAt":1724000000},
   "characters": [{
     "guid":"Player-1-TEST",

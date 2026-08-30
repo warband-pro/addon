@@ -176,7 +176,7 @@ UI:
 - Top-level folder name matches .toc base name — WoW hard rule else won't load.
 - Use unique global only WarbandPro or addonTable namespace, no other globals.
 - No frame scanning glob search, no GetGlobal dummy loops.
-- Check version on load `/dump select(4, GetBuildInfo())` to verify Interface 120001 matches client.
+- Check version on load `/dump select(4, GetBuildInfo())` to verify Interface 120100 matches client.
 - Fail closed: if in combat, export button disabled or queued until out-of-combat (SECURE rules)
 - No OnUpdate heavy, no heavy loops in events. BAG_UPDATE throttle prevents UI spam when looting.
 - Taint quarantine: don't call protected APIs from OnShow. Keep pre-logic pure.
