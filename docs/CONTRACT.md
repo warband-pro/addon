@@ -516,7 +516,7 @@ A payload that merely decodes the same would only prove the decoder works.
 | `items[].k` | The verdict: `sell`, `de` (disenchant), or `del`. |
 | `items[].id` | Item id, for display and for a sanity check against the resolved item. |
 | `items[].s` | **The identity key.** The verbatim item string, as this addon sent it. |
-| `items[].r` | Why: `gap` (far below the equipped piece) or `unusable` (wrong armor class). |
+| `items[].r` | Why: `gap` (far below the equipped piece), `unusable` (wrong armor class), or `dupe` (a copy of an item already worn — see below). **An unknown value is displayed as no reason at all, never rejected**, so the website may add one without an addon release. |
 | `items[].g` | Item levels below the equipped item it would replace. Present only when `r` is `gap`. |
 | `items[].ilvl` | The item's own level, for the row. Optional. |
 
@@ -540,6 +540,37 @@ two items with the same item string are the same item in every respect the
 game exposes, including the `uniqueID` field the string itself carries. Sending
 the verdict twice would ask the addon which copy each one meant, and there is
 no answer.
+
+### `r: "dupe"` — and why it needed no new field — added 1.9.0
+
+A `dupe` verdict says the player is **already wearing this exact item**, in as
+many copies as they could ever wear at once: two for a ring or a trinket, one
+everywhere else. Every copy still in a bag is therefore surplus, and "apply to
+every live match" — the rule directly above — is already the correct handling.
+That is not a happy accident; it is what the verdict was shaped around.
+
+The design that did not survive was the obvious one: let the website flag
+surplus copies wherever they sit and add a `keep` count saying how many live
+matches to leave alone. **An addon predating that field drops it** — the
+decoder whitelists what it reads, deliberately — **and `Junk.Resolve` then
+offers every match for sale.** An old client would have sold both copies of a
+perfectly good ring, which is the same class of failure the no-coordinates rule
+exists to prevent, arriving through a different door. Bumping payload `v` was
+the only other way to make it safe, and that hard-rejects the whole string on
+every un-updated client, taking the two working verdicts down with it.
+
+So the website only ever emits `dupe` for a copy whose twin is **on the
+player's body**, never one merely sitting beside it in the same bag. That case
+— two copies in a bag, none worn — stays unflagged, which is the quiet
+direction: the surplus copy stays where it already was.
+
+Exactness is the item string, never the item id. Two items sharing an id can
+differ in bonus ids, in a crafted stat, in the difficulty they dropped at, and
+an id-level test would call a Heroic piece a copy of the Mythic one being worn.
+The website reads the equipped side out of this addon's own `gear[]` entries
+(`where: "equipped"`) rather than Blizzard's equipment document, because the
+document has no item string to compare and this addon captures both sides in
+one walk.
 
 **A string from another account matches nothing** and the panel says so. The
 guid simply does not appear in `WarbandProDB.chars`, which is the whole check —

@@ -57,6 +57,13 @@ for the next 20". Paste each one. The site merges them, so the pages add up to
 your whole warband rather than replacing each other, and the order is stable —
 every character lands on exactly one page.
 
+**The junk panel reads warband.pro's new spare-copy verdict.** The site can now
+tell you when something in your bags is a copy of what you already have on, and
+the row says "already wearing one" beside it. Nothing to set up — paste your
+cleanup string as usual. Older versions of the addon show the same rows with no
+reason text beside them, so this is worth updating for rather than something you
+have to update for.
+
 ### Fixed
 
 **Your warband bank stopped losing four tabs out of five.** The game hands the
