@@ -516,7 +516,7 @@ A payload that merely decodes the same would only prove the decoder works.
 | `items[].k` | The verdict: `sell`, `de` (disenchant), or `del`. |
 | `items[].id` | Item id, for display and for a sanity check against the resolved item. |
 | `items[].s` | **The identity key.** The verbatim item string, as this addon sent it. |
-| `items[].r` | Why: `gap` (far below the equipped piece), `unusable` (wrong armor class), or `dupe` (a copy of an item already worn — see below). **An unknown value is displayed as no reason at all, never rejected**, so the website may add one without an addon release. |
+| `items[].r` | Why: `gap` (far below the equipped piece), `unusable` (wrong armor class), `dupe` (a copy of an item already worn — see below), or `dominated` (another item in the same bags beats it on item level and on every stat at once). **An unknown value is displayed as no reason at all, never rejected**, so the website may add one without an addon release — `dominated` shipped through exactly that door. |
 | `items[].g` | Item levels below the equipped item it would replace. Present only when `r` is `gap`. |
 | `items[].ilvl` | The item's own level, for the row. Optional. |
 
