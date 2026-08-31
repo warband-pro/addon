@@ -88,7 +88,7 @@ misrouted call fails toward a sentence rather than "invalid":
   receipt. An ordinary button, not a secure one — equipping out of combat is
   not protected, and the tab is gone before combat can make it so.
 
-  **Since 1.10.0 the row is about the setup for the spec you are in.** A paste
+  **Since 1.8.0 the row is about the setup for the spec you are in.** A paste
   stores one setup per spec the website solved, so switching spec switches
   which set this row offers — no dropdown, because there is exactly one setup
   per spec and the game already knows which spec you are. When you have setups
@@ -96,7 +96,7 @@ misrouted call fails toward a sentence rather than "invalid":
   going blank: "none for this spec — 2 stored for others". Blank would send a
   player back to the website for a string they have already pasted.
 
-  **`/warband equip` (1.9.0) is the same button without the window.** It calls
+  **`/warband equip` (1.8.0) is the same button without the window.** It calls
   the same `GearSet.Apply`, so the receipt, the verify and the Equipment
   Manager save are identical — what it removes is having to open a frame
   first, which is what makes it bindable to an action bar. It tells the two

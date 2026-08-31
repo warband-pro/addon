@@ -192,7 +192,7 @@ check("every code has a message", (function()
 end)())
 
 -- ── the one string: three sections on wbc1! ─────────────────────────────────
--- Added 1.11.0. `items` is the clear-out list as it always was; `gear` nests
+-- Added 1.8.0. `items` is the clear-out list as it always was; `gear` nests
 -- the equip setups (nested, because `items` at the character level was already
 -- taken); `builds` says which saved talent build is for which kind of night.
 
@@ -280,7 +280,7 @@ check("DecodeInbound reads the current string", (function()
   return p ~= nil and why == nil and kind == "plan"
 end)())
 
--- The equip-only string the site sent before 1.11.0, normalised into the same
+-- The equip-only string the site sent before 1.8.0, normalised into the same
 -- shape so the panel has one code path rather than two that must agree.
 check("DecodeInbound normalises a legacy equip string", (function()
   inflated = '{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N",' ..

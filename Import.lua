@@ -254,7 +254,7 @@ function Import.CleanupItems(raw)
 end
 
 -- ── the one string from warband.pro ─────────────────────────────────────────
--- `wbc1!` carried a cleanup list and nothing else until 1.11.0. It carries
+-- `wbc1!` carried a cleanup list and nothing else until 1.8.0. It carries
 -- everything the website has to say now — the clear-out list, the gear setups
 -- best-in-bags picked, and which saved talent build is for which kind of night
 -- — because three strings to fetch from two pages was the whole friction:
@@ -262,7 +262,7 @@ end
 -- had a set with no cleanup and no way to know.
 --
 -- **Additive, so the prefix does not move**, and the consequence is what
--- decides that rather than the shape: an addon older than 1.11.0 reads `items`
+-- decides that rather than the shape: an addon older than 1.8.0 reads `items`
 -- exactly as it always did and never learns the rest exists — it loses setups
 -- it never had. Compare the `keep` field the cleanup wire deliberately does
 -- not have, where an old client dropping it would have sold a good ring.
@@ -494,7 +494,7 @@ function Import.DecodeGearSet(paste)
     if type(c) == "table" and type(c.guid) == "string" and c.guid ~= "" and type(c.items) == "table" then
       local items = Import.GearSetItems(c.items)
       if #items > 0 then
-        -- `sets` is additive, added by the website in 1.10.0: one entry per
+        -- `sets` is additive, added by the website in 1.8.0: one entry per
         -- spec it solved. The legacy `spec`/`set`/`items` above describe the
         -- FIRST of them (the spec being played), so a build older than this
         -- one reads that and behaves exactly as it always did — it simply
@@ -578,7 +578,7 @@ end
 ---
 --- Two wires reach this box and only one of them is current. `wbc1!` is what
 --- warband.pro sends now and carries everything; `wbg1!` is the equip-only
---- string it sent before 1.11.0, still read because a player may have one on
+--- string it sent before 1.8.0, still read because a player may have one on
 --- the clipboard, in a note, or in a guild chat scrollback from last week.
 --- Normalising both into one shape here is what keeps the panel from growing a
 --- second code path for a format that is on its way out.

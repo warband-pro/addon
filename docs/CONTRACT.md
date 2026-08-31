@@ -504,16 +504,16 @@ Both were found while writing Export.lua, and the code is right.
 Everything above describes the addon talking to the website. This is the one
 string that goes the other way.
 
-**It carries everything warband.pro has to say, since 1.11.0.** Three sections
+**It carries everything warband.pro has to say, since 1.8.0.** Three sections
 per character: `items`, the clear-out list; `gear`, the setups best-in-bags
 picked; and `builds`, which saved talent build the player assigned to which
 kind of night. The prefix is `wbc1!` for history rather than description — it
 was the cleanup wire when it was named — and moving it now would cost every
 un-updated client its clear-out list to buy a better word.
 
-### Three strings became one — 1.11.0
+### Three strings became one — 1.8.0
 
-Until 1.11.0 the site handed back two strings from two pages: a `wbc1!`
+Until 1.8.0 the site handed back two strings from two pages: a `wbc1!`
 cleanup list from `/gear` and a `wbg1!` equip string from a character page.
 Talent builds would have been a third. The player's job was copy, alt-tab,
 paste, alt-tab, copy again — and doing half of it left a set with no cleanup
@@ -526,14 +526,14 @@ entry point, normalising the legacy `wbg1!` into the same shape so the panel
 has one code path rather than two that must agree about what "kept" counts.
 
 **Additive, so the prefix does not move**, and as everywhere on these wires the
-*consequence* decides that rather than the shape. An addon older than 1.11.0
+*consequence* decides that rather than the shape. An addon older than 1.8.0
 reads `items` exactly as it always did and never learns the rest exists: it
 loses setups it never had. Compare the `keep` field the cleanup wire
 deliberately does not have, where an old client dropping it would have sold a
 good ring. Same shape of change, opposite consequence.
 
 One thing genuinely degrades: a character carrying **only** `gear` or `builds`
-has no `items`, and the pre-1.11.0 reader required one, so such a character is
+has no `items`, and the pre-1.8.0 reader required one, so such a character is
 skipped there. A string in which *no* character has a clear-out list is
 rejected outright by that reader with "nothing to clean up". That is a stale
 client reading a string it half understands, and it fails toward saying so.
@@ -543,7 +543,7 @@ client reading a string it half understands, and it fails toward saying so.
 The equip-only wire is not deleted and not deprecated in the sense that would
 break anything: a player may have one on the clipboard, in a note, or in a
 guild-chat scrollback from last week, and it must still work. The website
-stopped emitting it in 1.11.0. Its section below stands unchanged, and
+stopped emitting it in 1.8.0. Its section below stands unchanged, and
 `DecodeInbound` maps it into a plan carrying only `gear`.
 
 ### Why not `wb2!`
@@ -613,7 +613,7 @@ was the case the cleanup-only reader could not express. A character carrying
 none of the three is dropped; a string in which every character is dropped is
 `no_items`.
 
-### `gear` — the setups, nested — added in 1.11.0
+### `gear` — the setups, nested — added in 1.8.0
 
 ```json
 {"guid":"Player-1-TEST","name":"Vocnar",
@@ -642,7 +642,7 @@ below and are not restated here.
 `gear` with neither `items` nor `sets` is nothing, and is dropped rather than
 stored as an empty setup.
 
-### `builds` — which build for which night — added in 1.11.0
+### `builds` — which build for which night — added in 1.8.0
 
 ```json
 "builds":[{"spec":103,"raid":7,"mplus":8,"delve":9},
@@ -701,7 +701,7 @@ game exposes, including the `uniqueID` field the string itself carries. Sending
 the verdict twice would ask the addon which copy each one meant, and there is
 no answer.
 
-### `r: "dupe"` — and why it needed no new field — added 1.9.0
+### `r: "dupe"` — and why it needed no new field — added 1.8.0
 
 A `dupe` verdict says the player is **already wearing this exact item**, in as
 many copies as they could ever wear at once: two for a ring or a trinket, one
@@ -798,9 +798,9 @@ entry would be an identity key the addon might mis-resolve. Locked slots on
 the site simply never appear. An empty `items` list is a rejection
 (`no_items`): a set that changes nothing has nothing to say.
 
-### `sets[]` — a setup per spec, added in 1.10.0
+### `sets[]` — a setup per spec, added in 1.8.0
 
-`wbg1!` carried one set per character until 1.10.0, because the website could
+`wbg1!` carried one set per character until 1.8.0, because the website could
 only solve the spec you were logged out in. It can solve any of them now, and
 one set per character became actively wrong: a stored Feral set is not an
 answer to a Restoration paperdoll, and pasting an off-spec solve silently
@@ -826,7 +826,7 @@ So a character entry may carry `sets`, one entry per spec the website solved:
 
 **`sets` is additive, and safely so.** `spec`, `set` and `items` at the
 character level still describe the **first** setup — the spec being played — so
-an addon older than 1.10.0 reads those, behaves exactly as it always did, and
+an addon older than 1.8.0 reads those, behaves exactly as it always did, and
 simply never learns the off-spec setups exist. That is the opposite of the
 `keep` field the cleanup wire deliberately does not have: dropping `sets` costs
 a stale client setups it never had, where dropping `keep` would have had it
@@ -1134,8 +1134,8 @@ captured from the game — see the item-string correction above for what that
 means for `v1-gear`'s `s` values specifically.
 
 The return direction has two: `wbc1-min` is the cleanup-only string as it stood
-before 1.11.0, kept precisely so the additive change stays tested against the
+before 1.8.0, kept precisely so the additive change stays tested against the
 shape it was additive *to*; `wbc1-all` exercises all three sections at once and
 carries a second character with `gear` and no `items`, which is the entry the
-pre-1.11.0 reader could not express. `wbg1-min` covers the equip-only wire the
+pre-1.8.0 reader could not express. `wbg1-min` covers the equip-only wire the
 website no longer writes and both sides still read.

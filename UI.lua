@@ -365,7 +365,7 @@ local function buildImport()
     local text = self:GetText()
     if text == "" then return end
     -- **One decode, whichever string this is.** Two wires still reach this box
-    -- — `wbc1!`, which carries everything since 1.11.0, and the equip-only
+    -- — `wbc1!`, which carries everything since 1.8.0, and the equip-only
     -- `wbg1!` the site sent before it — but the prefix dispatch and the two
     -- receipts collapsed into `DecodeInbound`, which normalises both into one
     -- plan. The panel below used to be two code paths that had to agree about
@@ -494,7 +494,7 @@ function UI.RenderGearSet()
   local r = ns.GearSet.Resolve()
   if not r then
     -- Two silences, and they are different things to tell somebody. Since
-    -- 1.10.0 a paste stores a setup per spec, so having sets and having none
+    -- 1.8.0 a paste stores a setup per spec, so having sets and having none
     -- for the spec you are standing in is the common case after a respec —
     -- and "nothing here" would send that player back to the website for a
     -- string they already pasted.

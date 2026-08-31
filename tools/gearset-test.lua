@@ -184,7 +184,7 @@ check("ignores a guid this account has never scanned",
   GearSet.Save({ generatedAt = 1, chars = { ["Player-9-NOPE"] = { gear = { items = {} } } } }) == 0)
 
 -- Junk.Save's guard, the other way round: one string carries three sections
--- since 1.11.0, and a character can have a clear-out list and no setups.
+-- since 1.8.0, and a character can have a clear-out list and no setups.
 check("a paste carrying no setups leaves the stored ones alone", (function()
   local before = ns.Store.db.gearset["Player-1-TEST"]
   GearSet.Save({
@@ -215,7 +215,7 @@ check("never answers with another spec's build", (function()
 end)())
 
 -- Saving setups must not drop assignments, and saving assignments must not
--- drop setups: an equip string from before 1.11.0 carries no builds at all.
+-- drop setups: an equip string from before 1.8.0 carries no builds at all.
 check("a legacy equip string does not erase the assignments", (function()
   inflated = readAll(DIR .. "wbg1-min.json")
   GearSet.Save(Import.DecodeInbound(wire))
@@ -318,7 +318,7 @@ check("combat mid-apply drops the pending save", GearSet.pending == nil)
 check("and says to press the button again", printed[1] ~= nil and printed[1]:find("combat", 1, true) ~= nil, printed[1])
 inCombat = false
 
--- ── a setup per spec (1.10.0) ───────────────────────────────────────────────
+-- ── a setup per spec (1.8.0) ───────────────────────────────────────────────
 -- The website can solve any spec since it learned to, so one set per character
 -- became wrong: a stored Feral set is not an answer to a Restoration
 -- paperdoll. A record that names specs answers only for the one being played.

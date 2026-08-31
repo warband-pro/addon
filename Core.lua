@@ -358,7 +358,7 @@ SlashCmdList.WARBANDPRO = function(msg)
     if InCombatLockdown() then
       ns.print("combat — press equip again after the fight")
     elseif not ns.GearSet.Stored() then
-      -- Same two silences the panel tells apart: since 1.10.0 a paste stores a
+      -- Same two silences the panel tells apart: since 1.8.0 a paste stores a
       -- setup per spec, so "none for this spec" is the common case after a
       -- respec and must not read as "you never pasted one".
       local stored = ns.GearSet.Summary()
