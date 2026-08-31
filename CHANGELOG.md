@@ -12,6 +12,8 @@ Until 1.5.0 the packager was given this whole file and shipped it whole, header 
 
 **The release workflow looks for `## [1.5.0]` exactly.** A tag without a matching heading here fails the release before anything is published. Write the section first, then tag.
 
+**Cutting a release adds a heading, it does not rename `## [Unreleased]`.** Leave that heading in place, empty, above the new one. CI runs `slop.mjs --unreleased` on every push and errors when the section is missing — so renaming it turns `main` red and, on a release run, fails `verify` before the tag is ever created. That is exactly what happened on the first attempt at 1.8.0: the run died in 24 seconds, at the one step that gates everything downstream. `slop.mjs` passes an empty section (`nothing to check`); it is the absent heading it refuses.
+
 It also reads the section for machine-written marketing voice and fails on that — same check, so run it yourself before you tag:
 
 ```
@@ -40,6 +42,8 @@ accepted by a website they do not control. That prefix has its own rules, and
 they are in [docs/CONTRACT.md](docs/CONTRACT.md), which is law for this repo and
 `warband-pro/app` at once. **A wire break is at least a MAJOR here; not every
 MAJOR has to be a wire break.**
+
+## [Unreleased]
 
 ## [1.8.0] — 2026-08-31 — one string back, and your builds by name
 
