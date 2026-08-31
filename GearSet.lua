@@ -55,7 +55,7 @@ end
 
 --- The stored setup for the spec at the keyboard, or nil.
 ---
---- **Per spec since 1.10.0, and the nil is the point.** One set per character
+--- **Per spec since 1.8.0, and the nil is the point.** One set per character
 --- was fine while the website could only solve the spec you were logged out
 --- in; it can solve any of them now, so a stored Feral set is not an answer to
 --- a Restoration paperdoll and equipping it would be actively wrong. So a
@@ -110,7 +110,7 @@ end
 --- reads, and they describe the spec the player was on when they pasted, which
 --- is the only one a build that cannot choose should be handed.
 --- **A character with no `gear` section is skipped, not cleared** — Junk.Save's
---- rule and for the same reason. One string carries three things since 1.11.0,
+--- rule and for the same reason. One string carries three things since 1.8.0,
 --- and a character can legitimately have a clear-out list and no setups.
 function GearSet.Save(decoded)
   local db = Store.db
@@ -142,7 +142,7 @@ end
 --- for delves — per spec.
 ---
 --- Written separately from the setups so each section survives the other being
---- absent: a `wbg1!` string from before 1.11.0 carries setups and no builds,
+--- absent: a `wbg1!` string from before 1.8.0 carries setups and no builds,
 --- and must not erase assignments the player made on the site.
 function GearSet.SaveBuilds(decoded)
   local db = Store.db
@@ -273,7 +273,7 @@ local NAME_FALLBACKS = { 24, 16, 11 }
 --- into it. Out-of-combat only; callers guard.
 ---
 --- **The client's name-length limit is discovered, never assumed.** Set names
---- gained a spec suffix in 1.10.0 (`warband.pro Restoration`), which is longer
+--- gained a spec suffix in 1.8.0 (`warband.pro Restoration`), which is longer
 --- than anything this ever asked for before, and `C_EquipmentSet` enforces a
 --- maximum this addon has no API to read. Hardcoding a guess fails in the
 --- worst direction — `CreateEquipmentSet` simply does nothing and the player

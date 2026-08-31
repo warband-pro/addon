@@ -87,7 +87,7 @@ export function decodeCleanup(str) {
   if (!Array.isArray(payload.chars)) throw new Error('chars is not an array');
   for (const c of payload.chars) {
     if (!c.guid) throw new Error('cleanup character has no guid to match on');
-    // Since 1.11.0 this wire carries three sections and a character needs only
+    // Since 1.8.0 this wire carries three sections and a character needs only
     // one of them: a character with setups and nothing to sell is normal.
     // `items` is still the clear-out list and still validated when present.
     if (c.items !== undefined) {

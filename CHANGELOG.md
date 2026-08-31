@@ -41,7 +41,7 @@ they are in [docs/CONTRACT.md](docs/CONTRACT.md), which is law for this repo and
 `warband-pro/app` at once. **A wire break is at least a MAJOR here; not every
 MAJOR has to be a wire break.**
 
-## [Unreleased]
+## [1.8.0] — 2026-08-31 — one string back, and your builds by name
 
 ### Added
 

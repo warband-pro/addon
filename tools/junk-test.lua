@@ -177,7 +177,7 @@ check("stores it under the guid", ns.Store.db.junk["Player-1-TEST"] ~= nil)
 check("ignores a guid this account has never scanned", ns.Store.db.junk["Player-9-OTHER"] == nil)
 
 -- The failure the one-string change could have introduced, and the reason
--- Save guards on its own section: since 1.11.0 one paste carries the clear-out
+-- Save guards on its own section: since 1.8.0 one paste carries the clear-out
 -- list, the gear setups and the build assignments, and a character can
 -- legitimately have setups and nothing to sell. Writing an absent section
 -- would delete a list the player still wants, silently.

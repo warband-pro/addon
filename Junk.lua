@@ -46,7 +46,7 @@ end
 --- belongs to characters that will read it when they log in.
 ---
 --- **A character with no `junk` section is skipped, not cleared.** Since
---- 1.11.0 one string carries the clear-out list, the gear setups and the build
+--- 1.8.0 one string carries the clear-out list, the gear setups and the build
 --- assignments together, and a character can legitimately have setups and
 --- nothing to sell. Writing an absent section would make pasting a
 --- gear-and-talents string silently delete a cleanup list the player still
