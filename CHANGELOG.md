@@ -45,6 +45,11 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-09-02 — see every alt at once
+
+Everything this addon has been collecting since 1.0 went into a compressed
+string and nowhere else. This release gives it a screen.
+
 ### Added
 
 **A Roster tab, so you can see what this addon has been collecting.** Until now
@@ -73,18 +78,20 @@ have banked and, underneath, what you have earned against this week's cap —
 the one that disappears if you do not spend it. A column header carries realm,
 guild, level, item level, gold and where that character logged out.
 
-**Lockouts that already reset are no longer listed.** If you had not logged a
-character in since the weekly reset, the addon was still showing you last
-week's raid as though you were saved to it. That cell is now blank, which is
-the honest answer: the old lockout is gone, and whether you have picked up a
-new one is something nobody has checked yet.
-
 **A `from warband.pro` section shows what the site last sent you.** Paste a
 string from warband.pro and the bottom of the grid fills in, per character: how
 many pieces of the gear set you can still put on, how many items are on the
 clear-out list and why, how many specs have a build assigned, and how old that
 answer is. Finding out which of nine alts had an unapplied plan used to mean
 logging into nine alts.
+
+### Fixed
+
+**Lockouts that already reset are no longer listed.** If you had not logged a
+character in since the weekly reset, the addon was still showing you last
+week's raid as though you were saved to it. That cell is now blank, which is
+the honest answer: the old lockout is gone, and whether you have picked up a
+new one is something nobody has checked yet.
 
 ## [1.8.0] — 2026-08-31 — one string back, and your builds by name
 
