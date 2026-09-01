@@ -78,7 +78,7 @@ luacheck .
 node tools/validate.mjs
 node tools/vector.mjs
 node tools/slop.mjs --unreleased
-for t in import junk gear gearset freshness; do lua5.1 tools/$t-test.lua; done
+for t in import junk gear gearset freshness roster; do lua5.1 tools/$t-test.lua; done
 node tools/vector.mjs --write && git diff --exit-code -- docs/contract/vectors
 ```
 
@@ -104,10 +104,11 @@ fails the build if a listed file is missing or an unlisted one exists, and the
 `.claude` commit hook treats a `.lua` file with a slash in its path as a file
 that does not belong to this repo. Do not create a source directory.
 
-Where a change goes, by default: **an existing file.** There are thirteen at the
+Where a change goes, by default: **an existing file.** There are fourteen at the
 root and each owns one subject — reading a WoW API is `Scan.lua`, item classification is
 `Gear.lua`, anything that parses a string somebody else produced is
-`Import.lua`, anything with a frame is `UI.lua`. A new file is a decision worth
+`Import.lua`, anything that turns the stored DB into something to look at is
+`Roster.lua`, anything with a frame is `UI.lua`. A new file is a decision worth
 a sentence in the commit; adding to the right existing one is not.
 
 ### Conventions
@@ -143,9 +144,10 @@ a sentence in the commit; adding to the right existing one is not.
 
 - **Pure code is tested off-client; impure code is a manual checklist.** That
   split is `docs/TESTING.md` and it is the whole strategy. `Bundle.lua`,
-  `Export.lua`, `Import.lua`, `Gear.lua`, `GearSet.lua`, `Junk.lua` are pure and
-  have `tools/<subject>-test.lua`; `Scan.lua`, `Store.lua`, `UI.lua` and
-  `Core.lua` are WoW-bound and are verified by `docs/QA.md` in game.
+  `Export.lua`, `Import.lua`, `Gear.lua`, `GearSet.lua`, `Junk.lua` and
+  `Roster.lua` are pure and have `tools/<subject>-test.lua`; `Scan.lua`,
+  `Store.lua`, `UI.lua` and `Core.lua` are WoW-bound and are verified by
+  `docs/QA.md` in game.
 - **Tests are hand-rolled `lua5.1` scripts, not busted.** Each one stands a fake
   client API in front of the module, counts `pass`/`fail` and exits non-zero —
   copy the shape of `tools/import-test.lua`, which loads the *shipped*
@@ -155,6 +157,10 @@ a sentence in the commit; adding to the right existing one is not.
   module arrives with its case in that module's test file, and a wire-format
   change arrives with regenerated fixtures. 295 assertions across the five
   files today.
+- **A display gets a model, and the model gets the tests.** `Roster.lua` is
+  the pattern: everything deciding what a cell says is pure and tested, and
+  `UI.lua` is left with layout only. Six columns of plausible-looking numbers
+  is exactly what a hand check cannot audit.
 - **Never hand-edit `docs/contract/vectors`.** `node tools/vector.mjs --write`
   is deterministic; regenerate and commit.
 
@@ -348,7 +354,7 @@ node tools/validate.mjs         # .toc and .pkgmeta agree
 node tools/vector.mjs           # wb1! round-trips
 node tools/slop.mjs --unreleased   # the notes read like a person wrote them
 
-for t in import junk gear gearset freshness; do lua5.1 tools/$t-test.lua; done
+for t in import junk gear gearset freshness roster; do lua5.1 tools/$t-test.lua; done
 
 # The fixture check, which is NOT the line above and fails separately:
 node tools/vector.mjs --write && git diff --exit-code -- docs/contract/vectors

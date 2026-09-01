@@ -103,7 +103,11 @@ jobs:
       # what a partial read may overwrite — and that is where being wrong is
       # invisible, because every failure it guards against leaves a stamp that
       # looks right on data that is not.
-      - name: Import decoder, junk, gear and freshness tests
+      # roster-test.lua is here for the reason the grid was built with a model
+      # in the first place: six columns of numbers all look plausible, so the
+      # rule that an unread section draws an EMPTY cell rather than a `0` is
+      # exactly the one a human staring at a screenshot will not catch.
+      - name: Import decoder, junk, gear, freshness and roster tests
         run: |
           sudo apt-get install -y --no-install-recommends lua5.1
           lua5.1 tools/import-test.lua
@@ -111,6 +115,7 @@ jobs:
           lua5.1 tools/gear-test.lua
           lua5.1 tools/gearset-test.lua
           lua5.1 tools/freshness-test.lua
+          lua5.1 tools/roster-test.lua
 
       # A drifted fixture means /app is testing against a string this addon no
       # longer produces. Regenerate with `node tools/vector.mjs --write`.

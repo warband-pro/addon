@@ -5,10 +5,16 @@ Copying from WoW chat is notoriously awful. This addon lives or dies by how pain
 ## Game side — one native window (1.5.0)
 
 One frame, `WarbandProFrame`, with the tabs every stock panel wears along the
-bottom: **Export · Import · Options**. `/warband` and the addon compartment
-open it on Export, `/warband junk` on Import, `/warband options` on Options.
-Esc closes (`UISpecialFrames`), the whole window drags, and it clamps to the
-screen.
+bottom: **Roster · Export · Import · Options**. `/warband` and the addon
+compartment open it on Export, `/warband roster` on Roster, `/warband junk` on
+Import, `/warband options` on Options. Esc closes (`UISpecialFrames`), the whole
+window drags, and it clamps to the screen.
+
+**Roster is tab 1 and is not what the window opens on**, which is deliberate
+and is the one place tab order and default disagree. Reading precedes acting,
+so the tab you read sits leftmost; but `/warband` has always landed on a
+highlighted export box and FLOW.md counts that path at under two seconds, so
+every door that existed before still opens the tab it always opened.
 
 ```
 +--[crystal]--- Warband.pro Companion ---------------------[x]-+
@@ -42,6 +48,89 @@ Still no Ace and no LibStub registration. There is a minimap button as of
 cosine, not LibDBIcon, so the addon still registers with nothing. Mixin calls
 that could plausibly move (`SetTitle`, `SetPortraitToAsset`) are guarded so a
 rename costs the title or the icon, never the window.
+
+### Roster tab (1.9.0)
+
+The grid. Every character across the top, everything this addon knows about
+them down the side.
+
+```
++--[crystal]--- Warband.pro Companion ---------------------[x]-+
+|  6 characters                                                |
+|                *Vocnar *Voctara *Voctesa *Vocgrim  ...       |
+|                 80·621  80·618   80·614   77·602             |
+|  +--------------------------------------------------------+  |
+|  | this week                                              |  |
+|  | vault · raid     1/3     2/3     --      1/3           |  |
+|  | vault · mythic+  8/8 (1) 4/8     --      1/8           |  |
+|  | keystone         +12     +9      --      --            |  |
+|  | lockouts                                               |  |
+|  | Nerub-ar (Heroic) 2/8    8/8     --      --            |  |
+|  | currencies                                             |  |
+|  | Valorstones      1,900/2,000  240/2,000  --            |  |
+|  | pockets                                                |  |
+|  | gold             48,205g 1,204g  980g    12g           |  |
+|  +--------------------------------------------------------+  |
+|  warband bank 1h ago (by Vocnar) · 5,000g          [ < ][ > ]|
++--------------------------------------------------------------+
+   [ Roster ] [ Export ] [ Import ] [ Options ]
+```
+
+**The arrangement is SavedInstances', and that is the whole design decision.**
+Characters are COLUMNS and tracked things are ROWS, because the question an alt
+player actually asks is *which of them still has this*, and that is a line you
+read across rather than six panes you hold in your head. Its class-coloured
+name over a level, its two-or-three-character cells (`3/8`), its labelled row
+groups with a rule between them, its self-first-then-realm-then-name column
+sort (`cpairs_sort`) and its raids-above-dungeons row sort are all ported.
+
+**What could not be ported is how it draws.** SavedInstances builds its grid
+with LibQTip on top of Ace3, and this addon ships neither and is not going to —
+`RESEARCH-REFERENCE.md` is the standing answer and this was not the change that
+reopened it. So the MODEL is ported and the rendering is ours, out of the
+client's own FontStrings. That split is also why our grid is *testable* and
+SavedInstances' equivalent is not: `Roster.lua` is a DB table in and a display
+model out, with no WoW API anywhere in it, and `tools/roster-test.lua` holds
+every rule below.
+
+**Three rules, and the first one is the one a grid is most likely to destroy:**
+
+1. **Absent is not zero.** A section a character has never had read draws an
+   EMPTY cell, never a `0`. That is the distinction `seenAt` exists to carry;
+   a blank column reads as "nothing there" when it means "nobody looked", and
+   `0/8` means we looked and nothing had died. The model expresses this in its
+   type — an unknown is an absent cell, not a grey one — rather than as a
+   convention a renderer has to remember.
+2. **A row nobody has a value for is not drawn.** SavedInstances gives every
+   instance a per-row `always | saved | never`; the useful half of that with no
+   config attached is "show it if somebody is saved to it". An alt player's
+   list of *possible* lockouts is far longer than their list of real ones, and
+   a grid of mostly-blank rows is a grid nobody reads.
+3. **Nothing in it reads the game.** Every number already went through
+   `ns.safe` on the way into the DB. Reading it back out is table work, so the
+   grid cannot throw in the middle of a raid.
+
+**Six columns, then it pages.** The window is 560 wide, the inset and scrollbar
+take about 60, and a label column wide enough for `Nerub-ar Palace (Heroic)`
+takes 152 more — which leaves room for exactly six cells that can still hold
+`4,500/20,000`. A larger warband gets `[ < ]` and `[ > ]`, the same idiom the
+export tab already uses for a bundle larger than twenty. Column headers sit
+OUTSIDE the scroll frame, so scrolling the rows never scrolls away the names
+they belong to.
+
+**Row groups, in order:** `this week` (the three vault buckets, keystone, m+
+score), `lockouts` (one row per instance-and-difficulty anybody is saved to,
+raids first, plus a world-boss count), `currencies` (one row per currency
+anybody has, capped ones as a fraction and warning near the cap), `professions`
+(skill over max), `pockets` (gold, bag space, the five consumable counts, and
+mail when something is waiting). The warband bank is account-wide and so has no
+column to live in; it is the footer line, with how many of its tabs were
+actually read.
+
+**It reads the same DB the export encodes**, so it is not a second source of
+truth and cannot drift from the bundle: what the grid shows is what the paste
+will carry. That is the reason it belongs in this window rather than in one of
+its own.
 
 ### Export tab
 

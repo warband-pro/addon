@@ -176,6 +176,7 @@ prose does not move when a row is added and the row is what CI reads.
 | `lua5.1 tools/junk-test.lua` | lua5.1 | ❌ CI only |
 | `lua5.1 tools/gearset-test.lua` | lua5.1 | ❌ CI only |
 | `lua5.1 tools/freshness-test.lua` | lua5.1 | ❌ CI only |
+| `lua5.1 tools/roster-test.lua` | lua5.1 | ❌ CI only |
 
 ```bash
 node tools/validate.mjs && node tools/vector.mjs && node tools/slop.mjs --unreleased

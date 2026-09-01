@@ -50,6 +50,10 @@ read_globals = {
   "debugprofilestop", "UpdateAddOnMemoryUsage", "GetAddOnMemoryUsage",
   "UpdateAddOnCPUUsage", "GetAddOnCPUUsage", "GetCVar",
 
+  -- the roster grid (Roster.lua, UI.lua): the client's own class palette, so
+  -- a name in this window is the colour it is on the character's own frame.
+  "RAID_CLASS_COLORS",
+
   -- character
   "UnitGUID", "UnitName", "UnitClass", "UnitRace", "UnitLevel", "UnitXP", "UnitFactionGroup",
   "GetXPExhaustion", "GetRealmName", "GetZoneText", "GetBindLocation",

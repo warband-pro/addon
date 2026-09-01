@@ -345,6 +345,10 @@ SlashCmdList.WARBANDPRO = function(msg)
     end
   elseif cmd == "junk" or cmd == "clean" then
     UI.ToggleJunk()
+  -- The grid. `roster` is the name the tab carries; `alts` is what a player
+  -- who has nine of them calls the thing they are looking for.
+  elseif cmd == "roster" or cmd == "alts" then
+    UI.ToggleRoster()
   -- The equip that the Import tab's button does, reachable from a macro.
   -- Both paths run the same GearSet.Apply, so the receipt, the verify and the
   -- Equipment Manager save are identical — this only removes the window from
@@ -377,7 +381,7 @@ SlashCmdList.WARBANDPRO = function(msg)
     ns.Perf.Reset()
     ns.print("perf counters reset")
   else
-    ns.print("/warband · /warband copy current · /warband copy <page> · /warband junk · "
+    ns.print("/warband · /warband roster · /warband copy current · /warband copy <page> · /warband junk · "
       .. "/warband equip · /warband options · /warband status · "
       .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband minimap on|off · "
       .. "/warband perf")

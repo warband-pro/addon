@@ -1,16 +1,24 @@
 -- WarbandPro / UI.lua
--- One window, three tabs: Export, Import, Options. Built entirely from the
--- templates Blizzard's own panels use — ButtonFrameTemplate for the chrome,
+-- One window, four tabs: Roster, Export, Import, Options. Built entirely from
+-- the templates Blizzard's own panels use — ButtonFrameTemplate for the chrome,
 -- PanelTabButtonTemplate for the tabs, InputBoxTemplate and InsetFrameTemplate
 -- inside — so the window looks like the game and inherits whatever the player
 -- has set: UI scale, font scale, colorblind text. No hand-rolled backdrop, no
 -- pixel skin of our own.
 --
--- The two jobs have not changed. Export: show what the bundle contains and how
--- stale it is, then put the string somewhere Ctrl+C can reach it — WoW has no
--- SetClipboard, so an auto-highlighted multiline EditBox is the only path that
--- works. Import: take the string warband.pro sends back and turn it into a
--- clear-out list with live Sell and Disenchant buttons.
+-- The jobs, in the order the tabs sit in. Roster: the grid — every character
+-- across the top, everything the addon knows about them down the side, which
+-- is the SavedInstances arrangement and is the only tab you READ rather than
+-- act on. Export: show what the bundle contains and how stale it is, then put
+-- the string somewhere Ctrl+C can reach it — WoW has no SetClipboard, so an
+-- auto-highlighted multiline EditBox is the only path that works. Import: take
+-- the string warband.pro sends back and turn it into a clear-out list with live
+-- Sell and Disenchant buttons.
+--
+-- **The roster reads the same DB the export encodes**, so it is not a second
+-- source of truth and cannot drift from the bundle: what the grid shows is what
+-- the paste will carry, which is the whole reason it is worth having in a
+-- window whose other job is producing that paste.
 --
 -- The two paste rules survive the merge into one window because they belong to
 -- widgets, not frames. The export box is copied FROM and reverts anything
@@ -34,17 +42,30 @@ local DOT = {
 }
 local MUTED, WARN, BAD, GOOD = "808080", "ffd100", "ff2020", "00ff00"
 
-local TAB_EXPORT, TAB_IMPORT, TAB_OPTIONS = 1, 2, 3
+local TAB_ROSTER, TAB_EXPORT, TAB_IMPORT, TAB_OPTIONS = 1, 2, 3, 4
 local MAX_ROWS = 8
 local JUNK_ROWS = 12
+
+-- The grid's geometry, and the one number that decides the rest: the window is
+-- 560 wide, the inset and the scrollbar take about 60 of it, and a label column
+-- wide enough for "Nerub-ar Palace (Heroic)" takes 152 more. What is left
+-- divides into six cells, which is why a warband larger than six pages rather
+-- than shrinking — a cell narrower than this cannot hold `4,500/20,000`.
+local ROSTER_COLS = 6
+local ROSTER_LINES = 24
+local LABEL_W, CELL_W = 152, 56
 
 local frame, panels, tabs
 local editBox, header, footer, rows, help
 local junkPaste, junkHeader, junkFooter, junkRows, junkChild
 local gsHeader, gsButton
+local rosterHead, rosterFoot, rosterCols, rosterLines, rosterChild, rosterPrev, rosterNext
 local optionChecks = {}
 
 UI.mode = "bundle"
+-- Which six characters the grid is showing. Same idiom as UI.page below and
+-- for the same reason: a warband can be larger than the surface that draws it.
+UI.rosterPage = 1
 -- Which page of a warband too large for one bundle is in the box. Always 1
 -- unless `/warband copy 2` asked for another, and reset by any plain open so
 -- the panel cannot sit on page 3 days after the player went looking for it.
@@ -634,6 +655,225 @@ function UI.RenderJunk()
   end
 end
 
+-- ── roster tab ──────────────────────────────────────────────────────────────
+
+-- The grid. Roster.lua decides WHAT is in it and this decides how it looks, so
+-- everything below is layout — no rule about the data lives here, and the file
+-- that owns the rules is the one with tests.
+--
+-- **Characters across, things down.** That is SavedInstances' arrangement and
+-- the reason it is worth copying: the question this window exists to answer is
+-- "which of them still has this", and that is a line you read across. A
+-- per-character pane would answer a question nobody with nine alts is asking.
+--
+-- Widgets are pooled and reused rather than created per render. The grid
+-- redraws on every tab switch and a warband is twenty characters deep, so
+-- creating FontStrings per row would leak a few hundred frames across an
+-- evening of opening and closing the window.
+
+local TONE = { good = GOOD, warn = WARN, bad = BAD }
+
+--- The class colour escape for a character, or plain white.
+---
+--- `colorStr` already carries the alpha byte, so it follows `|c` directly
+--- rather than the `|cff` the rest of this file writes by hand.
+local function classText(class, text)
+  local c = class and ns.safe(function() return RAID_CLASS_COLORS[class] end)
+  if c and c.colorStr then return "|c" .. c.colorStr .. text .. "|r" end
+  return text
+end
+
+local function buildRoster()
+  local p = panels[TAB_ROSTER]
+
+  rosterHead = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  rosterHead:SetPoint("TOPLEFT")
+  rosterHead:SetPoint("TOPRIGHT")
+  rosterHead:SetJustifyH("LEFT")
+
+  -- The column headers sit OUTSIDE the scroll frame, so scrolling the rows
+  -- never scrolls away the names they belong to. A grid whose header leaves
+  -- the screen is a grid of anonymous numbers.
+  rosterCols = {}
+  for i = 1, ROSTER_COLS do
+    local x = LABEL_W + (i - 1) * CELL_W
+    local name = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    name:SetPoint("TOPLEFT", x, -20)
+    name:SetWidth(CELL_W)
+    name:SetJustifyH("CENTER")
+    name:SetWordWrap(false)
+    local meta = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    meta:SetPoint("TOPLEFT", x, -34)
+    meta:SetWidth(CELL_W)
+    meta:SetJustifyH("CENTER")
+    meta:SetWordWrap(false)
+    rosterCols[i] = { name = name, meta = meta }
+  end
+
+  local well = makeWell(p)
+  well:SetPoint("TOPLEFT", 0, -50)
+  well:SetPoint("BOTTOMRIGHT", -20, 34)
+
+  local scroll = CreateFrame("ScrollFrame", "WarbandProRosterScroll", p, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 8, -8)
+  scroll:SetPoint("BOTTOMRIGHT", well, "BOTTOMRIGHT", -8, 8)
+
+  rosterChild = CreateFrame("Frame", nil, scroll)
+  rosterChild:SetSize(LABEL_W + ROSTER_COLS * CELL_W, ROSTER_LINES * 14)
+  scroll:SetScrollChild(rosterChild)
+
+  rosterLines = {}
+  for i = 1, ROSTER_LINES do
+    local y = -(i - 1) * 14
+    local label = rosterChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("TOPLEFT", 0, y)
+    label:SetWidth(LABEL_W)
+    label:SetJustifyH("LEFT")
+    label:SetWordWrap(false)
+    local cells = {}
+    for j = 1, ROSTER_COLS do
+      local fs = rosterChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      fs:SetPoint("TOPLEFT", LABEL_W + (j - 1) * CELL_W, y)
+      fs:SetWidth(CELL_W)
+      fs:SetJustifyH("CENTER")
+      fs:SetWordWrap(false)
+      cells[j] = fs
+    end
+    rosterLines[i] = { label = label, cells = cells }
+  end
+
+  rosterFoot = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  rosterFoot:SetPoint("BOTTOMLEFT", 0, 2)
+  rosterFoot:SetJustifyH("LEFT")
+
+  rosterPrev = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  rosterPrev:SetSize(24, 20)
+  rosterPrev:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -46, 0)
+  rosterPrev:SetText("<")
+  rosterPrev:SetScript("OnClick", function()
+    UI.rosterPage = UI.rosterPage - 1
+    UI.RenderRoster()
+  end)
+
+  rosterNext = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  rosterNext:SetSize(24, 20)
+  rosterNext:SetPoint("LEFT", rosterPrev, "RIGHT", 2, 0)
+  rosterNext:SetText(">")
+  rosterNext:SetScript("OnClick", function()
+    UI.rosterPage = UI.rosterPage + 1
+    UI.RenderRoster()
+  end)
+end
+
+--- Draw the grid for the current page.
+---
+--- Flattens the model's groups into one list of lines — a group header is a
+--- line with no cells — because a scroll child of uniform 14px rows is what
+--- makes the label column and the cells stay aligned without a layout pass.
+function UI.RenderRoster()
+  if not rosterLines then return end
+  local db = ns.Store.db
+  local model = ns.Roster.Build(db, ns.safe(UnitGUID, "player"))
+  local all = model.columns
+  local pages = math.max(math.ceil(#all / ROSTER_COLS), 1)
+
+  UI.rosterPage = math.min(math.max(UI.rosterPage, 1), pages)
+  local first = (UI.rosterPage - 1) * ROSTER_COLS
+  local shown = {}
+  for i = 1, ROSTER_COLS do
+    shown[i] = all[first + i]
+  end
+
+  for i = 1, ROSTER_COLS do
+    local col, head = shown[i], rosterCols[i]
+    if col then
+      head.name:SetText((DOT[col.dot] or DOT.never) .. classText(col.class, col.name))
+      head.meta:SetText(format("|cff%s%s%s|r", MUTED,
+        col.level and tostring(col.level) or "?",
+        col.ilvl and (" · " .. col.ilvl) or ""))
+    else
+      head.name:SetText("")
+      head.meta:SetText("")
+    end
+  end
+
+  -- The model is per-column already, so the page has to pull the same slice out
+  -- of every row that it pulled out of the column list — the cell index is the
+  -- column index, and they must not drift.
+  local lines, n = {}, 0
+  for _, g in ipairs(model.groups) do
+    n = n + 1
+    lines[n] = { head = g.label }
+    for _, r in ipairs(g.rows) do
+      local cells, any = {}, false
+      for i = 1, ROSTER_COLS do
+        local src = shown[i] and r.cells[first + i]
+        cells[i] = src
+        if src then any = true end
+      end
+      -- A row can be empty for THIS page while carrying values on another —
+      -- one alt's lockout is not the next six characters' business.
+      if any then
+        n = n + 1
+        lines[n] = { label = r.label, cells = cells }
+      end
+    end
+    -- A group whose every row fell off this page leaves its header behind.
+    if lines[n].head then n = n - 1 end
+  end
+
+  for i = 1, ROSTER_LINES do
+    local line, w = lines[i], rosterLines[i]
+    if not line then
+      w.label:SetText("")
+      for j = 1, ROSTER_COLS do w.cells[j]:SetText("") end
+    elseif line.head then
+      w.label:SetText(format("|cff%s%s|r", MUTED, line.head))
+      for j = 1, ROSTER_COLS do w.cells[j]:SetText("") end
+    else
+      w.label:SetText(line.label)
+      for j = 1, ROSTER_COLS do
+        local c = line.cells[j]
+        if not c then
+          -- An empty cell, never a zero. Roster.lua's rule 1, drawn.
+          w.cells[j]:SetText("")
+        elseif TONE[c.tone] then
+          w.cells[j]:SetText(format("|cff%s%s|r", TONE[c.tone], c.text))
+        else
+          w.cells[j]:SetText(c.text)
+        end
+      end
+    end
+  end
+  rosterChild:SetHeight(math.max(n, 1) * 14)
+
+  if #all == 0 then
+    rosterHead:SetText(format("|cff%sno characters scanned yet — log in on a character and it lands here|r",
+      MUTED))
+  elseif n == 0 then
+    rosterHead:SetText(format("|cff%s%d character%s, and nothing read yet — play one and it fills in|r",
+      MUTED, #all, #all == 1 and "" or "s"))
+  else
+    rosterHead:SetText(format("%d character%s%s", #all, #all == 1 and "" or "s",
+      pages > 1 and format("  ·  |cff%sshowing %d-%d|r", MUTED, first + 1,
+        math.min(first + ROSTER_COLS, #all)) or ""))
+  end
+
+  local wb = model.warbandBank
+  rosterFoot:SetText(wb
+    and format("|cff%swarband bank %s%s%s%s|r", MUTED, wb.ago,
+      wb.by and (" (by " .. wb.by .. ")") or "",
+      wb.gold and ("  ·  " .. wb.gold) or "",
+      (wb.tabsOwned and wb.tabs < wb.tabsOwned)
+        and format(", %d of %d tabs", wb.tabs, wb.tabsOwned) or "")
+    or format("|cff%swarband bank never seen|r", MUTED))
+
+  rosterPrev:SetShown(pages > 1)
+  rosterNext:SetShown(pages > 1)
+  rosterPrev:SetEnabled(UI.rosterPage > 1)
+  rosterNext:SetEnabled(UI.rosterPage < pages)
+end
+
 -- ── options tab ─────────────────────────────────────────────────────────────
 
 --- One native checkbox with a label beside it and a muted description under
@@ -768,7 +1008,7 @@ local function build()
     frame.Inset:SetPoint("BOTTOMRIGHT", -8, 30)
   end
 
-  panels = { makePanel(), makePanel(), makePanel() }
+  panels = { makePanel(), makePanel(), makePanel(), makePanel() }
 
   tabs = {}
   -- Named by direction, with the site as the fixed reference — 2026-08-24.
@@ -783,12 +1023,21 @@ local function build()
   -- Nothing in the window said which way either tab flowed except one sentence
   -- buried inside the second panel. A direction is what these tabs actually
   -- differ by, so it is what they are named by.
+  -- Roster is first because it is the only tab you READ. The other three act —
+  -- copy a string, apply one, change a setting — and reading precedes acting.
+  -- It is not what the window OPENS on, though: `/warband` has always landed
+  -- on a highlighted export box and FLOW.md counts that at under two seconds,
+  -- so every existing door still opens the tab it always opened. This one is
+  -- reached by its tab, by `/warband roster`, and by the minimap tooltip
+  -- saying so.
+  tabs[TAB_ROSTER]  = makeTab(TAB_ROSTER, "Roster")
   tabs[TAB_EXPORT]  = makeTab(TAB_EXPORT, "To warband.pro")
   tabs[TAB_IMPORT]  = makeTab(TAB_IMPORT, "From warband.pro")
   tabs[TAB_OPTIONS] = makeTab(TAB_OPTIONS, "Options")
   frame.Tabs = tabs
   PanelTemplates_SetNumTabs(frame, #tabs)
 
+  buildRoster()
   buildExport()
   buildImport()
   buildOptions()
@@ -806,7 +1055,9 @@ function UI.SelectTab(id)
   end
   PanelTemplates_SetTab(frame, id)
   for i, p in ipairs(panels) do p:SetShown(i == id) end
-  if id == TAB_EXPORT then
+  if id == TAB_ROSTER then
+    UI.RenderRoster()
+  elseif id == TAB_EXPORT then
     refreshExport()
   elseif id == TAB_IMPORT then
     UI.RenderJunk()
@@ -829,6 +1080,7 @@ function UI.Open(tab, mode, page)
   UI.pendingOpen = nil
   if mode then UI.mode = mode end
   UI.page = math.max(math.floor(tonumber(page) or 1), 1)
+  UI.rosterPage = 1
   build()
   frame:Show()
   UI.SelectTab(tab)
@@ -842,6 +1094,23 @@ end
 
 function UI.ShowJunk()
   UI.Open(TAB_IMPORT)
+end
+
+function UI.ShowRoster()
+  UI.Open(TAB_ROSTER)
+end
+
+--- Same shape as ToggleJunk: a second press on the same tab closes.
+function UI.ToggleRoster()
+  if frame and frame:IsShown() then
+    if frame.selectedTab == TAB_ROSTER then
+      frame:Hide()
+    else
+      UI.SelectTab(TAB_ROSTER)
+    end
+    return
+  end
+  UI.ShowRoster()
 end
 
 function UI.ShowOptions()
@@ -1019,6 +1288,10 @@ local function minimapTooltip(self)
   GameTooltip:AddLine(" ")
   GameTooltip:AddLine("Click  ·  the export string", 1, 0.82, 0)
   GameTooltip:AddLine("Right-click  ·  options", 1, 0.82, 0)
+  -- The grid has no click of its own left on this button, so the tooltip is
+  -- where it gets discovered: the roster is a tab and a slash command, and a
+  -- feature nobody is told about is one nobody uses.
+  GameTooltip:AddLine("/warband roster  ·  every alt at once", 0.5, 0.5, 0.5)
   GameTooltip:AddLine("Drag  ·  move it round the ring", 0.5, 0.5, 0.5)
   GameTooltip:Show()
 end
