@@ -683,6 +683,26 @@ local function classText(class, text)
   return text
 end
 
+--- Paint one of Roster.lua's tips into GameTooltip and show it.
+---
+--- The model hands back plain strings and `{left, right}` pairs and no colour
+--- at all, so the palette decision lives here with the rest of it. Two columns
+--- for a pair is what makes `Ulgrax   dead` scan as a table rather than as
+--- prose — the same reason the grid itself has columns.
+local function showTip(owner, title, tip)
+  if not tip or #tip == 0 then return end
+  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  if title then GameTooltip:AddLine(title) end
+  for _, line in ipairs(tip) do
+    if type(line) == "table" then
+      GameTooltip:AddDoubleLine(line[1], line[2], 1, 1, 1, 0.6, 0.6, 0.6)
+    else
+      GameTooltip:AddLine(line, 0.5, 0.5, 0.5)
+    end
+  end
+  GameTooltip:Show()
+end
+
 local function buildRoster()
   local p = panels[TAB_ROSTER]
 
@@ -694,20 +714,42 @@ local function buildRoster()
   -- The column headers sit OUTSIDE the scroll frame, so scrolling the rows
   -- never scrolls away the names they belong to. A grid whose header leaves
   -- the screen is a grid of anonymous numbers.
+  -- Each header is a mouse-enabled frame rather than a bare FontString: a
+  -- column is 56px and a name plus a realm plus a level plus an item level plus
+  -- a last-seen does not fit in 56px, so the header shows what identifies the
+  -- character and the hover carries the rest.
   rosterCols = {}
   for i = 1, ROSTER_COLS do
     local x = LABEL_W + (i - 1) * CELL_W
-    local name = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    name:SetPoint("TOPLEFT", x, -20)
+    local hit = CreateFrame("Frame", nil, p)
+    hit:SetPoint("TOPLEFT", x, -18)
+    hit:SetSize(CELL_W, 30)
+    hit:EnableMouse(true)
+    local name = hit:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    name:SetPoint("TOPLEFT", 0, -2)
     name:SetWidth(CELL_W)
     name:SetJustifyH("CENTER")
     name:SetWordWrap(false)
-    local meta = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    meta:SetPoint("TOPLEFT", x, -34)
+    local meta = hit:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    meta:SetPoint("TOPLEFT", 0, -16)
     meta:SetWidth(CELL_W)
     meta:SetJustifyH("CENTER")
     meta:SetWordWrap(false)
-    rosterCols[i] = { name = name, meta = meta }
+    hit:SetScript("OnEnter", function(self)
+      if not self.col then return end
+      local c = self.col
+      local tip = {}
+      if c.realm then tip[#tip + 1] = { "realm", c.realm } end
+      if c.guild then tip[#tip + 1] = { "guild", c.guild } end
+      if c.level then tip[#tip + 1] = { "level", tostring(c.level) } end
+      if c.ilvl then tip[#tip + 1] = { "item level", tostring(c.ilvl) } end
+      if c.gold then tip[#tip + 1] = { "gold", c.gold } end
+      if c.zone then tip[#tip + 1] = { "last seen in", c.zone } end
+      tip[#tip + 1] = { "scanned", c.ago }
+      showTip(self, c.name, tip)
+    end)
+    hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    rosterCols[i] = { hit = hit, name = name, meta = meta }
   end
 
   local well = makeWell(p)
@@ -730,16 +772,28 @@ local function buildRoster()
     label:SetWidth(LABEL_W)
     label:SetJustifyH("LEFT")
     label:SetWordWrap(false)
-    local cells = {}
+    -- A cell is a frame wrapping its FontString for one reason: a FontString
+    -- takes no mouse input, and the hover detail is the whole of what makes
+    -- `2/8` worth reading. This is the widget cost of SavedInstances' secondary
+    -- tooltip, paid once at build and pooled like everything else here.
+    local cells, hits = {}, {}
     for j = 1, ROSTER_COLS do
-      local fs = rosterChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-      fs:SetPoint("TOPLEFT", LABEL_W + (j - 1) * CELL_W, y)
-      fs:SetWidth(CELL_W)
+      local hit = CreateFrame("Frame", nil, rosterChild)
+      hit:SetPoint("TOPLEFT", LABEL_W + (j - 1) * CELL_W, y)
+      hit:SetSize(CELL_W, 14)
+      hit:EnableMouse(true)
+      local fs = hit:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      fs:SetAllPoints(hit)
       fs:SetJustifyH("CENTER")
       fs:SetWordWrap(false)
+      hit:SetScript("OnEnter", function(self)
+        showTip(self, self.tipTitle, self.tip)
+      end)
+      hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
       cells[j] = fs
+      hits[j] = hit
     end
-    rosterLines[i] = { label = label, cells = cells }
+    rosterLines[i] = { label = label, cells = cells, hits = hits }
   end
 
   rosterFoot = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -786,6 +840,8 @@ function UI.RenderRoster()
 
   for i = 1, ROSTER_COLS do
     local col, head = shown[i], rosterCols[i]
+    head.hit.col = col
+    head.hit:SetShown(col ~= nil)
     if col then
       head.name:SetText((DOT[col.dot] or DOT.never) .. classText(col.class, col.name))
       head.meta:SetText(format("|cff%s%s%s|r", MUTED,
@@ -822,25 +878,46 @@ function UI.RenderRoster()
     if lines[n].head then n = n - 1 end
   end
 
+  local function blank(w)
+    for j = 1, ROSTER_COLS do
+      w.cells[j]:SetText("")
+      -- A hit area with no cell under it must not keep the previous render's
+      -- tooltip: an empty cell that still explains somebody else's lockout is
+      -- the exact failure a pooled widget invites.
+      w.hits[j].tip, w.hits[j].tipTitle = nil, nil
+      w.hits[j]:Hide()
+    end
+  end
+
   for i = 1, ROSTER_LINES do
     local line, w = lines[i], rosterLines[i]
     if not line then
       w.label:SetText("")
-      for j = 1, ROSTER_COLS do w.cells[j]:SetText("") end
+      blank(w)
     elseif line.head then
       w.label:SetText(format("|cff%s%s|r", MUTED, line.head))
-      for j = 1, ROSTER_COLS do w.cells[j]:SetText("") end
+      blank(w)
     else
       w.label:SetText(line.label)
       for j = 1, ROSTER_COLS do
         local c = line.cells[j]
+        local hit = w.hits[j]
         if not c then
           -- An empty cell, never a zero. Roster.lua's rule 1, drawn.
           w.cells[j]:SetText("")
-        elseif TONE[c.tone] then
-          w.cells[j]:SetText(format("|cff%s%s|r", TONE[c.tone], c.text))
+          hit.tip, hit.tipTitle = nil, nil
+          hit:Hide()
         else
-          w.cells[j]:SetText(c.text)
+          if TONE[c.tone] then
+            w.cells[j]:SetText(format("|cff%s%s|r", TONE[c.tone], c.text))
+          else
+            w.cells[j]:SetText(c.text)
+          end
+          hit.tip = c.tip
+          -- The title names WHOSE cell this is, because a grid read across
+          -- loses track of the column by the time the mouse arrives.
+          hit.tipTitle = shown[j] and (line.label .. "  —  " .. shown[j].name) or line.label
+          hit:SetShown(c.tip ~= nil)
         end
       end
     end

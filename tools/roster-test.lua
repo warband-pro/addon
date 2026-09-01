@@ -293,6 +293,158 @@ do
     model.warbandBank == nil)
 end
 
+-- ── expired lockouts ────────────────────────────────────────────────────────
+
+do
+  -- The correctness case. `resetTime` is absolute unix seconds, so a character
+  -- last played before the reset carries an instance that has certainly gone.
+  -- Drawing it states something known to be FALSE, which is worse than the
+  -- blank it becomes — the blank correctly says we have not looked since.
+  local model = Roster.Build(db({
+    a = char({ instances = {
+      { name = "Old Raid", difficultyName = "Heroic", isRaid = true, resetTime = NOW - 3600,
+        bosses = { { name = "A", killed = true } } },
+    } }),
+  }), nil)
+  check("an expired lockout is not drawn at all", row(model, "Old Raid (Heroic)") == nil)
+end
+
+do
+  local model = Roster.Build(db({
+    a = char({ instances = {
+      { name = "Live Raid", difficultyName = "Heroic", isRaid = true, resetTime = NOW + 2 * 86400,
+        bosses = { { name = "Ulgrax", killed = true }, { name = "Horror", killed = false } } },
+    } }),
+  }), nil)
+  check("a live one still is", textAt(model, "Live Raid (Heroic)", 1) == "1/2")
+
+  -- SavedInstances' secondary tooltip: the cell says how many, the hover says
+  -- which. Every boss name was already stored and none was ever shown.
+  local tip = row(model, "Live Raid (Heroic)").cells[1].tip
+  local flat = {}
+  for _, line in ipairs(tip or {}) do
+    flat[#flat + 1] = type(line) == "table" and (line[1] .. "=" .. line[2]) or line
+  end
+  local joined = table.concat(flat, ", ")
+  check("the hover names the bosses and says when it resets",
+    joined:find("resets in=2d") and joined:find("Horror=alive") and joined:find("Ulgrax=dead"),
+    joined)
+end
+
+do
+  -- A lockout with no reset time at all is a reading from before the field
+  -- existed, not an expired one. It stays.
+  local model = Roster.Build(db({
+    a = char({ instances = { { name = "No Reset", isRaid = true, bosses = { { killed = true } } } } }),
+  }), nil)
+  check("a lockout with no reset time is kept rather than assumed expired",
+    textAt(model, "No Reset", 1) == "1/1")
+end
+
+do
+  local model = Roster.Build(db({
+    a = char({ worldBosses = {
+      { name = "Kordac", resetTime = NOW + 86400 },
+      { name = "Gone", resetTime = NOW - 86400 },
+    } }),
+  }), nil)
+  check("world bosses count only the ones whose week has not rolled",
+    textAt(model, "world bosses", 1) == "1", textAt(model, "world bosses", 1))
+end
+
+-- ── currency detail ─────────────────────────────────────────────────────────
+
+do
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 3008, name = "Valorstones", quantity = 500, maxQuantity = 2000,
+        weeklyMax = 1500, earnedThisWeek = 320, isAccountWide = true },
+    } }),
+  }), nil)
+  local tip = row(model, "Valorstones").cells[1].tip
+  check("the hover carries the weekly cap, which is the urgent one",
+    tip and tip[1][1] == "this week" and tip[1][2] == "320/1,500", tip and tip[1][2])
+  check("and says when a currency is shared across the warband",
+    tip and tip[2] == "shared across the warband")
+end
+
+-- ── what warband.pro sent back ──────────────────────────────────────────────
+
+do
+  -- The group SavedInstances structurally cannot have. `db.junk[guid]` and
+  -- `db.gearset[guid]` are written by a wbc1! paste and keyed by the same guid
+  -- the columns sort on.
+  local model = Roster.Build({
+    chars = { a = char({ name = "Vocnar" }), b = char({ name = "Voctara" }) },
+    junk = { a = { generatedAt = NOW - 7200, items = {
+      { k = "sell", r = "gap" }, { k = "sell", r = "dupe" }, { k = "de", r = "unusable" },
+    } } },
+    gearset = { a = { generatedAt = NOW - 7200, set = "warband.pro Feral",
+      items = { {}, {}, {} }, bySpec = { [103] = {}, [105] = {} },
+      builds = { [103] = {} } } },
+  }, nil)
+
+  check("a character with a stored plan says how much of it is wearable",
+    textAt(model, "gear set", 1) == "3 to wear", textAt(model, "gear set", 1))
+  check("and how many items to clear out", textAt(model, "clear-out", 1) == "3")
+  check("and how many specs have a build assigned", textAt(model, "builds", 1) == "1")
+  check("and how old the whole answer is", textAt(model, "plan age", 1) == "2h ago")
+
+  -- A character who has never pasted is blank, not zero — the same rule the
+  -- rest of the grid runs on, applied to the inbox.
+  check("a character with no plan gets empty cells", row(model, "gear set").cells[2] == nil)
+
+  -- By verdict and reason, because the wire carries no display name: Junk.lua
+  -- resolves those live against the bags as they are now.
+  local tip = row(model, "clear-out").cells[1].tip
+  local flat = {}
+  for _, line in ipairs(tip or {}) do
+    flat[#flat + 1] = type(line) == "table" and (line[1] .. "=" .. line[2]) or line
+  end
+  local joined = table.concat(flat, ", ")
+  check("the clear-out hover breaks down by verdict and reason",
+    joined:find("to sell=2") and joined:find("to disenchant=1") and joined:find("gap=1"), joined)
+end
+
+do
+  local model = Roster.Build({
+    chars = { a = char() },
+    gearset = { a = { generatedAt = NOW - 60, bySpec = {}, items = {} } },
+  }, nil)
+  check("a stored set with nothing left to equip says stored rather than 0",
+    textAt(model, "gear set", 1) == "stored", textAt(model, "gear set", 1))
+  check("a fresh plan reads as good", row(model, "plan age").cells[1].tone == "good")
+end
+
+do
+  local model = Roster.Build({
+    chars = { a = char() },
+    junk = { a = { generatedAt = NOW - 5 * 86400, items = {} } },
+  }, nil)
+  check("an empty clear-out list is a real answer and reads as good",
+    textAt(model, "clear-out", 1) == "none")
+  -- A plan older than the freshness rule is one describing bags that have
+  -- since changed, so it is flagged with the same thresholds a scan uses.
+  check("a stale plan reads as a problem", row(model, "plan age").cells[1].tone == "bad")
+end
+
+do
+  local model = Roster.Build(db({ a = char() }), nil)
+  check("no plan anywhere means no group at all", row(model, "plan age") == nil)
+end
+
+-- ── ns.hence, the mirror of ns.ago ──────────────────────────────────────────
+
+do
+  check("hence counts forward", ns.hence(NOW + 3 * 86400) == "3d", ns.hence(NOW + 3 * 86400))
+  check("in hours inside two days", ns.hence(NOW + 7200) == "2h", ns.hence(NOW + 7200))
+  check("in minutes inside the hour", ns.hence(NOW + 300) == "5m", ns.hence(NOW + 300))
+  -- nil rather than "0s": a caller has to decide what expired means rather
+  -- than being handed a reassuring zero.
+  check("a passed stamp is nil, not zero", ns.hence(NOW - 1) == nil)
+  check("so is a missing one", ns.hence(nil) == nil)
+end
+
 -- ── result ──────────────────────────────────────────────────────────────────
 
 print(format("\n%d passed, %d failed", pass, fail))
