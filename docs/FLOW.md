@@ -8,6 +8,8 @@ The Blizzard API can't do this. Ever. 14 fields only (name, realm, guid, class, 
 
 So this addon is the bridge — lightweight bundle that makes Altoholic + SavedInstances web-readable, once.
 
+**The bridge carries traffic both ways, and has since 1.4.0.** This file described an export-only product until 2026-09-02, which was true when it was written and had been wrong for three releases: `wbc1!` (1.4.0), `wbg1!` (1.6.0), and `wbc1!` carrying all three sections (1.8.0). The site answers a question and hands the answer back as a string you paste in here — what to clear out, what to put on, which saved build is the raid build — and the Import tab acts on it in the game. See **The loop is a round trip** below; the wire is CONTRACT.md's and the panel is UI.md's.
+
 ## User — Voc, but also every alt-aholic
 
 - 6 tanks, 3H/3A, "Voc-" prefix locked, Horde Wyrmrest Accord / Alliance Moon Guard
@@ -32,11 +34,45 @@ This is not "install once, export once a month". It's frequent, low-friction, am
 
 6. **Saturday push** — Play normally Mon-Sat, Saturday before +12 you paste once and get all 6 current. You never remembered per-char export.
 
+7. **The answer comes back** — site says "worst slot: neck, and you are carrying 3 things worth clearing out". You press `copy for the addon`, alt-tab, `/warband`, Import tab, Ctrl+V. The box clears itself. Gear-set row: `3 to equip · 1 already worn · 1 missing (1 in your bank) · set from 2h ago`, plus junk rows with a reason each. One `[Equip N & save set]` and you are wearing it, with an Equipment Manager set saved once the server confirms — not before, because SaveEquipmentSet snapshots what is worn AT THAT MOMENT.
+
+8. **Sell on the way past a vendor** — `autoJunk` opens the Import tab at `MERCHANT_SHOW` if the resolved list has rows, closes at `MERCHANT_CLOSED`, never in combat and never over a window you already opened. `[Sell]` is dark away from a merchant rather than hidden. `[Disenchant]` is a secure button because it is a spell cast at an item, so it only ever fires under the player's own click.
+
+### The loop is a round trip
+
+Eight steps, two crossings, and **both crossings are a person pressing Ctrl+C and Ctrl+V.** That is the whole shape, and it falls out of the no-network promise rather than being a design choice on top of it:
+
+```
+  game  ──[ /warband, minimap, or Export tab ]──  wb1!  ──▶  warband.pro
+                                                                  │
+                                                            it decides
+                                                                  │
+  game  ◀──  wbc1!  ──[ Import tab, or /warband equip ]──────────  ┘
+     │
+   you act on it, and the next wb1! is what says you did
+```
+
+Two clocks, and hearing them as one is the mistake this file made:
+
+- **The addon's clock is automatic.** ~30 events — `BAG_UPDATE`, the bank and bank-tab ones, `WEEKLY_REWARDS_UPDATE`, `BOSS_KILL`/`ENCOUNTER_END`, `CHALLENGE_MODE_COMPLETED`, `PLAYER_EQUIPMENT_CHANGED`, `PLAYER_AVG_ITEM_LEVEL_UPDATE`, `TRAIT_CONFIG_UPDATED`, the currency and mail ones. **The player never decides to scan.** Step 2 above is this clock, and it is why the bundle is fresh before anyone thinks about it.
+- **The player's clock is deliberate**, and fires at a milestone — the vault ticked, the key went up, the drop landed. 4-10 times a night. Steps 3 and 7 are this clock.
+
+**Neither side may assume the other happened.** A string copied and never pasted looks exactly like one that was, on both sides of the gap. So nothing here applies on paste, and nothing on the site is marked done because a button was pressed. The only evidence a crossing landed is the next crossing back.
+
+**What the return direction refuses, and why each refusal is load-bearing:**
+
+- **Nothing pasted is ever executed.** Hand-rolled JSON decoder for exactly the grammar we emit; `tools/validate.mjs` fails the build on any runtime code-building call anywhere in the zip.
+- **No coordinate crosses the wire.** An item is its verbatim item string, resolved against the bags that exist at the moment you press the button. A list an hour old cannot sell the wrong stack.
+- **Guid is the only match key**, and only characters already in `WarbandProDB.chars` are kept. A string from someone else's account resolves to nothing and says so.
+- **Fail closed in combat, and name which refusal it was.** "You are in combat" is worth retrying in ten seconds; "you have not pasted a set" means go back to the site. One "nothing happened" would send the second player to wait out a fight that was never the problem.
+- **Greys are found here, not sent.** The site's copy of your bags is as old as your last paste; vendor trash is only worth listing if it is what you are carrying now.
+
 ### What does NOT happen
 
 - Not thinking about addon install after first 5 min (CurseForge or `_retail_/Interface/AddOns/` drag).
 - Not reading tooltips scanning (we don't do tooltip injection).
 - Not auto-uploading in background (trust/privacy — user-initiated only, we never network).
+- Not auto-applying what comes back either — same rule, other direction. A paste stores; a click acts.
 - Not opening settings to tweak (default correct: account-wide `WarbandProDB`, minimap button already on the ring, addon compartment as well).
 - Not managing recipe full list (too large) — we keep counts.
 
@@ -67,12 +103,14 @@ Hotkeys: `1-4` route, `?` help already. `i` opens import from anywhere.
 - No combat taint: export in combat safely disabled, queue reopen after `PLAYER_REGEN_ENABLED`.
 - Memory <2MB for 6 chars, SavedVariables <200KB.
 - String 4-7KB bundle 6, fits EditBox, copy-paste <5 sec for whole Saturday push.
+- **One paste back, not two.** A player who does half the return trip must not end up with a gear set and no clear-out list, with nothing saying so. That was true until 1.8.0 and is what `wbc1!` growing three sections fixed.
+- **The gear-set row never promises an equip it cannot find.** Counts come from a resolve at render time, so `1 missing (1 in your bank)` is a fact about your bags now rather than about the string.
 
 ## What we document elsewhere
 
 - `RESEARCH-REFERENCE.md` → Midnight 12.0+ rules, why no Ace3, Interface 120001, Compartment, C_Container/C_Bank, Secret Values/CLEU avoidance, LibDeflate wb1! standard.
-- `CONTRACT.md` → wire shape, versioning, validation, DoS caps.
-- `UI.md` → the game panel's exact EditBox props and auto-highlight. The website is the app repo's to specify; UI.md carries a pointer, not a design.
+- `CONTRACT.md` → wire shape, versioning, validation, DoS caps — **all three directions**: `wb1!` out, `wbc1!` back, `wbg1!` still read and no longer written.
+- `UI.md` → the game panel's exact EditBox props and auto-highlight, and the Import tab that acts on what comes back — the gear-set row, the junk rows, why Disenchant is a secure button. The website is the app repo's to specify; UI.md carries a pointer, not a design.
 - `TESTING.md` → offline luacheck + pure tests + vector round-trip + 5-min manual pass scripted for AI screenshot parse.
 - `QA.md` → copy-paste result format `PASS/FAIL`.
 - `CI.md` → packager, semver, tokens.
