@@ -45,6 +45,25 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**A Roster tab, so you can see what this addon has been collecting.** Until now
+it gathered everything and showed you a compressed string. `/warband roster`, or
+the new first tab, lays your characters out across the top and everything
+tracked about them down the side — vault progress, keystones, raid lockouts as
+`killed/total`, currencies against their caps, professions, gold, bag space,
+phials and food. It is one screen and you read it across: which of them still
+owes a vault slot, which one is holding the crests.
+
+Blank is not zero here, and the difference matters. A cell is empty when that
+character has never had that thing read — a bank you have not opened, an alt
+you have not played since the patch — and shows a number only when it was
+actually looked at. Six characters fit at a time; past that the `<` and `>`
+buttons page through the rest.
+
+Nothing about exporting changed. `/warband` still opens straight onto the
+string with it already selected.
+
 ## [1.8.0] — 2026-08-31 — one string back, and your builds by name
 
 ### Added

@@ -85,6 +85,33 @@ Pass 3 — edge + combat
 
 Result paste back format (pasteable to AI loop):
 
+## The roster grid (1.9.0)
+
+`tools/roster-test.lua` holds every rule about WHAT a cell says — 36
+assertions, and the load-bearing one is that an unread section draws an empty
+cell rather than a `0`. What it cannot check is whether the grid DRAWS: the
+model is a table of strings and tones, and alignment, class colour and paging
+only exist once a frame does. So this pass is about the picture, not the
+numbers.
+
+- [ ] `/warband roster` opens the window on the Roster tab; the tab is
+      leftmost and `/warband` on its own still opens Export with the string
+      already highlighted
+- [ ] Column headers line up over their cells, and stay put when the rows are
+      scrolled — they are outside the scroll frame for exactly this
+- [ ] Your current character is the first column
+- [ ] Names carry class colour; a level and an item level sit under each
+- [ ] A character you have not played in days shows a red dot, and the same
+      character shows the same dot on the Export tab — one freshness rule
+- [ ] A row where you know a value is missing is BLANK, not `0` — the easiest
+      way to see one is a character whose bank you have never opened
+- [ ] With seven or more characters, `[ < ]` and `[ > ]` appear and page the
+      columns; the row labels do not change as you page
+- [ ] A lockout row reads `killed/total` and matches the Raid Info panel
+- [ ] Reopening the window comes back on page 1 rather than where you left it
+- [ ] Nothing in BugSack after opening the tab on an account with one
+      character and again with a full warband
+
 ## The gear set — equip and save (1.6.0)
 
 **This is the first thing this addon has ever done that moves gear on your

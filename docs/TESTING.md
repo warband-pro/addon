@@ -8,8 +8,17 @@ Like modern Midnight template docs: debugging first-class, every feature degrada
 
 We split code into two halves:
 
-- **Pure / deterministic** — can be unit tested on CLI: Bundle.lua, Export.lua decode flow, consumables rollup, freshness dot logic, CONTRACT validators, gold math. WoW API = 0 inside these. Injection: caller passes data tables, function returns tables/strings. No globals.
+- **Pure / deterministic** — can be unit tested on CLI: Bundle.lua, Export.lua decode flow, consumables rollup, freshness dot logic, CONTRACT validators, gold math, and **Roster.lua's whole grid model** (1.9.0 — a DB table in, a display model out). WoW API = 0 inside these. Injection: caller passes data tables, function returns tables/strings. No globals.
 - **Impure / WoW-bound** — Scan.lua, Instances.lua, Store.lua, UI.lua, Core.lua dispatcher. Require GAME. Test via manual checklist + BugSack + /dump + screenshots.
+
+The roster is the clearest case the split has: the grid is a display, and a
+display is the thing hand-checking is worst at — six columns of numbers all
+look plausible. So every rule about WHAT is in a cell lives in Roster.lua and
+is tested here (`tools/roster-test.lua`, 36 assertions), and what is left for
+the QA pass is only whether it draws: alignment, paging, the class colours.
+**The rule most worth a test rather than an eyeball is that an absent reading
+draws an empty cell and never a `0`** — on screen those two differ by one
+character and mean opposite things.
 
 That means AI can get high confidence before human opens WoW: if pure tests pass + luacheck clean + .toc list valid, only WoW integration remains risky.
 

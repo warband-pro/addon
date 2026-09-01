@@ -42,6 +42,7 @@ Export.lua
 Import.lua
 Junk.lua
 GearSet.lua
+Roster.lua
 UI.lua
 Core.lua
 
