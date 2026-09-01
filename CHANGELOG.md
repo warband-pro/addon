@@ -64,6 +64,28 @@ buttons page through the rest.
 Nothing about exporting changed. `/warband` still opens straight onto the
 string with it already selected.
 
+**Hover any cell for the detail behind it.** The grid stays readable by keeping
+cells to two or three characters, so everything they summarise is on the mouse.
+A raid lockout says `2/8` and its tooltip names every boss you have killed and
+every one still alive, plus how long until it resets. A vault cell lists each
+slot, what it needs and whether you have earned it. A currency shows what you
+have banked and, underneath, what you have earned against this week's cap —
+the one that disappears if you do not spend it. A column header carries realm,
+guild, level, item level, gold and where that character logged out.
+
+**Lockouts that already reset are no longer listed.** If you had not logged a
+character in since the weekly reset, the addon was still showing you last
+week's raid as though you were saved to it. That cell is now blank, which is
+the honest answer: the old lockout is gone, and whether you have picked up a
+new one is something nobody has checked yet.
+
+**A `from warband.pro` section shows what the site last sent you.** Paste a
+string from warband.pro and the bottom of the grid fills in, per character: how
+many pieces of the gear set you can still put on, how many items are on the
+clear-out list and why, how many specs have a build assigned, and how old that
+answer is. Finding out which of nine alts had an unapplied plan used to mean
+logging into nine alts.
+
 ## [1.8.0] — 2026-08-31 — one string back, and your builds by name
 
 ### Added

@@ -210,6 +210,22 @@ function ns.ago(stamp)
   return math.floor(d / 86400) .. "d ago"
 end
 
+-- The mirror of ns.ago, for a stamp in the FUTURE: how long until it. Used by
+-- the roster grid for a lockout reset, which is the one number that decides
+-- whether a saved instance still matters tonight.
+--
+-- nil for a stamp that has already passed, deliberately — "0s" and "in 3d" are
+-- both statements about a live lockout, and a caller that gets nil has to
+-- decide what an expired one means rather than printing a reassuring zero.
+function ns.hence(stamp)
+  if type(stamp) ~= "number" or stamp <= 0 then return nil end
+  local d = stamp - ns.now()
+  if d <= 0 then return nil end
+  if d < 3600 then return math.max(math.floor(d / 60), 1) .. "m" end
+  if d < 172800 then return math.floor(d / 3600) .. "h" end
+  return math.floor(d / 86400) .. "d"
+end
+
 -- The dot the panel and the website both draw from one stamp.
 function ns.dot(stamp)
   local d = ns.age(stamp)

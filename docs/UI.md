@@ -127,6 +127,61 @@ mail when something is waiting). The warband bank is account-wide and so has no
 column to live in; it is the footer line, with how many of its tabs were
 actually read.
 
+**Hover is where the parity actually lands.** A cell is two or three characters
+because that is what makes a row readable *across*; everything it summarises
+lives in the cell's own tooltip, which is the feature people name when they say
+SavedInstances reads well. A lockout cell says `2/8` and its hover names every
+boss dead and alive and how long until it resets; a vault bucket's hover lists
+each slot's threshold and whether it is earned — detail `Instances.lua` has
+stored since 1.2.0 that nothing had ever read. A currency's hover carries the
+**weekly** cap, which is the urgent one: a weekly that resets unspent is gone,
+where a total cap merely stops accruing. A column header's hover carries realm,
+guild, level, item level, gold, last zone and when it was scanned, because none
+of that fits in 56px and all of it identifies the character.
+
+Mechanically this is why a cell is a `Frame` wrapping a FontString rather than a
+bare FontString: a FontString takes no mouse input. Pooled at build like every
+other widget here, and a hit area with no cell under it is hidden and has its
+tooltip cleared — a pooled widget that keeps the last render's tooltip is
+exactly the bug this arrangement invites.
+
+**An expired lockout is not drawn.** `resetTime` is absolute unix seconds, so a
+character last played before the reset carries a saved instance that has
+certainly gone. Drawing it would state something known to be false, which is
+worse than the blank it becomes — the blank correctly says nobody has looked
+since. Whether they re-locked is a different question and an unread one. This is
+SavedInstances' `ShowExpired` decided rather than configured, and it is decided
+the way this addon decides everything else: a reading it cannot stand behind is
+not shown. A lockout with no `resetTime` at all predates the field and stays.
+
+### `from warband.pro` — the group SavedInstances cannot have
+
+SavedInstances has no other side. This addon does, and the last row group is
+what the website last sent back, per character: whether a gear set is stored and
+how much of it is wearable, how many items are on the clear-out list, how many
+specs have a build assigned, and **how old the whole answer is**.
+
+It reads `db.junk[guid]` and `db.gearset[guid]` — written by a `wbc1!` paste,
+keyed by the same guid the columns already sort on.
+
+**It draws the plan's existence and age, never its reasoning.** Not which item
+is better, not how far behind a slot is, not who to play tonight: those need the
+season loot table, per-item stats and weights, none of which are in this client,
+and a second surface guessing at them would be a second surface being wrong. The
+website decides; this says whether its answer arrived and how stale it has gone.
+The clear-out hover breaks down by verdict and reason (`3 to sell`, `1 to
+disenchant`, `gap`, `dupe`) rather than by item name, because the wire carries
+no display name — `Junk.lua` resolves those live against the bags as they are
+now, and a name stored an hour ago is a name for an item that may have moved.
+
+The plan-age row uses `ns.dot`'s own thresholds rather than new ones: a plan and
+a scan go stale at the same rate, because they describe the same bags.
+
+Why it belongs in the grid rather than on the Import tab: **the Import tab is
+the character at the keyboard, and this is a warband question.** Before it,
+finding out which of nine alts had an unapplied plan meant logging into nine
+alts.
+
 **It reads the same DB the export encodes**, so it is not a second source of
 truth and cannot drift from the bundle: what the grid shows is what the paste
 will carry. That is the reason it belongs in this window rather than in one of

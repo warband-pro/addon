@@ -111,6 +111,20 @@ numbers.
 - [ ] Reopening the window comes back on page 1 rather than where you left it
 - [ ] Nothing in BugSack after opening the tab on an account with one
       character and again with a full warband
+- [ ] Hover a lockout cell — the tooltip names every boss dead and alive and
+      says how long until it resets, and its title names the character
+- [ ] Hover a vault cell — each slot's threshold, and which are earned
+- [ ] Hover a currency with a weekly cap — "this week 320/1,500"
+- [ ] Hover a column header — realm, guild, level, item level, gold, last zone,
+      when it was scanned
+- [ ] Move the mouse from a cell that has a tooltip to a blank one — the old
+      tooltip disappears rather than following the cursor
+- [ ] Page the columns with `>` while a tooltip is up, then hover the same
+      screen position — it describes the NEW character, not the old one
+- [ ] A character whose lockout expired while you were logged out shows a blank
+      cell there, not last week's `2/8`
+- [ ] After pasting a `wbc1!` string, the `from warband.pro` rows fill in for
+      the characters it covered and stay blank for the ones it did not
 
 ## The gear set — equip and save (1.6.0)
 
