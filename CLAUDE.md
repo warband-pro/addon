@@ -37,6 +37,164 @@ that is the change of 2026-08-26 and the reason for it is under **Git** below.
    at step 2. This container is ephemeral and is reclaimed after idle, so work
    that is committed and never pushed dies with it.
 
+## Defaults
+
+**Nothing here is a question.** This is the standing answer to what a session
+would otherwise stop and ask — the toolchain, the commands, where a file goes,
+what a new function should look like. Every line is read off this repo rather
+than proposed for it, and the same rule the docs live under applies: **where
+this and the code disagree, the code is right and this gets corrected in
+place.**
+
+### Toolchain
+
+| | |
+|---|---|
+| Addon language | **Lua 5.1** — what the WoW client runs. Not 5.4 syntax, ever: no goto, no integer division, no bitwise operators. |
+| Client target | Retail **Midnight**, `## Interface: 120100`. Retail only; there is no Classic branch. |
+| Lint | **luacheck** against `.luacheckrc`, **0 warnings** |
+| Tooling | **Node 22**, plain ESM `.mjs` under `tools/` |
+| Dependencies | **none, in either direction.** There is no `package.json` — every tool imports `node:fs`, `node:path`, `node:url`, `node:zlib` and nothing else. LibDeflate is vendored as one file in `Vendor/`, and `.pkgmeta` has no `externals:` block on purpose. |
+
+**Neither Lua nor luacheck is installed in a fresh container.** Measured
+2026-09-01: `node` is on the path, `lua5.1` and `luacheck` are not. Install them
+before Verify rather than reporting the tests as unrunnable — it is the same two
+commands CI uses, takes about 40 seconds, and `.claude/settings.json` allows
+both without asking:
+
+```bash
+apt-get update && apt-get install -y --no-install-recommends lua5.1 luarocks
+luarocks install luacheck
+```
+
+### Verify, as one block
+
+The **Verify** section below is the authority; this is the copy-pasteable form,
+and it is the whole gate — there is no build step, no formatter and no test
+runner beyond `lua5.1` running a file.
+
+```bash
+luacheck .
+node tools/validate.mjs
+node tools/vector.mjs
+node tools/slop.mjs --unreleased
+for t in import junk gear gearset freshness; do lua5.1 tools/$t-test.lua; done
+node tools/vector.mjs --write && git diff --exit-code -- docs/contract/vectors
+```
+
+The last line is a **separate** check from `node tools/vector.mjs` and fails on
+its own; the reason that trips people is under **Verify**. A green run of all
+six is a green PR, because `ci.yml` runs exactly these.
+
+### Layout
+
+```
+*.lua           the addon, flat at the root, loaded in .toc order
+Vendor/         upstream LibDeflate, verbatim and unlinted — never reformat it
+tools/          Node and Lua checks. Never ships (.pkgmeta strips it).
+docs/           the twelve reference documents. Never ships.
+docs/contract/  the golden wb1!/wbc1! vectors, regenerated not hand-edited
+.github/        ci.yml and release.yml
+```
+
+**Flat root, and flat means flat.** A new Lua file goes at the root and gets a
+line in `WarbandPro.toc` in load order — libs → namespace → data → UI →
+`Core.lua` last, because Core registers events at load. `tools/validate.mjs`
+fails the build if a listed file is missing or an unlisted one exists, and the
+`.claude` commit hook treats a `.lua` file with a slash in its path as a file
+that does not belong to this repo. Do not create a source directory.
+
+Where a change goes, by default: **an existing file.** There are thirteen at the
+root and each owns one subject — reading a WoW API is `Scan.lua`, item classification is
+`Gear.lua`, anything that parses a string somebody else produced is
+`Import.lua`, anything with a frame is `UI.lua`. A new file is a decision worth
+a sentence in the commit; adding to the right existing one is not.
+
+### Conventions
+
+- **One global, deliberately.** `_G.WarbandPro = ns` in `Init.lua`, and
+  everything else hangs off the private addon table: `local _, ns = ...` at the
+  top of every file, then `ns.Gear = Gear`. `.luacheckrc`'s `globals` list is
+  therefore also the leak audit — **a new luacheck warning is usually a leaked
+  global, not a style nit.** Do not add a name to that list to silence one
+  without knowing why it is there.
+- **Every WoW API call goes through `ns.safe`.** 75 call sites across ten
+  files. Midnight renamed and moved enough of the container and bank surface
+  that a nil field must cost one section of one snapshot, never a Lua error in
+  the middle of the user's raid. A section that cannot be read **goes missing
+  rather than throwing**, and the wire format is null-tolerant so the website
+  can tell "not read" from "read, empty" — `docs/CONTRACT.md` is the law on
+  which is which.
+- **Naming.** `PascalCase.lua` files, one module table per file named after it;
+  `local function camelCase` for file-local helpers; `ns.camelCase` for shared
+  ones; `SCREAMING_SNAKE` for constant tables (`EQUIPPED_SLOTS`,
+  `EQUIPLOC_SLOT`). Constants that cross the wire live in `Init.lua`.
+- **Formatting** is `.editorconfig` and it is not negotiable by feel: two
+  spaces, LF, final newline, no trailing whitespace, 100 columns for Lua.
+  luacheck allows 120 bytes and comments are exempt, because the box-drawing
+  section rules measure long in bytes and short on screen.
+- **Comments carry the reasoning.** The house style is a prose header saying
+  what a file is for and what was tried and rejected — `Init.lua` on why
+  `ns.LibDeflate` has a fallback, `Gear.lua` on why gear rides the item string
+  instead of a decomposed model. A comment restating the line under it is
+  noise.
+
+### Testing
+
+- **Pure code is tested off-client; impure code is a manual checklist.** That
+  split is `docs/TESTING.md` and it is the whole strategy. `Bundle.lua`,
+  `Export.lua`, `Import.lua`, `Gear.lua`, `GearSet.lua`, `Junk.lua` are pure and
+  have `tools/<subject>-test.lua`; `Scan.lua`, `Store.lua`, `UI.lua` and
+  `Core.lua` are WoW-bound and are verified by `docs/QA.md` in game.
+- **Tests are hand-rolled `lua5.1` scripts, not busted.** Each one stands a fake
+  client API in front of the module, counts `pass`/`fail` and exits non-zero —
+  copy the shape of `tools/import-test.lua`, which loads the *shipped*
+  `Init.lua` rather than restating the namespace, because a fixture that
+  restates the contract cannot catch the shipped file failing to meet it.
+- **No coverage number, and the bar is a rule instead:** a change to a pure
+  module arrives with its case in that module's test file, and a wire-format
+  change arrives with regenerated fixtures. 295 assertions across the five
+  files today.
+- **Never hand-edit `docs/contract/vectors`.** `node tools/vector.mjs --write`
+  is deterministic; regenerate and commit.
+
+### Commits, changelog, releases
+
+**Conventional Commits with a scope, in the maintainer's voice** —
+`type(scope): what is now true`, lowercase, no trailing period, the outcome
+rather than the mechanics. Types in use: `feat`, `fix`, `docs`, `ci`, `chore`,
+and `release: N.N.N — summary` for a cut. `fix(bindings): Bindings.xml is
+loaded by name, so listing it in the .toc loads it twice` is the register.
+
+**A `CHANGELOG.md` note under `## [Unreleased]` moves with the commit** when a
+player would notice the change — and only then. It is written for players, not
+for the commit log, and `tools/slop.mjs` fails CI on notes that read like
+marketing. Leave the `## [Unreleased]` heading in place when cutting a release;
+removing it turns `main` red.
+
+**Cutting a release is not a routine decision and is not yours to make
+unasked.** A tag ships to CurseForge and Wago and cannot be recalled;
+`.claude/settings.json` asks before `git tag` and before pushing one. What
+number a release gets is `CHANGELOG.md`'s semver rule — anchored to what the
+player has to do about it, not to payload shape.
+
+### The rest, stated once
+
+- **No network calls, ever.** The central promise of this addon and of
+  `docs/POLICY.md`. Nothing leaves the client on its own; the player copies a
+  string by hand. This is not a performance trade-off to revisit.
+- **No Ace3, no LibStub, no new library.** `docs/RESEARCH-REFERENCE.md` says
+  why. LibDeflate is the one vendored dependency and it stays one file.
+- **A wire-format change is never a local decision.** `wb1!` is a contract with
+  `warband-pro/app`; `docs/CONTRACT.md` says when the prefix moves — additive
+  and narrowing changes do not spend one, only a break does.
+- **`.claude/settings.json` is a convenience, not a boundary.** The allow list
+  covers the six Verify commands, the toolchain install, git and the PR tools so
+  a session does not stop mid-path; the deny list restates rules already in
+  prose — no force-push, no discarding uncommitted work, and no retrying the
+  remote-ref delete that is 403 every time. The commit hook is the boundary, and
+  it is in `.claude/hooks/`.
+
 ## Start Here
 
 | Question | Document |
