@@ -45,6 +45,10 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+- clear orphaned junk lists when warbank attribution is cleared without removing a character — matches optimize path
+
 ## [1.9.0] — 2026-09-02 — see every alt at once
 
 Everything this addon has been collecting since 1.0 went into a compressed

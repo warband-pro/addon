@@ -268,10 +268,8 @@ function Store.Forget(name)
       cleared = true
     end
   end
-  if removed > 0 then
+  if removed > 0 or cleared then
     Store.DropJunk(removedGuids)
-    Store.Touch()
-  elseif cleared then
     Store.Touch()
   end
   return removed
