@@ -109,8 +109,8 @@ numbers.
       character shows the same dot on the Export tab — one freshness rule
 - [ ] A row where you know a value is missing is BLANK, not `0` — the easiest
       way to see one is a character whose bank you have never opened
-- [ ] With seven or more characters, `[ < ]` and `[ > ]` appear and page the
-      columns; the row labels do not change as you page
+- [ ] `[ < ]` and `[ > ]` appear only when the warband is wider than the window
+      can be dragged; the row labels do not change as you page
 - [ ] A lockout row reads `killed/total` and matches the Raid Info panel
 - [ ] Reopening the window comes back on page 1 rather than where you left it
 - [ ] Nothing in BugSack after opening the tab on an account with one
@@ -123,6 +123,35 @@ numbers.
       when it was scanned
 - [ ] Move the mouse from a cell that has a tooltip to a blank one — the old
       tooltip disappears rather than following the cursor
+
+### The resizable window (unreleased)
+
+The grid now measures itself, so the picture depends on the window and on the
+size of the warband looking at it. The two failures worth hunting are a column
+count that does not follow the width, and a pool that grows but never shrinks —
+a widget left over from a wider window still drawing last render's cell.
+
+- [ ] The window opens at eight columns wide with nothing configured
+- [ ] Drag the corner grip wider — columns APPEAR as it grows, and the headers
+      stay over their cells the whole way
+- [ ] Drag it narrower — columns disappear and no orphaned name or cell is left
+      behind past the right edge of the grid
+- [ ] It refuses to go below about 560 wide or above 1600
+- [ ] `/reload` — the window comes back the size you left it and where you put
+      it, and the columns match that width
+- [ ] Log in on a second character — the window is the same size there
+      (`opts.window` is account-wide, like the minimap angle)
+- [ ] **The 24-row ceiling is gone.** On a character with a full currency list,
+      scroll the grid to the bottom: every row has a label and cells, and there
+      is no run of blank rows under the last one
+- [ ] A group header (`currencies`, `pockets`) has a faint rule behind it
+- [ ] Moving down the rows lights each one under the cursor, full width, and
+      the highlight leaves when the mouse leaves the grid
+- [ ] Group headers do NOT highlight — they are not rows you read across
+- [ ] Widen the window, switch to the Export tab — the string fills the new
+      width rather than wrapping at the old one, and Ctrl+C still acknowledges
+- [ ] Resize while the Import tab has disenchant rows on it, then go back —
+      nothing has been taint-broken and the buttons still work
 - [ ] Page the columns with `>` while a tooltip is up, then hover the same
       screen position — it describes the NEW character, not the old one
 - [ ] A character whose lockout expired while you were logged out shows a blank

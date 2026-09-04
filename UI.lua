@@ -46,20 +46,48 @@ local TAB_ROSTER, TAB_EXPORT, TAB_IMPORT, TAB_OPTIONS = 1, 2, 3, 4
 local MAX_ROWS = 8
 local JUNK_ROWS = 12
 
--- The grid's geometry, and the one number that decides the rest: the window is
--- 560 wide, the inset and the scrollbar take about 60 of it, and a label column
--- wide enough for "Nerub-ar Palace (Heroic)" takes 152 more. What is left
--- divides into six cells, which is why a warband larger than six pages rather
--- than shrinking — a cell narrower than this cannot hold `4,500/20,000`.
-local ROSTER_COLS = 6
-local ROSTER_LINES = 24
-local LABEL_W, CELL_W = 152, 56
+-- The grid's geometry. Two numbers are fixed because the text decides them: a
+-- label column has to hold "Nerub-ar Palace (Heroic)", and a cell has to hold
+-- `4,500/20,000`. Everything else follows from the size of the window, which
+-- the player now sets by dragging its corner.
+--
+-- **This was a constant six columns and a constant 24 rows, and both were wrong
+-- in the same way** — a warband is not a fixed size. Six columns meant an
+-- eight-alt player read six of them and paged for the rest, which is precisely
+-- what the read-across arrangement exists to avoid. Twenty-four rows was worse
+-- than a limit and closer to a lie: the model builds every row and the scroll
+-- child was sized for all of them, but only the first 24 were ever painted, so
+-- a real warband (16 currencies, 9 professions, the vault, pockets — 38 lines
+-- measured) scrolled off the bottom of its own grid into blank space. Both
+-- pools now grow to whatever the model and the window between them ask for.
+local LABEL_W, CELL_W, LINE_H = 152, 56, 14
+
+-- The gutter left of the first cell. The well is already anchored 20px clear of
+-- UIPanelScrollFrameTemplate's bar, so the bar is NOT subtracted again here —
+-- doing so is how a 560px window that has always held six columns quietly
+-- starts holding five.
+local ROSTER_GUTTER = 6
+
+-- Window bounds, and the default is the one worth explaining. It is derived
+-- rather than chosen: eight columns is 152 + 8x56, the gutter is 6, and the
+-- chrome between the frame's edge and the scroll frame's costs about 72 across
+-- the inset, the panel, the well and the scrollbar gutter — so 680 is the width
+-- at which a warband of eight is on screen the moment the window opens.
+--
+-- **Eight, not the six this window used to fit, because opening on a partial
+-- warband is the complaint.** The minimum stays at the old 560 so a player who
+-- wants it narrow can still have it; below that the label column and a usable
+-- cell stop fitting together.
+local WIN_DEF_W, WIN_DEF_H = 680, 520
+local WIN_MIN_W, WIN_MIN_H = 560, 420
+local WIN_MAX_W, WIN_MAX_H = 1600, 1000
 
 local frame, panels, tabs
 local editBox, header, footer, rows, help
 local junkPaste, junkHeader, junkFooter, junkRows, junkChild
 local gsHeader, gsButton
 local rosterHead, rosterFoot, rosterCols, rosterLines, rosterChild, rosterPrev, rosterNext
+local rosterScroll
 local optionChecks = {}
 
 UI.mode = "bundle"
@@ -163,6 +191,12 @@ local function buildExport()
   editBox:SetAutoFocus(false)
   editBox:SetFontObject(ChatFontNormal)
   editBox:SetWidth(470)
+  -- The box wraps at its own width, so a window the player widened for the
+  -- roster has to widen the string too — otherwise the export tab keeps a
+  -- 470px column of text in the middle of a 1200px window.
+  scroll:SetScript("OnSizeChanged", function(self, w)
+    if w and w > 0 then editBox:SetWidth(w) end
+  end)
   editBox:SetScript("OnEscapePressed", function() frame:Hide() end)
   -- The string is not editable in any useful sense; if the user types into it,
   -- put it back rather than let a broken paste reach the website. SetText from
@@ -703,6 +737,142 @@ local function showTip(owner, title, tip)
   GameTooltip:Show()
 end
 
+--- Build one column header, on demand.
+---
+--- Headers sit OUTSIDE the scroll frame so scrolling the rows never scrolls
+--- away the names they belong to. A grid whose header leaves the screen is a
+--- grid of anonymous numbers.
+---
+--- Each is a mouse-enabled frame rather than a bare FontString, because a name
+--- plus a realm plus a level plus an item level plus a last-seen does not fit
+--- in 56px: the header shows what identifies the character and the hover
+--- carries the rest.
+local function makeRosterCol(i)
+  local p = panels[TAB_ROSTER]
+  local hit = CreateFrame("Frame", nil, p)
+  -- +8 because the cells below are children of the scroll frame, which starts
+  -- 8px inside the well, and these are children of the panel. Without it every
+  -- name in the grid sits 8px left of the column it labels.
+  hit:SetPoint("TOPLEFT", 8 + LABEL_W + (i - 1) * CELL_W, -18)
+  hit:SetSize(CELL_W, 30)
+  hit:EnableMouse(true)
+  local name = hit:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  name:SetPoint("TOPLEFT", 0, -2)
+  name:SetWidth(CELL_W)
+  name:SetJustifyH("CENTER")
+  name:SetWordWrap(false)
+  local meta = hit:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  meta:SetPoint("TOPLEFT", 0, -16)
+  meta:SetWidth(CELL_W)
+  meta:SetJustifyH("CENTER")
+  meta:SetWordWrap(false)
+  hit:SetScript("OnEnter", function(self)
+    if not self.col then return end
+    local c = self.col
+    local tip = {}
+    if c.realm then tip[#tip + 1] = { "realm", c.realm } end
+    if c.guild then tip[#tip + 1] = { "guild", c.guild } end
+    if c.level then tip[#tip + 1] = { "level", tostring(c.level) } end
+    if c.ilvl then tip[#tip + 1] = { "item level", tostring(c.ilvl) } end
+    if c.gold then tip[#tip + 1] = { "gold", c.gold } end
+    if c.zone then tip[#tip + 1] = { "last seen in", c.zone } end
+    tip[#tip + 1] = { "scanned", c.ago }
+    showTip(self, c.name, tip)
+  end)
+  hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  rosterCols[i] = { hit = hit, name = name, meta = meta }
+  return rosterCols[i]
+end
+
+--- Build one grid line, on demand: a label and as many cells as columns exist.
+---
+--- A line owns its own cells, so growing the column count has to reach into
+--- every line already built. `growLine` below is that reach, and it is why the
+--- cell pool is per-line rather than a flat grid — a line is the unit that
+--- appears and disappears as the model changes.
+local function makeRosterLine(i)
+  local y = -(i - 1) * LINE_H
+
+  -- The stripe under the whole line, drawn first so text sits on top of it. It
+  -- does two jobs SavedInstances does with LibQTip: it separates a group from
+  -- the one above, and it follows the mouse across a row. Reading a 14px row
+  -- across twelve columns is exactly where an eye loses its place.
+  local stripe = rosterChild:CreateTexture(nil, "BACKGROUND")
+  stripe:SetPoint("TOPLEFT", 0, y)
+  stripe:SetHeight(LINE_H)
+  stripe:Hide()
+
+  local label = rosterChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  label:SetPoint("TOPLEFT", 0, y)
+  label:SetWidth(LABEL_W)
+  label:SetJustifyH("LEFT")
+  label:SetWordWrap(false)
+
+  -- The hover area spans the whole line, under the cells, so the highlight
+  -- tracks a row rather than a cell. It is behind them in frame level, so a
+  -- cell's own tooltip still wins where there is one.
+  local rowHit = CreateFrame("Frame", nil, rosterChild)
+  rowHit:SetPoint("TOPLEFT", 0, y)
+  rowHit:SetHeight(LINE_H)
+  -- Explicitly below the cells. They are siblings, and a tie on frame level is
+  -- settled by creation order — which would make the row highlight swallow the
+  -- cell tooltips that are the whole point of the grid.
+  rowHit:SetFrameLevel(rosterChild:GetFrameLevel())
+  rowHit:EnableMouse(false)
+  rowHit:SetScript("OnEnter", function(self) if self.hi then self.hi:Show() end end)
+  rowHit:SetScript("OnLeave", function(self) if self.hi then self.hi:Hide() end end)
+
+  local hi = rosterChild:CreateTexture(nil, "ARTWORK")
+  hi:SetPoint("TOPLEFT", 0, y)
+  hi:SetHeight(LINE_H)
+  hi:SetColorTexture(1, 1, 1, 0.06)
+  hi:Hide()
+  rowHit.hi = hi
+
+  rosterLines[i] = {
+    label = label, stripe = stripe, hi = hi, rowHit = rowHit,
+    cells = {}, hits = {}, y = y,
+  }
+  return rosterLines[i]
+end
+
+--- Give a line cells up to `n`, creating the ones it does not have.
+---
+--- A cell is a frame wrapping its FontString for one reason: a FontString takes
+--- no mouse input, and the hover detail is the whole of what makes `2/8` worth
+--- reading. This is the widget cost of SavedInstances' secondary tooltip, and
+--- it is paid once per cell for the life of the session.
+local function growLine(w, n)
+  for j = #w.cells + 1, n do
+    local hit = CreateFrame("Frame", nil, rosterChild)
+    hit:SetPoint("TOPLEFT", LABEL_W + (j - 1) * CELL_W, w.y)
+    hit:SetSize(CELL_W, LINE_H)
+    hit:SetFrameLevel(rosterChild:GetFrameLevel() + 2)
+    hit:EnableMouse(true)
+    local fs = hit:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fs:SetAllPoints(hit)
+    fs:SetJustifyH("CENTER")
+    fs:SetWordWrap(false)
+    hit:SetScript("OnEnter", function(self)
+      if w.hi then w.hi:Show() end
+      showTip(self, self.tipTitle, self.tip)
+    end)
+    hit:SetScript("OnLeave", function()
+      if w.hi then w.hi:Hide() end
+      GameTooltip:Hide()
+    end)
+    w.cells[j] = fs
+    w.hits[j] = hit
+  end
+end
+
+--- The pools, grown to what this render needs and no further.
+local function ensureRoster(nCols, nLines)
+  for i = #rosterCols + 1, nCols do makeRosterCol(i) end
+  for i = #rosterLines + 1, nLines do makeRosterLine(i) end
+  for i = 1, #rosterLines do growLine(rosterLines[i], nCols) end
+end
+
 local function buildRoster()
   local p = panels[TAB_ROSTER]
 
@@ -711,46 +881,7 @@ local function buildRoster()
   rosterHead:SetPoint("TOPRIGHT")
   rosterHead:SetJustifyH("LEFT")
 
-  -- The column headers sit OUTSIDE the scroll frame, so scrolling the rows
-  -- never scrolls away the names they belong to. A grid whose header leaves
-  -- the screen is a grid of anonymous numbers.
-  -- Each header is a mouse-enabled frame rather than a bare FontString: a
-  -- column is 56px and a name plus a realm plus a level plus an item level plus
-  -- a last-seen does not fit in 56px, so the header shows what identifies the
-  -- character and the hover carries the rest.
   rosterCols = {}
-  for i = 1, ROSTER_COLS do
-    local x = LABEL_W + (i - 1) * CELL_W
-    local hit = CreateFrame("Frame", nil, p)
-    hit:SetPoint("TOPLEFT", x, -18)
-    hit:SetSize(CELL_W, 30)
-    hit:EnableMouse(true)
-    local name = hit:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    name:SetPoint("TOPLEFT", 0, -2)
-    name:SetWidth(CELL_W)
-    name:SetJustifyH("CENTER")
-    name:SetWordWrap(false)
-    local meta = hit:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    meta:SetPoint("TOPLEFT", 0, -16)
-    meta:SetWidth(CELL_W)
-    meta:SetJustifyH("CENTER")
-    meta:SetWordWrap(false)
-    hit:SetScript("OnEnter", function(self)
-      if not self.col then return end
-      local c = self.col
-      local tip = {}
-      if c.realm then tip[#tip + 1] = { "realm", c.realm } end
-      if c.guild then tip[#tip + 1] = { "guild", c.guild } end
-      if c.level then tip[#tip + 1] = { "level", tostring(c.level) } end
-      if c.ilvl then tip[#tip + 1] = { "item level", tostring(c.ilvl) } end
-      if c.gold then tip[#tip + 1] = { "gold", c.gold } end
-      if c.zone then tip[#tip + 1] = { "last seen in", c.zone } end
-      tip[#tip + 1] = { "scanned", c.ago }
-      showTip(self, c.name, tip)
-    end)
-    hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    rosterCols[i] = { hit = hit, name = name, meta = meta }
-  end
 
   local well = makeWell(p)
   well:SetPoint("TOPLEFT", 0, -50)
@@ -759,42 +890,13 @@ local function buildRoster()
   local scroll = CreateFrame("ScrollFrame", "WarbandProRosterScroll", p, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 8, -8)
   scroll:SetPoint("BOTTOMRIGHT", well, "BOTTOMRIGHT", -8, 8)
+  rosterScroll = scroll
 
   rosterChild = CreateFrame("Frame", nil, scroll)
-  rosterChild:SetSize(LABEL_W + ROSTER_COLS * CELL_W, ROSTER_LINES * 14)
+  rosterChild:SetSize(LABEL_W + CELL_W, LINE_H)
   scroll:SetScrollChild(rosterChild)
 
   rosterLines = {}
-  for i = 1, ROSTER_LINES do
-    local y = -(i - 1) * 14
-    local label = rosterChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    label:SetPoint("TOPLEFT", 0, y)
-    label:SetWidth(LABEL_W)
-    label:SetJustifyH("LEFT")
-    label:SetWordWrap(false)
-    -- A cell is a frame wrapping its FontString for one reason: a FontString
-    -- takes no mouse input, and the hover detail is the whole of what makes
-    -- `2/8` worth reading. This is the widget cost of SavedInstances' secondary
-    -- tooltip, paid once at build and pooled like everything else here.
-    local cells, hits = {}, {}
-    for j = 1, ROSTER_COLS do
-      local hit = CreateFrame("Frame", nil, rosterChild)
-      hit:SetPoint("TOPLEFT", LABEL_W + (j - 1) * CELL_W, y)
-      hit:SetSize(CELL_W, 14)
-      hit:EnableMouse(true)
-      local fs = hit:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-      fs:SetAllPoints(hit)
-      fs:SetJustifyH("CENTER")
-      fs:SetWordWrap(false)
-      hit:SetScript("OnEnter", function(self)
-        showTip(self, self.tipTitle, self.tip)
-      end)
-      hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
-      cells[j] = fs
-      hits[j] = hit
-    end
-    rosterLines[i] = { label = label, cells = cells, hits = hits }
-  end
 
   rosterFoot = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   rosterFoot:SetPoint("BOTTOMLEFT", 0, 2)
@@ -817,9 +919,44 @@ local function buildRoster()
     UI.rosterPage = UI.rosterPage + 1
     UI.RenderRoster()
   end)
+
+  -- Widening the window is only worth doing because it buys columns, so the
+  -- grid redraws when it happens. Watch the SCROLL frame rather than the panel,
+  -- because that is what fittingCols measures — and because an anchored frame
+  -- reads 0 wide until the first layout pass, so this is also what turns the
+  -- opening render's fallback single column into the real one.
+  --
+  -- A render only resizes the scroll CHILD, so this cannot feed itself; the
+  -- guard is for the layout pass a resize can schedule inside one.
+  scroll:SetScript("OnSizeChanged", function()
+    if UI.rendering or not scroll:IsVisible() then return end
+    UI.rendering = true
+    UI.RenderRoster()
+    UI.rendering = false
+  end)
 end
 
---- Draw the grid for the current page.
+--- How many character columns fit in the grid as it is currently sized.
+---
+--- **This is the shrink-to-fit SavedInstances does, spent the other way.** SI
+--- scales its tooltip down until the whole warband fits the screen; a window
+--- with an EditBox and buttons on its other tabs cannot be scaled without
+--- taking them with it, so the player sizes the window and the column count
+--- follows. The result is the same one that matters: your warband is on screen
+--- at once, and `<` `>` appear only when it genuinely does not fit.
+local function fittingCols()
+  -- The scroll frame is what the cells actually live in, so it is what decides
+  -- how many fit. Measuring the panel instead would be measuring the well, the
+  -- scrollbar gutter and the page buttons along with them.
+  local w = rosterScroll and rosterScroll:GetWidth() or 0
+  local n = math.floor((w - LABEL_W - ROSTER_GUTTER) / CELL_W)
+  -- Before the first layout pass a frame measures 0, and one column is a better
+  -- wrong answer than none: the OnSizeChanged that follows corrects it.
+  if n < 1 then n = 1 end
+  return n
+end
+
+--- Draw the grid.
 ---
 --- Flattens the model's groups into one list of lines — a group header is a
 --- line with no cells — because a scroll child of uniform 14px rows is what
@@ -829,28 +966,16 @@ function UI.RenderRoster()
   local db = ns.Store.db
   local model = ns.Roster.Build(db, ns.safe(UnitGUID, "player"))
   local all = model.columns
-  local pages = math.max(math.ceil(#all / ROSTER_COLS), 1)
+
+  -- Columns first, because the page arithmetic depends on how many fit.
+  local nCols = fittingCols()
+  local pages = math.max(math.ceil(#all / nCols), 1)
 
   UI.rosterPage = math.min(math.max(UI.rosterPage, 1), pages)
-  local first = (UI.rosterPage - 1) * ROSTER_COLS
+  local first = (UI.rosterPage - 1) * nCols
   local shown = {}
-  for i = 1, ROSTER_COLS do
+  for i = 1, nCols do
     shown[i] = all[first + i]
-  end
-
-  for i = 1, ROSTER_COLS do
-    local col, head = shown[i], rosterCols[i]
-    head.hit.col = col
-    head.hit:SetShown(col ~= nil)
-    if col then
-      head.name:SetText((DOT[col.dot] or DOT.never) .. classText(col.class, col.name))
-      head.meta:SetText(format("|cff%s%s%s|r", MUTED,
-        col.level and tostring(col.level) or "?",
-        col.ilvl and (" · " .. col.ilvl) or ""))
-    else
-      head.name:SetText("")
-      head.meta:SetText("")
-    end
   end
 
   -- The model is per-column already, so the page has to pull the same slice out
@@ -862,7 +987,7 @@ function UI.RenderRoster()
     lines[n] = { head = g.label }
     for _, r in ipairs(g.rows) do
       local cells, any = {}, false
-      for i = 1, ROSTER_COLS do
+      for i = 1, nCols do
         local src = shown[i] and r.cells[first + i]
         cells[i] = src
         if src then any = true end
@@ -878,8 +1003,29 @@ function UI.RenderRoster()
     if lines[n].head then n = n - 1 end
   end
 
+  -- Grow to exactly what this render needs. Every line the model produced gets
+  -- a widget, which is the whole of the fix for the old 24-row ceiling.
+  ensureRoster(nCols, n)
+
+  local gridW = LABEL_W + nCols * CELL_W
+
+  for i = 1, #rosterCols do
+    local col, head = shown[i], rosterCols[i]
+    head.hit.col = col
+    head.hit:SetShown(i <= nCols and col ~= nil)
+    if col then
+      head.name:SetText((DOT[col.dot] or DOT.never) .. classText(col.class, col.name))
+      head.meta:SetText(format("|cff%s%s%s|r", MUTED,
+        col.level and tostring(col.level) or "?",
+        col.ilvl and (" · " .. col.ilvl) or ""))
+    else
+      head.name:SetText("")
+      head.meta:SetText("")
+    end
+  end
+
   local function blank(w)
-    for j = 1, ROSTER_COLS do
+    for j = 1, #w.cells do
       w.cells[j]:SetText("")
       -- A hit area with no cell under it must not keep the previous render's
       -- tooltip: an empty cell that still explains somebody else's lockout is
@@ -889,18 +1035,32 @@ function UI.RenderRoster()
     end
   end
 
-  for i = 1, ROSTER_LINES do
+  for i = 1, #rosterLines do
     local line, w = lines[i], rosterLines[i]
+    w.stripe:SetWidth(gridW)
+    w.hi:SetWidth(gridW)
+    w.rowHit:SetWidth(gridW)
+    w.hi:Hide()
     if not line then
       w.label:SetText("")
+      w.stripe:Hide()
+      w.rowHit:EnableMouse(false)
       blank(w)
     elseif line.head then
+      -- A group header is the rule between groups as well as its name: the
+      -- stripe under it is what stops `currencies` reading as one more row of
+      -- the block above it.
       w.label:SetText(format("|cff%s%s|r", MUTED, line.head))
+      w.stripe:SetColorTexture(1, 1, 1, 0.05)
+      w.stripe:Show()
+      w.rowHit:EnableMouse(false)
       blank(w)
     else
       w.label:SetText(line.label)
-      for j = 1, ROSTER_COLS do
-        local c = line.cells[j]
+      w.stripe:Hide()
+      w.rowHit:EnableMouse(true)
+      for j = 1, #w.cells do
+        local c = j <= nCols and line.cells[j] or nil
         local hit = w.hits[j]
         if not c then
           -- An empty cell, never a zero. Roster.lua's rule 1, drawn.
@@ -917,12 +1077,12 @@ function UI.RenderRoster()
           -- The title names WHOSE cell this is, because a grid read across
           -- loses track of the column by the time the mouse arrives.
           hit.tipTitle = shown[j] and (line.label .. "  —  " .. shown[j].name) or line.label
-          hit:SetShown(c.tip ~= nil)
+          hit:Show()
         end
       end
     end
   end
-  rosterChild:SetHeight(math.max(n, 1) * 14)
+  rosterChild:SetSize(gridW, math.max(n, 1) * LINE_H)
 
   if #all == 0 then
     rosterHead:SetText(format("|cff%sno characters scanned yet — log in on a character and it lands here|r",
@@ -932,8 +1092,8 @@ function UI.RenderRoster()
       MUTED, #all, #all == 1 and "" or "s"))
   else
     rosterHead:SetText(format("%d character%s%s", #all, #all == 1 and "" or "s",
-      pages > 1 and format("  ·  |cff%sshowing %d-%d|r", MUTED, first + 1,
-        math.min(first + ROSTER_COLS, #all)) or ""))
+      pages > 1 and format("  ·  |cff%sshowing %d-%d · drag the corner to widen|r", MUTED, first + 1,
+        math.min(first + nCols, #all)) or ""))
   end
 
   local wb = model.warbandBank
@@ -1049,11 +1209,68 @@ end
 
 -- ── the window ──────────────────────────────────────────────────────────────
 
+--- Remember where the window is and how big it was left.
+---
+--- Same idiom and same home as the minimap button's angle: an `opts` field,
+--- written when the drag stops rather than on every frame of it. A window the
+--- player widened for their warband that comes back at 560 next session has
+--- not really been made resizable.
+local function saveGeometry()
+  local o = ns.Store.db and ns.Store.db.opts
+  if not o or not frame then return end
+  local point, _, rel, x, y = frame:GetPoint(1)
+  if not point then return end
+  o.window = {
+    w = math.floor(frame:GetWidth() + 0.5),
+    h = math.floor(frame:GetHeight() + 0.5),
+    point = point, rel = rel, x = math.floor(x + 0.5), y = math.floor(y + 0.5),
+  }
+end
+
+--- Put it back, clamped to the bounds this version allows.
+---
+--- Clamping on the way IN as well as on the way out is what makes a bound
+--- change safe: a size stored by an older build, or by a player on a monitor
+--- they no longer have, must not be able to produce a window that cannot be
+--- reached or resized back.
+local function restoreGeometry()
+  local o = ns.Store.db and ns.Store.db.opts
+  local g = o and o.window
+  if not g or not frame then return end
+  local w = math.min(math.max(tonumber(g.w) or WIN_DEF_W, WIN_MIN_W), WIN_MAX_W)
+  local h = math.min(math.max(tonumber(g.h) or WIN_DEF_H, WIN_MIN_H), WIN_MAX_H)
+  frame:SetSize(w, h)
+  if g.point and g.x and g.y then
+    frame:ClearAllPoints()
+    frame:SetPoint(g.point, UIParent, g.rel or g.point, g.x, g.y)
+  end
+end
+
+--- The corner grab. Hand-rolled from the size-grabber textures rather than a
+--- template, for the reason the portrait calls are guarded: these three
+--- textures have shipped since Wrath and cannot be renamed out from under us,
+--- where a resize *template* is a name that has moved more than once.
+local function makeGrip(parent)
+  local grip = CreateFrame("Button", nil, parent)
+  grip:SetSize(16, 16)
+  grip:SetPoint("BOTTOMRIGHT", -4, 4)
+  grip:SetFrameLevel(parent:GetFrameLevel() + 10)
+  grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+  grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+  grip:SetScript("OnMouseDown", function() parent:StartSizing("BOTTOMRIGHT") end)
+  grip:SetScript("OnMouseUp", function()
+    parent:StopMovingOrSizing()
+    saveGeometry()
+  end)
+  return grip
+end
+
 local function build()
   if frame then return frame end
 
   frame = CreateFrame("Frame", "WarbandProFrame", UIParent, "ButtonFrameTemplate")
-  frame:SetSize(560, 520)
+  frame:SetSize(WIN_DEF_W, WIN_DEF_H)
   frame:SetPoint("CENTER")
   frame:SetFrameStrata("DIALOG")
   frame:SetToplevel(true)
@@ -1062,7 +1279,19 @@ local function build()
   frame:SetClampedToScreen(true)
   frame:RegisterForDrag("LeftButton")
   frame:SetScript("OnDragStart", frame.StartMoving)
-  frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+  frame:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    saveGeometry()
+  end)
+
+  -- Resizable, because the roster is a grid and a grid's useful width is the
+  -- size of the player's warband. Guarded like the portrait mixins above: a
+  -- client missing SetResizeBounds should cost the resizing, never the window.
+  frame:SetResizable(true)
+  if frame.SetResizeBounds then
+    frame:SetResizeBounds(WIN_MIN_W, WIN_MIN_H, WIN_MAX_W, WIN_MAX_H)
+  end
+  makeGrip(frame)
   frame:Hide()
   tinsert(UISpecialFrames, "WarbandProFrame")   -- Esc closes
 
@@ -1118,6 +1347,11 @@ local function build()
   buildExport()
   buildImport()
   buildOptions()
+
+  -- Last, because it has to overrule the SetSize and SetPoint above and every
+  -- panel inside is anchored rather than placed, so one resize at the end lays
+  -- the whole window out correctly.
+  restoreGeometry()
 
   return frame
 end

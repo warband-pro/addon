@@ -45,6 +45,31 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+**The Roster grid stopped drawing after 24 rows.** If you had a full spread of
+currencies and a few professions, everything past about the middle of the
+currency list was built and never painted — the scrollbar let you scroll down
+into empty space where the rest of your grid should have been. Every row the
+grid has is now drawn.
+
+### Changed
+
+**The window resizes, and it opens wide enough for eight characters.** Drag the
+corner. It remembers the size and where you put it, so a warband of twelve is a
+window you set up once. `<` and `>` are still there for a warband wider than
+your screen, but most people will not see them again.
+
+**Row groups have a rule above them and a row lights up under the mouse.**
+Reading `1,900/2,000` across twelve columns and landing on the right character
+was harder than it needed to be.
+
+**Column names line up with the columns.** They were sitting eight pixels to the
+left of the cells they name.
+
+**The export string uses the whole width of the window.** It was wrapping at a
+fixed width no matter how wide the window got.
+
 ## [1.9.0] — 2026-09-04 — see every alt at once
 
 Everything this addon has been collecting since 1.0 went into a compressed
