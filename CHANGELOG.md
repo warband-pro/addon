@@ -45,26 +45,7 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
-### Added
-
-**The minimap tooltip answers the question now, instead of telling you where to
-go and ask it.** Hover the icon and you get four lines across the whole warband:
-who has a Great Vault slot already earned, who is carrying a keystone and what
-level, who is saved to something, and who has a currency sitting at its cap and
-throwing away everything they earn towards it. Vault is first because it is the
-only one on that list you can lose by not logging in before Tuesday.
-
-Three names to a line, then `+2` for the rest, so the tooltip does not grow past
-the minimap it hangs off. A line with nobody on it is not drawn at all, and a
-character you have not logged into since the reset does not get counted as saved
-to a lockout that has since expired — blank still means nobody looked, the same
-as it does in the Roster tab.
-
-### Fixed
-
-- clear orphaned junk lists when warbank attribution is cleared without removing a character — matches optimize path
-
-## [1.9.0] — 2026-09-02 — see every alt at once
+## [1.9.0] — 2026-09-04 — see every alt at once
 
 Everything this addon has been collecting since 1.0 went into a compressed
 string and nowhere else. This release gives it a screen.
@@ -104,6 +85,19 @@ clear-out list and why, how many specs have a build assigned, and how old that
 answer is. Finding out which of nine alts had an unapplied plan used to mean
 logging into nine alts.
 
+**The minimap tooltip answers the question now, instead of telling you where to
+go and ask it.** Hover the icon and you get four lines across the whole warband:
+who has a Great Vault slot already earned, who is carrying a keystone and what
+level, who is saved to something, and who has a currency sitting at its cap and
+throwing away everything they earn towards it. Vault is first because it is the
+only one on that list you can lose by not logging in before Tuesday.
+
+Three names to a line, then `+2` for the rest, so the tooltip does not grow past
+the minimap it hangs off. A line with nobody on it is not drawn at all, and a
+character you have not logged into since the reset does not get counted as saved
+to a lockout that has since expired — blank still means nobody looked, the same
+as it does in the Roster tab.
+
 ### Fixed
 
 **Lockouts that already reset are no longer listed.** If you had not logged a
@@ -111,6 +105,8 @@ character in since the weekly reset, the addon was still showing you last
 week's raid as though you were saved to it. That cell is now blank, which is
 the honest answer: the old lockout is gone, and whether you have picked up a
 new one is something nobody has checked yet.
+
+- clear orphaned junk lists when warbank attribution is cleared without removing a character — matches optimize path
 
 ## [1.8.0] — 2026-08-31 — one string back, and your builds by name
 
