@@ -58,6 +58,10 @@ meet a live client is this list. So run it, do not skim it.
 - [ ] Click it again — window closes
 - [ ] Right-click — Options tab; right-click again — closes
 - [ ] Hover — tooltip names the addon, the character count and the freshest age
+- [ ] Hover on an account with a vault slot earned, a keystone, a live lockout and a capped currency — one line each, labels coloured green / white / gold / red, names in class colour
+- [ ] Hover on a fresh install with one unscanned character — the four lines are ABSENT, not zero. This is the check the glance exists to fail
+- [ ] Hover with four or more characters holding keystones — three named, then `+N`, and the tooltip does not cover the minimap
+- [ ] Hover after a weekly reset, before logging the saved alt in — `saved` does not name them. Their stored lockout has expired and the glance will not claim it
 - [ ] Drag it round the ring — it follows the cursor and stays where dropped
 - [ ] /reload — still where you dropped it
 - [ ] Full logout and back — still there (WarbandProDB.opts.minimapAngle persisted)

@@ -99,6 +99,12 @@ local function num(v)
   return v
 end
 
+local function unlockedN(v)
+  if v == true then return 1 end
+  if type(v) == "number" then return v end
+  return nil
+end
+
 -- ── columns ─────────────────────────────────────────────────────────────────
 
 -- SavedInstances' `cpairs_sort`, ported: the character at the keyboard first,
@@ -189,7 +195,7 @@ local function thisWeek(groups, cols)
     addRow(g, cols, v.label, function(c)
       local b = c.weeklyVault and c.weeklyVault[v.key]
       if not b then return nil end
-      local unlocked = num(b.unlocked) or 0
+      local unlocked = unlockedN(b.unlocked) or 0
       -- The per-slot detail the two-character summary is a summary OF. A bucket
       -- carries only the NEXT threshold, so "one more boss raises the slot you
       -- already have" cannot be said from the summary at all — `rows` is the
@@ -603,5 +609,143 @@ function Roster.Build(db, selfGuid)
       tabsOwned = num(wb.tabsOwned),
       gold = wb.gold and money(wb.gold) or nil,
     } or nil,
+  }
+end
+
+-- ── the glance ──────────────────────────────────────────────────────────────
+
+-- **SavedInstances' primary tooltip — the half of its interface that is not the
+-- grid.** Hovering its icon is not how you reach the answer there, it *is* the
+-- answer, and opening a window is the follow-up question. Ours has said "6
+-- characters · freshest 4m ago" and then listed slash commands since 1.5.0,
+-- which tells a player the addon is installed and nothing about the warband it
+-- has been watching.
+--
+-- A hover can carry four lines before it stops being a glance, so it carries
+-- the four that decide a night: a vault slot already earned, the keystone in
+-- the bag, what is locked, and what has stopped accruing. The grid answers each
+-- of those per character; this answers them ACROSS the warband, which is the
+-- only shape in which four lines can cover twenty alts.
+--
+-- The grid's rules survive the compression, and the first is again the one the
+-- format is most likely to destroy:
+--
+-- 1. **Absent is not zero.** A character whose vault has never been read is not
+--    counted as having no slots — it is not counted at all. Every test below is
+--    "did this character have an answer", never "was the answer zero", so an
+--    unscanned alt is silent rather than reassuring.
+-- 2. **A line nobody has a value for is not drawn.** A row's rule, at line
+--    scale: an account with no keystone anywhere gets no keystone line, not an
+--    empty one.
+-- 3. **Names where a name is what you act on.** "2 characters have a keystone"
+--    sends you to the grid to find out which; `Vocnar +12 · Voctara +9` does
+--    not. The column sort already puts the character at the keyboard first, so
+--    the name you check against leads the line for free.
+--
+-- Shrink-to-fit is SavedInstances' fit-to-screen, decided rather than
+-- configured: a line names at most `GLANCE_NAMES` characters and reports how
+-- many it did not name. A tooltip that grows with the warband ends up covering
+-- the minimap it is anchored to, which is the one thing a minimap tooltip must
+-- not do.
+--
+-- Like everything else in this file it reads only the stored DB, so the glance
+-- and the grid cannot disagree — what the hover claims is what the tab shows.
+
+local GLANCE_NAMES = 3
+
+--- One glance line, or nil when nobody could answer.
+---
+--- `fn` returns the short note drawn after a character's name — `+12`, `3
+--- slots` — or nil for "no answer", which is the absent case rule 1 is about.
+--- Not "" and not `0`: the two are the same pixels on screen and the opposite
+--- fact, which is the whole reason this is a separate return value.
+local function glance(cols, label, tone, fn)
+  local parts, more = {}, 0
+  for i = 1, #cols do
+    local note = fn(cols[i].char, cols[i])
+    if note ~= nil then
+      if #parts < GLANCE_NAMES then
+        parts[#parts + 1] = { name = cols[i].name, class = cols[i].class, note = note }
+      else
+        more = more + 1
+      end
+    end
+  end
+  if #parts == 0 then return nil end
+  return { label = label, tone = tone, parts = parts, more = more }
+end
+
+--- What the minimap hover says, before the window is opened.
+---
+--- Colours are absent here for the reason cell tones are: UI.lua owns the
+--- palette, including the class colour a name is drawn in, and a model carrying
+--- hex would have to know which surface it was painted on.
+function Roster.Glance(db, selfGuid)
+  local cols = Roster.Columns(db, selfGuid)
+  local lines = {}
+  local function add(line) if line then lines[#lines + 1] = line end end
+
+  -- A slot already earned leads, because it is the only thing on this list that
+  -- can be lost by not logging in before Tuesday.
+  add(glance(cols, "vault ready", "good", function(c)
+    local v = c.weeklyVault
+    if type(v) ~= "table" then return nil end
+    local unlocked = 0
+    for _, b in ipairs(VAULT) do
+      local bucket = v[b.key]
+      if type(bucket) == "table" then unlocked = unlocked + (unlockedN(bucket.unlocked) or 0) end
+    end
+    if unlocked == 0 then return nil end
+    return unlocked .. (unlocked == 1 and " slot" or " slots")
+  end))
+
+  add(glance(cols, "keystone", "plain", function(c)
+    local k = c.keystone
+    if type(k) ~= "table" or not num(k.level) then return nil end
+    return "+" .. k.level
+  end))
+
+  -- Live lockouts only, by the same absolute-`resetTime` rule the grid's rows
+  -- use. A glance is the worst surface on which to state something known to be
+  -- false: there is no cell to hover for the detail that would correct it.
+  add(glance(cols, "saved", "warn", function(c)
+    local n = 0
+    for _, inst in ipairs(c.instances or {}) do
+      if not inst.resetTime or ns.hence(inst.resetTime) then n = n + 1 end
+    end
+    if n == 0 then return nil end
+    return tostring(n)
+  end))
+
+  -- A currency at its total cap has stopped accruing, and everything earned
+  -- towards it from here is thrown away — the one currency state worth
+  -- interrupting a glance for. Reaching a WEEKLY cap is the opposite news, and
+  -- stays in the grid's currency hover where it already is.
+  add(glance(cols, "at cap", "bad", function(c)
+    local hit
+    for _, cur in ipairs(c.currencies or {}) do
+      local q, max = num(cur.quantity), num(cur.maxQuantity)
+      -- `maxQuantity` 0 is uncapped per CONTRACT.md, not a cap of nothing.
+      if q and max and max > 0 and q >= max and cur.name then
+        hit = hit or {}
+        hit[#hit + 1] = cur.name
+      end
+    end
+    if not hit then return nil end
+    if #hit == 1 then return hit[1] end
+    return #hit .. " currencies"
+  end))
+
+  local freshest
+  for i = 1, #cols do
+    local seen = cols[i].char.seenAt and cols[i].char.seenAt.lastSeen
+    if type(seen) == "number" and (not freshest or seen > freshest) then freshest = seen end
+  end
+
+  return {
+    characters = #cols,
+    ago = ns.ago(freshest),
+    dot = ns.dot(freshest),
+    lines = lines,
   }
 end

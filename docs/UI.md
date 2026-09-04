@@ -312,10 +312,7 @@ client's own parts.
 ### Minimap button
 
 `WarbandProMinimapButton`, parented to `Minimap`, added in 1.5.0. Click for the
-export string, right-click for the Options tab, drag to move it round the ring;
-the hover tooltip says how many characters are stored and how fresh the
-freshest is, so a glance answers "do I need to export" without opening
-anything.
+export string, right-click for the Options tab, drag to move it round the ring.
 
 **Why it exists now and not before.** `docs/FLOW.md` ruled it out on
 compatibility grounds, and the argument was really about the library: a minimap
@@ -330,6 +327,70 @@ a click, a read and a second click.
 
 The compartment entry stays. It costs one `.toc` line, and it is where a player
 who turned this button off goes looking.
+
+#### The hover — SavedInstances' primary tooltip
+
+```
+Warband.pro Companion
+* 6 characters  ·  freshest 12m ago
+
+vault ready       Vocnar 3 slots  Voctara 1 slot
+keystone          Vocnar +12  Voctara +9  Voctesa +7  +2
+saved             Vocnar 2  Voctesa 1
+at cap            Vocnar Weathered Crest  Voctesa 2 currencies
+
+Click  ·  the export string
+Right-click  ·  options
+/warband roster  ·  every alt at once
+Drag  ·  move it round the ring
+```
+
+**In SavedInstances, hovering the icon is not the route to the answer — it is
+the answer**, and opening a window is the follow-up question. Through 1.9.0
+this hover said how many characters were stored and then listed slash commands:
+enough to tell you the addon was installed, and nothing about the warband it
+had been watching.
+
+A hover carries about four lines before it stops being a glance, so it carries
+the four that decide a night — **a vault slot already earned, the keystone in
+the bag, what is locked, and what has stopped accruing.** The grid answers each
+of those *per character*; the glance answers them *across the warband*, which
+is the only shape in which four lines can cover twenty alts. Vault leads
+because it is the only one you can lose by not logging in before Tuesday.
+
+`Roster.Glance` is the model and `UI.lua` paints it — the same split the grid
+has, so the file with the rules is the file with tests, and both surfaces read
+one DB and cannot disagree about it.
+
+**The grid's three rules survive the compression**, and the first is again the
+one the format is most likely to destroy:
+
+1. **Absent is not zero.** A character whose vault has never been read is not
+   counted as having no slots — it is not counted at all. Every test is "did
+   this character have an answer", never "was the answer zero", so an unscanned
+   alt is silent rather than reassuring.
+2. **A line nobody has a value for is not drawn.** An account with no keystone
+   anywhere gets no keystone line, not an empty one.
+3. **Names, where a name is what you act on.** "2 characters have a keystone"
+   sends you to the grid to find out which; `Vocnar +12` does not. The column
+   sort already puts the character at the keyboard first, so the name you check
+   the others against leads the line for free.
+
+**Colour is state, never decoration.** The label carries the tone — `vault
+ready` green, `saved` gold, `at cap` red — and the names carry their class
+colour, which is identity. That is SavedInstances' rule and the reason its
+tooltip stays readable at twenty characters.
+
+**Shrink-to-fit is decided, not configured.** A line names at most three
+characters and appends `+2` for the rest. This is SavedInstances' fit-to-screen
+answered the way this addon answers everything: a tooltip that grows with the
+warband ends up covering the minimap it is anchored to, which is the one thing
+a minimap tooltip must not do — and `+2` is honest about the omission where
+simply stopping at three would not be.
+
+An expired lockout is not counted, by the same absolute-`resetTime` rule the
+grid's rows use. The glance refuses harder than the grid does: there is no cell
+to hover for the detail that would correct it.
 
 **Position is an angle, not a point.** `opts.minimapAngle` is degrees round the
 ring and `UI.lua` owns the default (216°, the emptiest arc of the stock ring),
