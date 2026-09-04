@@ -99,6 +99,12 @@ local function num(v)
   return v
 end
 
+local function unlockedN(v)
+  if v == true then return 1 end
+  if type(v) == "number" then return v end
+  return nil
+end
+
 -- ── columns ─────────────────────────────────────────────────────────────────
 
 -- SavedInstances' `cpairs_sort`, ported: the character at the keyboard first,
@@ -189,7 +195,7 @@ local function thisWeek(groups, cols)
     addRow(g, cols, v.label, function(c)
       local b = c.weeklyVault and c.weeklyVault[v.key]
       if not b then return nil end
-      local unlocked = num(b.unlocked) or 0
+      local unlocked = unlockedN(b.unlocked) or 0
       -- The per-slot detail the two-character summary is a summary OF. A bucket
       -- carries only the NEXT threshold, so "one more boss raises the slot you
       -- already have" cannot be said from the summary at all — `rows` is the
@@ -687,7 +693,7 @@ function Roster.Glance(db, selfGuid)
     local unlocked = 0
     for _, b in ipairs(VAULT) do
       local bucket = v[b.key]
-      if type(bucket) == "table" then unlocked = unlocked + (num(bucket.unlocked) or 0) end
+      if type(bucket) == "table" then unlocked = unlocked + (unlockedN(bucket.unlocked) or 0) end
     end
     if unlocked == 0 then return nil end
     return unlocked .. (unlocked == 1 and " slot" or " slots")
