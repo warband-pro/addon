@@ -71,10 +71,13 @@ them down the side.
 |  | pockets                                                |  |
 |  | gold             48,205g 1,204g  980g    12g           |  |
 |  +--------------------------------------------------------+  |
-|  warband bank 1h ago (by Vocnar) · 5,000g          [ < ][ > ]|
+|  warband bank 1h ago (by Vocnar) · 5,000g                  // |
 +--------------------------------------------------------------+
    [ Roster ] [ Export ] [ Import ] [ Options ]
 ```
+
+(`//` is the corner grip. `[ < ][ > ]` appear beside it only when the warband
+is wider than the window can be dragged.)
 
 **The arrangement is SavedInstances', and that is the whole design decision.**
 Characters are COLUMNS and tracked things are ROWS, because the question an alt
@@ -110,13 +113,41 @@ every rule below.
    `ns.safe` on the way into the DB. Reading it back out is table work, so the
    grid cannot throw in the middle of a raid.
 
-**Six columns, then it pages.** The window is 560 wide, the inset and scrollbar
-take about 60, and a label column wide enough for `Nerub-ar Palace (Heroic)`
-takes 152 more — which leaves room for exactly six cells that can still hold
-`4,500/20,000`. A larger warband gets `[ < ]` and `[ > ]`, the same idiom the
-export tab already uses for a bundle larger than twenty. Column headers sit
-OUTSIDE the scroll frame, so scrolling the rows never scrolls away the names
-they belong to.
+**The grid fits the warband, and the window resizes (unreleased).** Two fixed
+numbers remain, and only because the text decides them: a label column wide
+enough for `Nerub-ar Palace (Heroic)` is 152px, and a cell that can still hold
+`4,500/20,000` is 56px. Everything else is measured at render time from the
+scroll frame the cells live in — `fittingCols()` — so widening the window buys
+columns and nothing else has to be told.
+
+The window opens at **680x520, which is eight columns**, derived rather than
+chosen: `152 + 8x56 + 6` gutter, plus about 72 for the chrome between the
+frame's edge and the scroll frame's. It drags from a corner grip between 560x420
+and 1600x1000, and the size and position are remembered in `opts.window` — the
+same `opts` idiom, and the same write-on-drag-stop timing, as the minimap
+button's angle. A size stored by an older build is clamped to the current bounds
+on the way back IN as well as out, so a bound change can never leave a window
+that cannot be reached or resized back.
+
+`[ < ]` and `[ > ]` survive for the case where a warband genuinely will not fit
+the widest window, but they are hidden unless that is true.
+
+**This replaced a fixed six columns and a fixed 24 rows, and the second was a
+bug rather than a limit.** The model built every row and the scroll child was
+sized for all of them, but the widget pool held 24 and only those were ever
+painted — so a real warband (a measured 38 lines: 16 currencies, 9 professions,
+the vault, pockets) scrolled off the bottom of its own grid into blank space,
+with no indication that anything was missing. Both pools now grow on demand to
+what the model and the window between them ask for.
+
+Column headers sit OUTSIDE the scroll frame, so scrolling the rows never scrolls
+away the names they belong to — and they are offset by the same 8px the scroll
+frame is inset into its well, because a header that is a child of the panel and
+a cell that is a child of the scroll frame do not otherwise line up.
+
+**A group header carries a rule and a row highlights under the mouse.** Reading
+a 14px row across twelve columns is exactly where an eye loses its place, and
+these are the two things SavedInstances gets from LibQTip that we owed it.
 
 **Row groups, in order:** `this week` (the three vault buckets, keystone, m+
 score), `lockouts` (one row per instance-and-difficulty anybody is saved to,
