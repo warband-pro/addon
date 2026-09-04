@@ -433,6 +433,141 @@ do
   check("no plan anywhere means no group at all", row(model, "plan age") == nil)
 end
 
+-- ── the glance ──────────────────────────────────────────────────────────────
+
+-- Roster.Glance is the grid compressed to four lines for the minimap hover, and
+-- the compression is where its rules are easiest to lose. A cell that should be
+-- blank is at least visibly blank; a character wrongly counted into "vault
+-- ready" disappears into a name list nobody can audit. So the cases below are
+-- again mostly about absent-versus-zero, plus the shrink that keeps the tooltip
+-- off the minimap it hangs from.
+
+local function line(g, label)
+  for _, l in ipairs(g.lines) do
+    if l.label == label then return l end
+  end
+  return nil
+end
+
+--- The names a line ended up printing, in order, as `Name note`.
+local function names(l)
+  local out = {}
+  for _, p in ipairs(l.parts) do
+    out[#out + 1] = p.name .. (p.note and (" " .. p.note) or "")
+  end
+  return table.concat(out, ", ")
+end
+
+do
+  local g = Roster.Glance(db({}), nil)
+  check("an empty account has no lines at all", #g.lines == 0)
+  check("and says so rather than guessing", g.characters == 0 and g.ago == "never")
+end
+
+do
+  local g = Roster.Glance(db({ a = char() }), nil)
+  check("a character with nothing tracked earns no line", #g.lines == 0)
+  check("the header still counts them", g.characters == 1)
+  check("and carries the freshness dot the window draws", g.dot == "green", g.dot)
+end
+
+-- Absent is not zero, line scale: a vault nobody has had read is silent, and a
+-- vault read with nothing earned is silent too — only an EARNED slot is news.
+do
+  local g = Roster.Glance(db({
+    a = char({ name = "Vocnar", weeklyVault = { raid = { unlocked = 1 }, mplus = { unlocked = 2 } } }),
+    b = char({ name = "Voctara", weeklyVault = { raid = { unlocked = 0 } } }),
+    c = char({ name = "Voctesa" }),
+  }), nil)
+  check("vault ready names only who has a slot waiting", names(line(g, "vault ready")) == "Vocnar 3 slots",
+    names(line(g, "vault ready")))
+  check("and it is the good news it looks like", line(g, "vault ready").tone == "good")
+end
+
+do
+  local g = Roster.Glance(db({ a = char({ weeklyVault = { raid = { unlocked = 1 } } }) }), nil)
+  check("one slot is a slot, not slots", names(line(g, "vault ready")) == "Voctesa 1 slot")
+end
+
+do
+  local g = Roster.Glance(db({
+    a = char({ name = "Vocnar", keystone = { level = 12 } }),
+    b = char({ name = "Voctara", keystone = {} }),
+  }), nil)
+  check("a keystone shows its level", names(line(g, "keystone")) == "Vocnar +12")
+  check("a keystone record with no level is not a keystone", #line(g, "keystone").parts == 1)
+end
+
+do
+  local g = Roster.Glance(db({ a = char() }), nil)
+  check("nobody holding a keystone means no keystone line", line(g, "keystone") == nil)
+end
+
+-- The grid refuses to draw an expired lockout because resetTime is absolute.
+-- The glance has no cell to hover for the correction, so it refuses harder.
+do
+  local g = Roster.Glance(db({
+    a = char({ name = "Vocnar", instances = {
+      { name = "Nerub-ar Palace", resetTime = NOW + 86400 },
+      { name = "Liberation", resetTime = NOW - 60 },
+      { name = "Old Raid" },
+    } }),
+    b = char({ name = "Voctara", instances = { { name = "Gone", resetTime = NOW - 1 } } }),
+  }), nil)
+  check("saved counts live lockouts and the ones predating resetTime",
+    names(line(g, "saved")) == "Vocnar 2", names(line(g, "saved")))
+  check("a character whose every lockout has reset is not saved to anything",
+    #line(g, "saved").parts == 1)
+end
+
+do
+  local g = Roster.Glance(db({
+    a = char({ name = "Vocnar", currencies = {
+      { id = 1, name = "Valorstones", quantity = 2000, maxQuantity = 2000 },
+      { id = 2, name = "Weathered Crest", quantity = 90, maxQuantity = 90 },
+      { id = 3, name = "Resonance Crystals", quantity = 4000, maxQuantity = 0 },
+    } }),
+    b = char({ name = "Voctara", currencies = {
+      { id = 1, name = "Valorstones", quantity = 240, maxQuantity = 2000 },
+    } }),
+    c = char({ name = "Voctesa", currencies = {
+      { id = 2, name = "Weathered Crest", quantity = 90, maxQuantity = 90 },
+    } }),
+  }), nil)
+  check("two capped currencies are counted, one is named",
+    names(line(g, "at cap")) == "Vocnar 2 currencies, Voctesa Weathered Crest",
+    names(line(g, "at cap")))
+  -- Vocnar holds three currencies and is counted for two: maxQuantity 0 is
+  -- uncapped per CONTRACT.md, not a cap of nothing. Voctara is simply not at
+  -- hers, so she is not on the line at all.
+  check("a character below the cap is not on the line", #line(g, "at cap").parts == 2)
+  check("being at a cap is the one currency state worth a warning",
+    line(g, "at cap").tone == "bad")
+end
+
+-- Shrink-to-fit: the tooltip is anchored to the minimap and must not grow past
+-- it, so a line names three and reports the rest.
+do
+  local chars = {}
+  for i = 1, 6 do
+    chars["c" .. i] = char({ name = "Alt" .. i, realm = "R", keystone = { level = i } })
+  end
+  local g = Roster.Glance(db(chars), nil)
+  check("a line names at most three", #line(g, "keystone").parts == 3)
+  check("and says how many it did not name", line(g, "keystone").more == 3)
+end
+
+-- The column sort is the glance's sort, so the character at the keyboard leads
+-- the line — the one you are checking the others against.
+do
+  local g = Roster.Glance(db({
+    a = char({ name = "Aaa", keystone = { level = 2 } }),
+    z = char({ name = "Zzz", keystone = { level = 20 } }),
+  }), "z")
+  check("you lead your own glance", g.lines[1].parts[1].name == "Zzz")
+  check("carrying the class UI.lua colours it with", g.lines[1].parts[1].class == "DRUID")
+end
+
 -- ── ns.hence, the mirror of ns.ago ──────────────────────────────────────────
 
 do

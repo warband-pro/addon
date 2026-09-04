@@ -45,6 +45,21 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**The minimap tooltip answers the question now, instead of telling you where to
+go and ask it.** Hover the icon and you get four lines across the whole warband:
+who has a Great Vault slot already earned, who is carrying a keystone and what
+level, who is saved to something, and who has a currency sitting at its cap and
+throwing away everything they earn towards it. Vault is first because it is the
+only one on that list you can lose by not logging in before Tuesday.
+
+Three names to a line, then `+2` for the rest, so the tooltip does not grow past
+the minimap it hangs off. A line with nobody on it is not drawn at all, and a
+character you have not logged into since the reset does not get counted as saved
+to a lockout that has since expired — blank still means nobody looked, the same
+as it does in the Roster tab.
+
 ### Fixed
 
 - clear orphaned junk lists when warbank attribution is cleared without removing a character — matches optimize path
