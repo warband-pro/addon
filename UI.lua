@@ -1340,28 +1340,58 @@ local function dragMinimap()
   placeMinimap(deg)
 end
 
---- What the window's header says, said before you open the window.
+--- One glance line: who it applies to, joined, with the names class-coloured.
 ---
---- Read straight off the store rather than out of `Export.Build`: the header
---- gets its number from a built bundle because it is about to show you that
---- bundle, and a hover is not worth an encode and a deflate.
-local function minimapFreshest()
-  local db = ns.Store.db
-  if not db or not db.chars then return nil end
-  local best
-  for _, c in pairs(db.chars) do
-    local seen = c.seenAt and c.seenAt.lastSeen
-    if seen and (not best or seen > best) then best = seen end
+--- The label carries the TONE and the names carry their CLASS colour, which is
+--- the split the rest of this window already uses — a colour is either a status
+--- or an identity, never both at once. That is also SavedInstances' rule and
+--- the reason its tooltip stays readable at twenty characters: colour for
+--- state, and nothing else coloured for decoration.
+local function glanceLine(line)
+  local parts = {}
+  for _, p in ipairs(line.parts) do
+    parts[#parts + 1] = classText(p.class, p.name) .. " " .. p.note
   end
-  return best
+  local right = table.concat(parts, "  ")
+  -- The names the model dropped to keep the tooltip off the minimap. `+2` is
+  -- honest about the omission where simply stopping at three would not be.
+  if line.more > 0 then right = right .. format("  |cff%s+%d|r", MUTED, line.more) end
+  local label = line.label
+  if TONE[line.tone] then label = format("|cff%s%s|r", TONE[line.tone], label) end
+  return label, right
 end
 
+--- What the window says, said before you open the window.
+---
+--- **This is SavedInstances' primary tooltip, and that is the point of it.**
+--- Hovering its icon is not the route to the answer there, it IS the answer,
+--- and opening a window is the follow-up question. Until now this hover said
+--- how many characters were stored and then listed slash commands — enough to
+--- tell you the addon was installed, and nothing about the warband it had been
+--- watching.
+---
+--- `Roster.Glance` decides what earns a line and this paints it, the same split
+--- the grid already has: the file with the rules is the file with tests, and
+--- this one only knows about colour.
+---
+--- Read straight off the store rather than out of `Export.Build`: the export
+--- tab's header gets its number from a built bundle because it is about to show
+--- you that bundle, and a hover is not worth an encode and a deflate.
 local function minimapTooltip(self)
+  local g = ns.Roster.Glance(ns.Store.db, ns.safe(UnitGUID, "player"))
+
   GameTooltip:SetOwner(self, "ANCHOR_LEFT")
   GameTooltip:AddLine("Warband.pro Companion")
-  local n = ns.Store.Count()
-  GameTooltip:AddLine(format("%d character%s  ·  freshest %s",
-    n, n == 1 and "" or "s", ns.ago(minimapFreshest())), 1, 1, 1)
+  GameTooltip:AddLine(format("%s %d character%s  ·  freshest %s", DOT[g.dot] or DOT.never,
+    g.characters, g.characters == 1 and "" or "s", g.ago), 1, 1, 1)
+
+  if #g.lines > 0 then
+    GameTooltip:AddLine(" ")
+    for _, line in ipairs(g.lines) do
+      GameTooltip:AddDoubleLine(glanceLine(line))
+    end
+  end
+
   GameTooltip:AddLine(" ")
   GameTooltip:AddLine("Click  ·  the export string", 1, 0.82, 0)
   GameTooltip:AddLine("Right-click  ·  options", 1, 0.82, 0)
