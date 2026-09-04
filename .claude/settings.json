@@ -13,6 +13,7 @@
       "Bash(node tools/notes.mjs:*)",
       "Bash(node tools/sample.mjs:*)",
       "Bash(node tools/changelog.mjs:*)",
+      "Bash(node tools/released.mjs:*)",
 
       "Bash(apt-get update)",
       "Bash(apt-get install -y --no-install-recommends lua5.1 luarocks)",

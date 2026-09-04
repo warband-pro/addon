@@ -3,9 +3,10 @@
 // No shebang, unlike everything else in tools/: this one is imported, never
 // run. Every other .mjs here is a command.
 //
-// Two things read a release section out of CHANGELOG.md and they must agree:
-// tools/slop.mjs proofreads it before a tag, and tools/notes.mjs is what the
-// release actually publishes. A second copy of "find the heading, stop at the
+// Three things read a release section out of CHANGELOG.md and they must agree:
+// tools/slop.mjs proofreads it before a tag, tools/notes.mjs is what the
+// release actually publishes, and tools/released.mjs checks that the version it
+// describes was ever tagged. A second copy of "find the heading, stop at the
 // next one" is a copy that drifts, and the drift would be silent in the
 // direction that matters — slop passing a section the release never sends.
 //
@@ -46,4 +47,18 @@ export function section(arg) {
 
   const body = lines.slice(start + 1, end);
   return { wanted, found: true, start, heading: lines[start], body, prose: body.join('\n').trim() };
+}
+
+/**
+ * Every numbered version in the file, in the order the headings appear —
+ * newest first, because that is how the file is written.
+ *
+ * `## [Unreleased]` is deliberately not one of them. It is the section that has
+ * not been given a number yet, and `section('--unreleased')` is how to read it.
+ */
+export function versions() {
+  const lines = readFileSync(join(ROOT, CHANGELOG), 'utf8').split('\n');
+  return lines
+    .map((l) => l.match(/^## \[(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)\]/)?.[1])
+    .filter(Boolean);
 }

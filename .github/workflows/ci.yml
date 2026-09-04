@@ -54,7 +54,13 @@ jobs:
     name: packaging + contract
     runs-on: ubuntu-latest
     steps:
+      # Tags, not just the tree. The release-drift check below compares the
+      # changelog against what has actually been tagged, and a default
+      # depth-1 checkout fetches no tags at all — so it would pass by seeing
+      # nothing, which is the one way this check can be worse than useless.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -63,6 +69,38 @@ jobs:
       # Catches the failures WoW reports by silently not loading the addon.
       - name: Validate .toc and .pkgmeta
         run: node tools/validate.mjs
+
+      # The only step in this file that does not read the tree — and the only
+      # one that can tell a version that shipped from one that did not. There
+      # is no version number in the addon: `## Version: @project-version@` is
+      # filled in by the packager from the tag, so a release exists as a `##
+      # [x.y.z]` heading here and a `vx.y.z` tag there, and nothing connected
+      # the two. 1.3.0, 1.4.0 and 1.9.0 were each written up, dated and merged
+      # without ever being tagged, so main carried work no player could
+      # download and every check on this page stayed green.
+      #
+      # `--shipped` — the form that fails — only on a push to main. On a pull
+      # request the section is written before the tag by design, and on a
+      # manual release run this workflow is called *before* release.yml creates
+      # the tag; failing either would make cutting a release impossible. Both
+      # still get the report, in the job summary.
+      - name: The newest version has actually shipped
+        env:
+          STRICT: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && '--shipped' || '' }}
+        run: |
+          set -uo pipefail
+          status=0
+          node tools/released.mjs ${STRICT:-} > released.txt || status=$?
+          {
+            echo '### Release status'
+            echo
+            echo '```'
+            cat released.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat released.txt
+          rm -f released.txt
+          exit $status
 
       # The release workflow runs this same tool against the section it is about
       # to ship, where a finding fails the release. Running it on ## [Unreleased]

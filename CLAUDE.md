@@ -54,7 +54,7 @@ place.**
 | Client target | Retail **Midnight**, `## Interface: 120100`. Retail only; there is no Classic branch. |
 | Lint | **luacheck** against `.luacheckrc`, **0 warnings** |
 | Tooling | **Node 22**, plain ESM `.mjs` under `tools/` |
-| Dependencies | **none, in either direction.** There is no `package.json` — every tool imports `node:fs`, `node:path`, `node:url`, `node:zlib` and nothing else. LibDeflate is vendored as one file in `Vendor/`, and `.pkgmeta` has no `externals:` block on purpose. |
+| Dependencies | **none, in either direction.** There is no `package.json` — every tool imports `node:fs`, `node:path`, `node:url`, `node:zlib` and `node:child_process` (`tools/released.mjs`, to shell out to `git tag`) and nothing else. LibDeflate is vendored as one file in `Vendor/`, and `.pkgmeta` has no `externals:` block on purpose. |
 
 **Neither Lua nor luacheck is installed in a fresh container.** Measured
 2026-09-01: `node` is on the path, `lua5.1` and `luacheck` are not. Install them
@@ -78,13 +78,14 @@ luacheck .
 node tools/validate.mjs
 node tools/vector.mjs
 node tools/slop.mjs --unreleased
+node tools/released.mjs
 for t in import junk gear gearset freshness roster; do lua5.1 tools/$t-test.lua; done
 node tools/vector.mjs --write && git diff --exit-code -- docs/contract/vectors
 ```
 
 The last line is a **separate** check from `node tools/vector.mjs` and fails on
 its own; the reason that trips people is under **Verify**. A green run of all
-six is a green PR, because `ci.yml` runs exactly these.
+seven is a green PR, because `ci.yml` runs exactly these.
 
 ### Layout
 
@@ -183,6 +184,16 @@ unasked.** A tag ships to CurseForge and Wago and cannot be recalled;
 `.claude/settings.json` asks before `git tag` and before pushing one. What
 number a release gets is `CHANGELOG.md`'s semver rule — anchored to what the
 player has to do about it, not to payload shape.
+
+**But writing the section is not cutting the release, and this repo keeps
+proving it.** The tag is the version — the `.toc` carries `@project-version@`
+and the packager fills it in — so a `## [x.y.z]` heading publishes nothing on
+its own. 1.3.0, 1.4.0 and 1.9.0 were each written up, dated and merged without
+a tag, and sat in `main` where no player could download them. `tools/released.mjs`
+is what closed it: it compares the changelog against the tags, fails a push to
+`main` when the newest section has no tag, and names the two commands that ship
+it. If it reports an untagged version, **say so and ask** — it is the report
+that is yours to deliver, not the tag.
 
 ### The rest, stated once
 
@@ -353,6 +364,7 @@ luacheck .                      # zero warnings under .luacheckrc
 node tools/validate.mjs         # .toc and .pkgmeta agree
 node tools/vector.mjs           # wb1! round-trips
 node tools/slop.mjs --unreleased   # the notes read like a person wrote them
+node tools/released.mjs            # the newest changelog version has a tag
 
 for t in import junk gear gearset freshness roster; do lua5.1 tools/$t-test.lua; done
 
