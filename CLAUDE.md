@@ -308,9 +308,22 @@ DELETE /repos/warband-pro/addon/git/refs/heads/<branch>
 ```
 
 and the GitHub MCP server offers `create_branch` with no delete counterpart.
-Creating, updating and force-updating refs all succeed; only deletion is
-refused, on every branch, every time. It is a platform guardrail, so there is
-nothing to retry and nothing to wait out.
+Creating, updating and force-updating *branch* refs all succeed. It is a
+platform guardrail, so there is nothing to retry and nothing to wait out.
+
+**A tag push is refused the same way** — measured 2026-09-04, cutting 1.9.0:
+
+```
+git push origin v1.9.0
+  POST /warband-pro/addon/git-receive-pack   HTTP/1.1 403 Forbidden
+```
+
+So the `git tag && git push` line in [`docs/CI.md`](docs/CI.md) is the
+maintainer's path, not yours. **Yours is the workflow dispatch**, which creates
+the tag on the runner instead of pushing one from here: `Actions → Release → Run
+workflow → 1.9.0`, or `run_workflow` on `release.yml` with that version. It
+validates the semver string, the changelog section and tag uniqueness before it
+writes anything, so a wrong number fails before it can ship.
 
 **If merged branches pile up on the remote, say so plainly and leave them** —
 one click for the maintainer in the GitHub UI, impossible for you. Do not

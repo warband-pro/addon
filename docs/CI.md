@@ -108,6 +108,25 @@ Or, from the browser: **Actions → Release → Run workflow → `1.0.0`**. That
 validates the version string, the changelog section, and tag uniqueness *before*
 writing the tag, then tags and pushes it for you.
 
+**An agent has to use the second path.** Pushing a tag from a Claude Code web
+session is refused, the same way deleting a remote branch is:
+
+```
+git push origin v1.9.0
+  POST /warband-pro/addon/git-receive-pack   HTTP/1.1 403 Forbidden
+  send-pack: unexpected disconnect while reading sideband packet
+  fatal: the remote end hung up unexpectedly
+```
+
+Branch pushes go through; a tag ref does not, and `POST /repos/.../git/refs` is
+refused through the same proxy — so there is nothing to retry and nothing to
+wait out. Note the `hung up unexpectedly` line: git prints it after any 403 and
+it is not evidence of a timeout.
+
+The workflow dispatch has no such hole, because the tag is created by the runner
+rather than pushed from here — `Actions → Release → Run workflow`, or the API
+call behind that button. v1.9.0 went out that way, and so did v1.8.0.
+
 ### Writing the section is not cutting the release
 
 **The tag is the version.** There is no version number anywhere in the addon —
