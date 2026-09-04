@@ -10,7 +10,7 @@ one button, and everything between that and the download page is automatic.
 | Job | What it proves |
 | --- | --- |
 | `luacheck` | Zero warnings under `.luacheckrc`. That file lists every global the addon may touch, so a new warning is usually a leaked global rather than a style nit. |
-| `packaging + contract` | `tools/validate.mjs` — the `.toc` and `.pkgmeta` are internally consistent. `tools/vector.mjs` — a `wb1!` payload survives encode → decode unchanged, and the committed `.wb1` fixtures still match. `tools/slop.mjs --unreleased` — the notes accumulating under `## [Unreleased]` read like a person wrote them. |
+| `packaging + contract` | `tools/validate.mjs` — the `.toc` and `.pkgmeta` are internally consistent. `tools/vector.mjs` — a `wb1!` payload survives encode → decode unchanged, and the committed `.wb1` fixtures still match. `tools/slop.mjs --unreleased` — the notes accumulating under `## [Unreleased]` read like a person wrote them. `tools/released.mjs` — the newest version in `CHANGELOG.md` has a tag, so it actually reached a download page. |
 | `package (dry run)` | The real packager builds the real zip with uploads switched off, and attaches it as a workflow artifact. |
 
 That artifact matters: **every push to `main` produces a downloadable, correctly
@@ -108,6 +108,46 @@ Or, from the browser: **Actions → Release → Run workflow → `1.0.0`**. That
 validates the version string, the changelog section, and tag uniqueness *before*
 writing the tag, then tags and pushes it for you.
 
+### Writing the section is not cutting the release
+
+**The tag is the version.** There is no version number anywhere in the addon —
+`## Version: @project-version@` is a placeholder the packager fills in from the
+tag it is building — so a release exists as two separate things: a `## [x.y.z]`
+heading in `CHANGELOG.md`, which a person writes, and a `vx.y.z` tag on the
+remote, which is what ships. Writing the heading is the part that feels like
+cutting the release. It is not the part that publishes anything.
+
+Three versions have been lost in that gap. **1.3.0 and 1.4.0** were written up,
+dated and merged and never tagged, so CurseForge went 1.2.0 → 1.5.0 and two
+versions of work sat in `main` where no player could reach it. **1.9.0** did the
+same thing on 2026-09-02: the entire Roster grid, described in the changelog and
+absent from every download page.
+
+Nothing caught any of them, because every other check in CI reads the tree and
+the tree is identical either way. The tag is on the remote — the one place none
+of them look.
+
+```bash
+node tools/released.mjs            # report, locally, any time
+node tools/released.mjs --shipped  # what main runs; fails on an untagged version
+```
+
+It fails a push to `main` when the newest section has no tag, so an unshipped
+version turns the branch red and the failure prints the two commands that fix
+it. On a pull request and on a release run it reports without failing — the
+section is written before the tag by design on the first, and the release
+workflow calls CI *before* it creates the tag on the second.
+
+It also answers the question the nudge exists for: what is queued under
+`## [Unreleased]`, and what number that would go out under.
+
+```
+NOTE ## [Unreleased] holds 1 note under fixed — a patch on top of 1.9.0, so v1.9.1.
+```
+
+Notes accumulating there is normal and never a failure. A version described in
+the changelog and missing from CurseForge is neither.
+
 ## What to configure, once
 
 ### Repository secrets
@@ -141,14 +181,24 @@ visible in every CI run rather than discovered on release day.
 
 ## Versioning
 
-Semver, with the wire format as the thing being versioned:
+Semver, anchored to **what the player has to do about it** — not to the shape of
+the payload:
 
-- **MAJOR** — `wb1!` → `wb2!`. Old strings rejected with "update your addon".
-- **MINOR** — a new optional field or capture. The website still reads older bundles.
-- **PATCH** — a fix. Payload shape unchanged.
+- **MAJOR** — they have to update or it stops working. `wb1!` → `wb2!`: old strings rejected with "update your addon".
+- **MINOR** — something new. A new capture, a new field on the wire, or a new thing the in-game UI does.
+- **PATCH** — a fix. No new capture, no new field, no new control.
+
+**This section used to say the wire format was the thing being versioned**, and
+that was already wrong when it was written: 1.5.0 added a minimap button, a
+keybinding and an options tab and moved no wire field at all — a MINOR by every
+instinct and not by a rule that only knew about payload shape. The wire is still
+the hard edge of MAJOR, because it is the only change a player cannot absorb by
+ignoring it. **A wire break is at least a MAJOR; not every MAJOR is a wire
+break.** `CHANGELOG.md` carries the long version of this rule and
+`docs/CONTRACT.md` is the law for the wire half.
 
 The addon version and the wire version move independently: many addon minors can
-ship against `wb1!`. `docs/CONTRACT.md` is the law for the wire half.
+ship against `wb1!`.
 
 ## Branching
 
