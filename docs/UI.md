@@ -122,12 +122,19 @@ columns and nothing else has to be told.
 
 The window opens at **680x520, which is eight columns**, derived rather than
 chosen: `152 + 8x56 + 6` gutter, plus about 72 for the chrome between the
-frame's edge and the scroll frame's. It drags from a corner grip between 560x420
+frame's edge and the scroll frame's. It drags from a corner grip between 560x460
 and 1600x1000, and the size and position are remembered in `opts.window` — the
 same `opts` idiom, and the same write-on-drag-stop timing, as the minimap
 button's angle. A size stored by an older build is clamped to the current bounds
 on the way back IN as well as out, so a bound change can never leave a window
 that cannot be reached or resized back.
+
+**The minimum height is set by the Options tab, not by the grid** — it was 420
+until the currency filter added a fifth checkbox, and the tallest tab is what
+decides how short the window may get. Its controls run top-down at a fixed pitch
+against a version line pinned to the panel's bottom, so five of them and a
+footer need 460. That clamp on the way in is what makes raising it safe: a
+player who had left the window at 420 gets it back at 460 rather than losing it.
 
 `[ < ]` and `[ > ]` survive for the case where a warband genuinely will not fit
 the widest window, but they are hidden unless that is true.
@@ -151,8 +158,8 @@ these are the two things SavedInstances gets from LibQTip that we owed it.
 
 **Row groups, in order:** `this week` (the three vault buckets, keystone, m+
 score), `lockouts` (one row per instance-and-difficulty anybody is saved to,
-raids first, plus a world-boss count), `currencies` (one row per currency
-anybody has, capped ones as a fraction and warning near the cap), `professions`
+raids first, plus a world-boss count), `currencies` (one row per currency the
+game is still metering for somebody — see below), `professions`
 (skill over max), `pockets` (gold, bag space, the five consumable counts, and
 mail when something is waiting). The warband bank is account-wide and so has no
 column to live in; it is the footer line, with how many of its tabs were
@@ -184,6 +191,47 @@ since. Whether they re-locked is a different question and an unread one. This is
 SavedInstances' `ShowExpired` decided rather than configured, and it is decided
 the way this addon decides everything else: a reading it cannot stand behind is
 not shown. A lockout with no `resetTime` at all predates the field and stays.
+
+#### The currency rows — which ones, and what a colour means
+
+**A currency earns a row when the game is still metering it for somebody**: it
+has a total cap, or a weekly cap, or a character in this warband earned some of
+it this week. The test runs across the whole warband rather than per character,
+so one alt still earning a currency keeps its row for the nine who are not —
+which is the point of a grid.
+
+Everything else is a pile left over from an expansion nobody here is playing —
+Timewarped Badges, the marks of three seasons ago, one line each, padding the
+sixteen-row currency group measured above, between the two rows you opened the
+tab for. **SavedInstances answers this with a checklist of every currency in
+the game**, which is the largest thing in its options and is maintenance the
+player does on the addon's behalf every time an expansion retires a currency and
+mints four more. The signal is already on the wire here, so this is decided
+rather than configured — the same move as the expired lockout above.
+
+The group header **says how many it left out** — `currencies · 4 hidden` — for
+the reason the minimap glance prints `+2` rather than simply stopping at three: a
+header that silently drops rows is a bug report waiting to be filed, and one
+that counts them sends the player to the switch that shows them. That switch is
+**Show every currency in the Roster grid** on the Options tab, one checkbox
+rather than one per currency. A warband holding nothing but legacy currencies
+gets no group at all, by the same rule that drops every other empty group.
+
+**Colour is the two things you can act on.** SavedInstances paints green under
+the cap, red at it and yellow at a weekly cap; the green half is decoration
+here, because this grid's rule is that colour is state and sixteen green rows
+state nothing. So `plain` is what fine looks like, and the tones left are:
+
+- **red — at the cap.** Everything earned towards it from here is thrown away.
+  The hover says so.
+- **orange — nine tenths of the way there, or this week's allowance already
+  earned.** The first is the warning that arrives while it is still worth
+  something; the second answers "should I run more of this", and the hover's
+  weekly fraction says which of the two you are looking at.
+
+Being at the cap **used to be orange as well**, which made "go spend this" and
+"too late" the same colour — and the minimap glance has called the second one
+red since 1.9.0, so the grid and the hover disagreed about the same currency.
 
 ### `from warband.pro` — the group SavedInstances cannot have
 
@@ -335,6 +383,11 @@ the tab and `/warband gear on|off` are two doors to one switch:
   convenience worth porting whole ("automatically show junk list at
   vendors"); their auto-equip and gear-set halves arrived in 1.6.0 as the
   `wbg1!` equip string and the gear-set row above.
+- **Show every currency in the Roster grid** (`allCurrencies`, off by default) —
+  the escape hatch for the filter described under the Roster tab. Off, the grid
+  lists what the game is still metering and its header counts what it left out;
+  on, every currency any character is carrying gets a row. One checkbox, not
+  SavedInstances' one per currency.
 
 No UI-scale option, deliberately: AMR needs one because its window is skinned
 from scratch; this window inherits the player's scale by being made of the

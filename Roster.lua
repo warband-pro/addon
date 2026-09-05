@@ -337,50 +337,118 @@ local function lockouts(groups, cols)
   push(groups, g)
 end
 
-local function currencies(groups, cols)
+-- **Which currencies get a row.** SavedInstances answers this with a checklist
+-- of every currency in the game and asks the player to tick the interesting
+-- ones. That list is the single biggest thing in its options, and it is
+-- maintenance the player does on the addon's behalf every time an expansion
+-- retires a currency and mints four more.
+--
+-- The signal is already on the wire, so this is decided rather than configured,
+-- the way the expired lockout is: **a currency is LIVE when the game is still
+-- metering it for somebody.** It has a total cap, or a weekly cap, or a
+-- character earned some of it this week. Everything else is a pile left over
+-- from an expansion nobody in this warband is playing — Timewarped Badges, the
+-- marks of three seasons ago — padding a currency group that docs/UI.md
+-- measured at sixteen rows, between the two rows the tab was opened for.
+--
+-- The test runs across the WHOLE warband, not per character, so one alt still
+-- earning a currency keeps its row for the nine who are not. That is the point
+-- of a grid.
+local function liveCurrency(cur)
+  local max, weekly, earned = num(cur.maxQuantity), num(cur.weeklyMax), num(cur.earnedThisWeek)
+  if max and max > 0 then return true end
+  if weekly and weekly > 0 then return true end
+  if earned and earned > 0 then return true end
+  return false
+end
+
+local function currencies(groups, cols, showAll)
   local g = group("currencies")
 
   local keys, seen = {}, {}
   for i = 1, #cols do
     for _, cur in ipairs(cols[i].char.currencies or {}) do
-      if cur.id and cur.name and not seen[cur.id] then
-        seen[cur.id] = true
-        keys[#keys + 1] = { id = cur.id, name = cur.name }
+      if cur.id and cur.name then
+        local k = seen[cur.id]
+        if not k then
+          k = { id = cur.id, name = cur.name, live = false }
+          seen[cur.id] = k
+          keys[#keys + 1] = k
+        end
+        if liveCurrency(cur) then k.live = true end
       end
     end
   end
   sort(keys, function(a, b) return a.name < b.name end)
 
+  local hidden = 0
   for _, k in ipairs(keys) do
-    addRow(g, cols, k.name, function(c)
-      for _, cur in ipairs(c.currencies or {}) do
-        if cur.id == k.id then
-          local q = num(cur.quantity)
-          if not q then return nil end
-          local max = num(cur.maxQuantity)
-          -- The weekly cap is a different question from the total cap and the
-          -- more urgent one — a weekly that resets unspent is gone, where a
-          -- total cap merely stops accruing. Both ride the wire and neither was
-          -- being read.
-          local tip
-          local weekly, earned = num(cur.weeklyMax), num(cur.earnedThisWeek)
-          if weekly and weekly > 0 then
-            tip = { { "this week", commas(earned or 0) .. "/" .. commas(weekly) } }
+    if not (showAll or k.live) then
+      hidden = hidden + 1
+    else
+      addRow(g, cols, k.name, function(c)
+        for _, cur in ipairs(c.currencies or {}) do
+          if cur.id == k.id then
+            local q = num(cur.quantity)
+            if not q then return nil end
+            local max = num(cur.maxQuantity)
+            local weekly, earned = num(cur.weeklyMax), num(cur.earnedThisWeek)
+            -- `maxQuantity` 0 is uncapped per CONTRACT.md, not a cap of nothing.
+            local capped = max and max > 0 and q >= max
+            local weeklyDone = weekly and weekly > 0 and (earned or 0) >= weekly
+
+            -- The weekly cap is a different question from the total cap and the
+            -- more urgent one — a weekly that resets unspent is gone, where a
+            -- total cap merely stops accruing. Both ride the wire and neither
+            -- was being read.
+            local tip = {}
+            if capped then tip[#tip + 1] = "at cap — anything more is lost" end
+            if weekly and weekly > 0 then
+              tip[#tip + 1] = { "this week", commas(earned or 0) .. "/" .. commas(weekly) }
+            end
+            if cur.isAccountWide then tip[#tip + 1] = "shared across the warband" end
+            if #tip == 0 then tip = nil end
+
+            -- SavedInstances' three currency colours, translated rather than
+            -- copied. Its green for "under the cap" is decoration here — this
+            -- grid's rule is that colour is state, and sixteen green rows state
+            -- nothing — so `plain` is what "fine" looks like, and the two
+            -- colours left are the two things you can act on:
+            --
+            --   bad   at the cap. Everything earned from here is thrown away.
+            --   warn  close enough to that to go spend it, or this week's
+            --         allowance is already earned and running more pays nothing.
+            --
+            -- The 90% warning is the one that arrives while it is still worth
+            -- something. `bad` used to be `warn` too, which made "go spend
+            -- this" and "too late" the same colour — and the minimap glance has
+            -- called the second one red since 1.9.0, so the two surfaces
+            -- disagreed about the same currency.
+            local tone = "plain"
+            if capped then
+              tone = "bad"
+            elseif (max and max > 0 and q >= max * 0.9) or weeklyDone then
+              tone = "warn"
+            end
+
+            -- A cap is only worth drawing when there is one: `4500/0` is not a
+            -- fraction.
+            if max and max > 0 then
+              return cell(commas(q) .. "/" .. commas(max), tone, tip)
+            end
+            return cell(commas(q), tone, tip)
           end
-          if cur.isAccountWide then
-            tip = tip or {}
-            tip[#tip + 1] = "shared across the warband"
-          end
-          -- A cap is only worth drawing when there is one: `maxQuantity` 0
-          -- means uncapped, per CONTRACT.md, and `4500/0` is not a fraction.
-          if max and max > 0 then
-            return cell(commas(q) .. "/" .. commas(max), q >= max * 0.9 and "warn" or "plain", tip)
-          end
-          return cell(commas(q), "plain", tip)
         end
-      end
-      return nil
-    end)
+        return nil
+      end)
+    end
+  end
+
+  -- Honest about the omission, the way the glance's `+2` is. A group header
+  -- that silently drops four rows is a bug report waiting to be filed; one that
+  -- says how many were dropped sends the player to the switch that shows them.
+  if hidden > 0 then
+    g.label = format("currencies · %d hidden", hidden)
   end
 
   push(groups, g)
@@ -588,11 +656,16 @@ function Roster.Build(db, selfGuid)
     if j or gs then cols[i].plan = { junk = j, gearset = gs } end
   end
 
+  -- The only option the grid reads. It arrives on `db` rather than as an
+  -- argument because `db.opts` is where every other switch in this addon lives
+  -- and the model already has the whole DB in its hand.
+  local opts = type(db) == "table" and type(db.opts) == "table" and db.opts or {}
+
   local groups = {}
   if #cols > 0 then
     thisWeek(groups, cols)
     lockouts(groups, cols)
-    currencies(groups, cols)
+    currencies(groups, cols, opts.allCurrencies and true or false)
     professions(groups, cols)
     pockets(groups, cols)
     fromSite(groups, cols)

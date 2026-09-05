@@ -159,6 +159,40 @@ a widget left over from a wider window still drawing last render's cell.
 - [ ] After pasting a `wbc1!` string, the `from warband.pro` rows fill in for
       the characters it covered and stay blank for the ones it did not
 
+### The currency rows (unreleased)
+
+The filter is the one thing here that HIDES something, so the checks are mostly
+about it hiding the right rows and being findable when it hides the wrong ones.
+Bring a character carrying at least one retired currency — Timewarped Badges do
+for most accounts.
+
+- [ ] The currency group is shorter than it was, and what is left is this
+      season's: crests, valorstones, coffer key shards, whatever is capped
+- [ ] The group header reads `currencies · N hidden` and N matches what went
+      missing
+- [ ] Options → **Show every currency in the Roster grid** — the hidden rows
+      come back on the spot, without a `/reload`, and the header goes back to
+      plain `currencies`
+- [ ] Turn it off again — they go away again, and the count is the same as
+      before
+- [ ] A currency you are at the cap of is RED, and its hover says "at cap —
+      anything more is lost"
+- [ ] One near but not at its cap is ORANGE; one well under it is plain white
+- [ ] A currency whose weekly allowance you have already earned is ORANGE, and
+      its hover's "this week" fraction reads the same on both sides
+- [ ] The colour a currency reads in the grid matches the minimap hover's
+      `at cap` line — the same currency is never red in one and orange in the
+      other
+- [ ] `/reload` on a character with no currencies read at all — the group is
+      absent rather than an empty header
+
+### The Options tab at its shortest (unreleased)
+
+- [ ] Drag the window as short as it will go, then open Options — the fifth
+      checkbox and its description clear the version line at the bottom
+- [ ] A window left at the old 420 minimum by an earlier build opens at 460
+      rather than off-screen or unresizable
+
 ## The gear set — equip and save (1.6.0)
 
 **This is the first thing this addon has ever done that moves gear on your
