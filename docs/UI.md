@@ -233,6 +233,50 @@ Being at the cap **used to be orange as well**, which made "go spend this" and
 "too late" the same colour — and the minimap glance has called the second one
 red since 1.9.0, so the grid and the hover disagreed about the same currency.
 
+#### The cooldown rows — the group whose useful state is the expired one
+
+Trade skill cooldowns sit under the professions, one row per recipe: the alchemy
+transmutes, the daily forges, anything the client meters. It is SavedInstances'
+trade skill row, and it is the one place in this grid where **a timestamp in the
+past is the answer rather than something to refuse.**
+
+Everything else here counts towards something being taken away, and the rule for
+those is the expired lockout above — past its reset it is *known* to be gone, so
+drawing it would state something false. A cooldown inverts that exactly: past
+its ready time it is *known* to be ready, and an alt with a transmute waiting is
+the whole reason to look. Same absolute stamp, same arithmetic, opposite
+conclusion, which is why the rule is stated per group rather than applied to
+every timestamp on sight.
+
+| cell | means |
+|---|---|
+| `ready` (green) | the cooldown has run out. Log in and use it. |
+| `2/3` (green) | a charge-based cooldown with charges in hand. |
+| `18h` | still counting down, with nothing spendable. |
+| *empty* | this character has never had a profession window open, so we have nothing to say. Not "ready" — that would be inventing a fact about an alt. |
+
+**Charges beat the timer where they disagree**, and they disagree often: a
+charge-based cooldown can be counting down and usable at the same time, so a
+cell that only read the timer would send a player away from something they could
+do immediately. The hover carries the profession, the charge count, whether it
+is a daily, and how long it has been waiting.
+
+**Which recipes get a row is decided the way the currencies are.**
+SavedInstances carries a per-expansion table of trade skill cooldown spell ids
+and grows it every patch; we walk what the open profession window actually
+lists, and a recipe earns a row the first time the client reports a cooldown on
+it. From then on it is remembered — including after the cooldown runs out, which
+is the state worth knowing.
+
+**They are read only while a profession window is open**, the same as the bank
+and the mailbox, and `C_TradeSkillUI` answers for that one profession and
+nothing else. So the stored list is merged per skill line rather than replaced —
+opening Alchemy must not forget Tuesday's Blacksmithing cooldown — and it
+carries its own `professionCooldown` freshness stamp instead of sharing
+`profession`, which `SKILL_LINES_CHANGED` moves at every login. Sharing it would
+put a fresh dot on a transmute timer nobody has looked at since Tuesday, which
+is the reagent bank's bug with a different window in front of it.
+
 ### `from warband.pro` — the group SavedInstances cannot have
 
 SavedInstances has no other side. This addon does, and the last row group is

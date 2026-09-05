@@ -488,6 +488,71 @@ local function professions(groups, cols)
   push(groups, g)
 end
 
+-- **The row group whose useful state is the EXPIRED one.** Every other timer in
+-- this grid counts towards something being taken away — a lockout, a weekly
+-- allowance — and Roster's rule for those is that a stamp in the past means the
+-- thing is gone and must not be drawn. A trade skill cooldown inverts it: past
+-- its ready time is exactly when you want to be told about it, because that is
+-- an alt with a transmute waiting and a login's worth of gold in it. Same
+-- absolute `readyTime`, same `ns.hence`, opposite conclusion — which is why the
+-- rule is stated per group rather than applied to every timestamp on sight.
+--
+-- Charges complicate the timer and are the more common case in practice: a
+-- charge-based cooldown can be counting down and usable at the same time, so a
+-- cell that only read the timer would tell a player to wait for something they
+-- could do now. Charges win where the two disagree.
+local function cooldowns(groups, cols)
+  local g = group("cooldowns")
+
+  local keys, seen = {}, {}
+  for i = 1, #cols do
+    for _, cd in ipairs(cols[i].char.professionCooldowns or {}) do
+      if type(cd.spellID) == "number" and not seen[cd.spellID] then
+        seen[cd.spellID] = true
+        -- A name the client gave us, or the id, which is at least something to
+        -- paste into a search. Naming it "recipe 12345" beats dropping the row:
+        -- somebody in this warband is genuinely waiting on it.
+        keys[#keys + 1] = { id = cd.spellID, label = cd.name or ("recipe " .. cd.spellID) }
+      end
+    end
+  end
+  sort(keys, function(a, b) return a.label < b.label end)
+
+  for _, k in ipairs(keys) do
+    addRow(g, cols, k.label, function(c)
+      for _, cd in ipairs(c.professionCooldowns or {}) do
+        if cd.spellID == k.id then
+          local left = ns.hence(cd.readyTime)
+          local charges, maxCharges = num(cd.charges), num(cd.maxCharges)
+
+          local tip = {}
+          if cd.skillLine then tip[#tip + 1] = { "profession", tostring(cd.skillLine) } end
+          if maxCharges and maxCharges > 0 then
+            tip[#tip + 1] = { "charges", (charges or 0) .. "/" .. maxCharges }
+          end
+          if cd.isDayCooldown then tip[#tip + 1] = "a daily cooldown" end
+          if left then
+            tip[#tip + 1] = { "ready in", left }
+          else
+            tip[#tip + 1] = { "ready since", ns.ago(cd.readyTime) }
+          end
+
+          if charges and charges > 0 then
+            local text = maxCharges and maxCharges > 0
+              and (charges .. "/" .. maxCharges) or tostring(charges)
+            return cell(text, "good", tip)
+          end
+          if not left then return cell("ready", "good", tip) end
+          return cell(left, "plain", tip)
+        end
+      end
+      return nil
+    end)
+  end
+
+  push(groups, g)
+end
+
 -- The consumable keys the scanner actually writes, with what a player calls
 -- them. Not every key is worth a row on its own — a rune and a potion are one
 -- decision at raid time — but they are counted separately in the DB and
@@ -667,6 +732,7 @@ function Roster.Build(db, selfGuid)
     lockouts(groups, cols)
     currencies(groups, cols, opts.allCurrencies and true or false)
     professions(groups, cols)
+    cooldowns(groups, cols)
     pockets(groups, cols)
     fromSite(groups, cols)
   end

@@ -186,6 +186,37 @@ for most accounts.
 - [ ] `/reload` on a character with no currencies read at all — the group is
       absent rather than an empty header
 
+### The cooldown rows (unreleased)
+
+**The read is the untestable half** — `C_TradeSkillUI` only answers while a
+profession window is open, so nothing in CI reaches it and this checklist is the
+whole of the evidence. Bring a character with a profession that has a cooldown;
+an alchemist is easiest, and a second profession on the same character makes the
+merge check possible.
+
+- [ ] Open the profession window on a character with a cooldown *running*. Close
+      it, `/warband roster` — a `cooldowns` group under `professions`, one row
+      named after the recipe, cell showing the time left
+- [ ] Hover it — the profession name, `ready in`, and the charge count if it is
+      a charge cooldown
+- [ ] A charge-based cooldown (an alchemy transmute with a charge in hand) reads
+      as `2/3` in green, **not** as the countdown
+- [ ] Spend every charge — the same cell falls back to the countdown
+- [ ] A character who has never opened a profession window has an EMPTY cell in
+      that row, never `ready`
+- [ ] Wait one out (or bring an alt whose cooldown lapsed days ago) — the cell
+      reads `ready` in green, and the hover says `ready since`
+- [ ] **The merge:** with an Alchemy cooldown already stored, open Blacksmithing
+      on the same character. The Alchemy row is still there afterwards, with the
+      same time left — opening one profession must not forget the other
+- [ ] `/warband status` — `professionCooldown` is its own age in the section
+      list, and it is OLDER than `profession` on a character who has logged in
+      since last opening a profession window
+- [ ] `/warband copy` on that character — the bundle carries
+      `professionCooldowns` with an absolute `readyTime`, and no `remainingSec`
+- [ ] A warband where nobody has a cooldown gets no `cooldowns` group at all,
+      not an empty header
+
 ### The Options tab at its shortest (unreleased)
 
 - [ ] Drag the window as short as it will go, then open Options — the fifth

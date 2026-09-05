@@ -61,7 +61,7 @@ read_globals = {
 
   -- inventory, currency, professions, mail, auctions
   "C_Container", "C_Item", "GetItemInfoInstant", "Enum", "C_Bank", "C_Spell",
-  "C_CurrencyInfo", "GetProfessions", "GetProfessionInfo",
+  "C_CurrencyInfo", "GetProfessions", "GetProfessionInfo", "C_TradeSkillUI",
   "GetInboxNumItems", "GetInboxHeaderInfo", "C_AuctionHouse",
 
   -- gear and talents

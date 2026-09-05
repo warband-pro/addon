@@ -101,7 +101,8 @@ Top-level:
     {"id":171,"name":"Alchemy","skill":100,"maxLevel":100,"expansionTier":5,"knownRecipes":89,"totalRecipes":120}
   ],
   "professionCooldowns": [
-    {"spellID":12345,"name":"Transmute: Prismatic","readyTime":1724005000,"remainingSec":3600}
+    {"spellID":12345,"name":"Transmute: Prismatic","skillLineID":171,"skillLine":"Alchemy",
+     "readyTime":1724005000,"isDayCooldown":true,"charges":2,"maxCharges":3}
   ],
 
   "instances": [
@@ -134,6 +135,7 @@ Top-level:
     "mail":null,
     "auctions":null,
     "profession":1724001000,
+    "professionCooldown":1723990000,
     "gear":1724001000,
     "talents":1723999000
   }
@@ -167,9 +169,31 @@ Top-level:
 - Mail goldPending in copper.
 - Any field unknown on old version must be treated as optional by web. New fields additive, bumps minor patch but safe.
 
+- `professionCooldowns` is one row per recipe the client has told us has a
+  cooldown, and **`readyTime` is absolute unix seconds like every other stamp
+  here — never a remaining count.** A `remainingSec` was specified in this file
+  until the field was built and is deliberately not shipped: it is wrong the
+  instant it is stored, and a website comparing it against its own clock would
+  be comparing a duration to a moment. **A `readyTime` in the past means READY**,
+  which is the state worth reporting — the inverse of `instances.resetTime`,
+  where a stamp in the past means the lockout is gone and must not be drawn.
+  Read the two together; they are the same arithmetic with opposite meanings.
+  - `charges`/`maxCharges` are present only for charge-based cooldowns (the
+    alchemy transmutes). **`charges > 0` means usable now even while
+    `readyTime` is still in the future** — the two are not contradictory and a
+    reader that trusts only the timer will tell a player to wait for something
+    they can do immediately.
+  - The list is **merged per `skillLineID`, not replaced**: `C_TradeSkillUI`
+    answers for whichever profession window is open, so a bundle carries
+    Alchemy read ten minutes ago beside Blacksmithing read on Tuesday. One
+    `seenAt.professionCooldown` covers the newest of those, which is why it is
+    a separate stamp from `seenAt.profession` rather than sharing it.
+  - A recipe with no cooldown is **not** a row. Absent means we have never seen
+    the client meter it, not that it is ready.
+
 **Fields shown above that no code in this repo currently produces —
 aspirational, not a current promise:** `bankBags`, `bindZone`, `playtimeSec`,
-`professionCooldowns`, `auctions.goldHeld`, `mail.seenAt`,
+`auctions.goldHeld`, `mail.seenAt`,
 `professions.expansionTier`/`knownRecipes`/`totalRecipes`,
 `instances.lfgID`. The CharacterObject example above is this file's stated
 target shape, not a report of what `Scan.lua` actually walks — grep this

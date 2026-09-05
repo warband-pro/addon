@@ -9,7 +9,15 @@ Like modern Midnight template docs: debugging first-class, every feature degrada
 We split code into two halves:
 
 - **Pure / deterministic** — can be unit tested on CLI: Bundle.lua, Export.lua decode flow, consumables rollup, freshness dot logic, CONTRACT validators, gold math, and **Roster.lua's whole grid model** (1.9.0 — a DB table in, a display model out). WoW API = 0 inside these. Injection: caller passes data tables, function returns tables/strings. No globals.
-- **Impure / WoW-bound** — Scan.lua, Instances.lua, Store.lua, UI.lua, Core.lua dispatcher. Require GAME. Test via manual checklist + BugSack + /dump + screenshots.
+- **Impure / WoW-bound** — Scan.lua, Instances.lua, Cooldowns.lua, Store.lua, UI.lua, Core.lua dispatcher. Require GAME. Test via manual checklist + BugSack + /dump + screenshots.
+
+`Cooldowns.lua` splits the same way the bank scan does, and there is no third
+category for it: the *read* needs a profession window open in a real client and
+is checked in `QA.md`, while the **bookkeeping either side of it is pure and is
+tested here** — the merge-by-skill-line rule lives in `Store.PutProfessionCooldowns`
+with `tools/freshness-test.lua` behind it, and the cell rules live in Roster.lua
+with `tools/roster-test.lua` behind them. That is the same seam that caught the
+warband bank replacing four tabs with one and stamping the loss fresh.
 
 The roster is the clearest case the split has: the grid is a display, and a
 display is the thing hand-checking is worst at — six columns of numbers all

@@ -35,6 +35,7 @@ Init.lua
 Store.lua
 Scan.lua
 Instances.lua
+Cooldowns.lua
 Gear.lua
 Perf.lua
 Bundle.lua
