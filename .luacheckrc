@@ -55,7 +55,7 @@ read_globals = {
   "RAID_CLASS_COLORS",
 
   -- character
-  "UnitGUID", "UnitName", "UnitClass", "UnitRace", "UnitLevel", "UnitXP", "UnitFactionGroup",
+  "UnitGUID", "UnitName", "UnitClass", "UnitRace", "UnitLevel", "UnitXP", "UnitXPMax", "UnitFactionGroup",
   "GetXPExhaustion", "GetRealmName", "GetZoneText", "GetBindLocation",
   "GetAverageItemLevel", "GetGuildInfo", "GetMoney",
 

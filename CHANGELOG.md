@@ -45,6 +45,15 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**The export carries how much rested experience each character has.** It always
+sent the rested amount and never the size of the level it belongs to, which
+made the number impossible to compare between two characters — 400,000 rested
+is over a level at 81 and a fraction of one at 89. Both go out now, so
+warband.pro can tell you which of your levelling alts an evening pays double
+on.
+
 ## [1.11.0] — 2026-09-05 — the set is called what the spec is called
 
 ### Changed

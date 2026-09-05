@@ -59,6 +59,7 @@ Top-level:
   "level": 80,
   "xp": 123456,
   "restXP": 234567,
+  "xpMax": 1000000,
   "guild": {"name":"Moxes","rank":"Initiate","rankIndex":2},
   "lastZone": "Dornogal",
   "hearthZone": "Dornogal",
@@ -150,6 +151,20 @@ Top-level:
   because file token and display name happen to coincide for that race:
   `NightElf` carries no space where "Night Elf" does, and `Scourge` is the
   file token behind the localized "Undead". Decode against the token.
+- **`xp`, `restXP` and `xpMax` are one field in three parts, and `xpMax` is the
+  one that makes the other two mean anything.** `restXP` is the rested pool in
+  raw experience, and experience per level is not a constant — the same 400,000
+  is comfortably over a level at 81 and a fraction of one at 89. A consumer
+  comparing two characters on the bare number is comparing nothing, and
+  comparing characters is the only thing rested is for ("which alt does tonight
+  pay double on"). `xpMax` is `UnitXPMax`, the experience this level needs, so
+  the consumer can divide: `restXP / xpMax` is rested in levels, and the game
+  caps it at `1.5`. **No Blizzard endpoint publishes experience at all**, so a
+  bundle without `xpMax` leaves it unknowable rather than merely unread.
+  `xpMax` was added in **1.12.0**; `restXP` is nil off the client whenever the
+  character is not rested, so with `xpMax` present an absent `restXP` is a real
+  zero — the exception to *absent is not empty* below, and the reason `xpMax`
+  rather than `restXP` is what a reader tests for.
 - `items` limited to inventory stacks — no bonus IDs, no enchant, no sockets. `gear[]` (below) is where that detail lives, for equipped items and for anything in a bag or bank that could be equipped. link optional but include for debug quality.
 - For bank sections never opened, `free` = null and items = [] so we know "unknown" vs empty.
 - **A stamp moves only if that section was actually read this pass.** The bank
