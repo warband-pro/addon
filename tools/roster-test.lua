@@ -362,6 +362,95 @@ do
   check("an unmaxed one does not", row(model, "Alchemy").cells[2].tone == "plain")
 end
 
+-- ── profession cooldowns ────────────────────────────────────────────────────
+
+-- The group whose useful state is the EXPIRED one, which is why it gets its own
+-- block rather than riding along with the lockouts. Every assertion below is
+-- about the same `readyTime` in the past that the lockout rows must refuse.
+
+do
+  local model = Roster.Build(db({
+    a = char({ name = "Ana", professionCooldowns = {
+      { spellID = 116, name = "Transmute: Prismatic", skillLine = "Alchemy",
+        readyTime = NOW + 3600 },
+    } }),
+    -- The same recipe, elapsed. Not a stale row: an alt with a transmute
+    -- waiting is the answer this group exists to give.
+    b = char({ name = "Bex", professionCooldowns = {
+      { spellID = 116, name = "Transmute: Prismatic", skillLine = "Alchemy",
+        readyTime = NOW - 86400 },
+    } }),
+    -- Never opened a profession window, so there is nothing to say. Not
+    -- "ready" — that would be the grid inventing a fact about an alt.
+    c = char({ name = "Cyd" }),
+  }), nil)
+
+  local r = row(model, "Transmute: Prismatic")
+  check("a running cooldown reads as the time left", r and r.cells[1].text == "1h",
+    r and r.cells[1].text)
+  check("and carries no opinion", r and r.cells[1].tone == "plain")
+  check("an elapsed cooldown reads as ready, where an expired lockout would not be drawn",
+    r and r.cells[2].text == "ready", r and r.cells[2].text)
+  check("and reads as good, because that is an alt worth logging into",
+    r and r.cells[2].tone == "good")
+  check("a character who never opened a profession window has an absent cell",
+    r and r.cells[3] == nil)
+
+  local tip = r and r.cells[1].tip
+  check("the hover names the profession", tip and tip[1][1] == "profession" and tip[1][2] == "Alchemy")
+  check("and how long is left", tip and tip[2][1] == "ready in" and tip[2][2] == "1h",
+    tip and tip[2] and tip[2][2])
+  check("an elapsed one says how long it has been waiting",
+    r.cells[2].tip and r.cells[2].tip[2][1] == "ready since"
+      and r.cells[2].tip[2][2] == "24h ago", r.cells[2].tip and r.cells[2].tip[2][2])
+end
+
+do
+  -- Charges beat the timer. A charge-based cooldown can be counting down and
+  -- usable at the same time, and a cell that only read the timer would send a
+  -- player away from something they could do now.
+  local model = Roster.Build(db({
+    a = char({ name = "Ana", professionCooldowns = {
+      { spellID = 200, name = "Curious Coagulant", skillLine = "Alchemy",
+        readyTime = NOW + 7200, charges = 2, maxCharges = 3, isDayCooldown = true },
+    } }),
+    b = char({ name = "Bex", professionCooldowns = {
+      { spellID = 200, name = "Curious Coagulant", skillLine = "Alchemy",
+        readyTime = NOW + 7200, charges = 0, maxCharges = 3 },
+    } }),
+  }), nil)
+
+  local r = row(model, "Curious Coagulant")
+  check("a charge in hand reads as the charge count, not the countdown",
+    r and r.cells[1].text == "2/3", r and r.cells[1].text)
+  check("and reads as good", r and r.cells[1].tone == "good")
+  check("no charges left falls back to the countdown", r and r.cells[2].text == "2h",
+    r and r.cells[2].text)
+  local tip = r and r.cells[1].tip
+  check("the hover carries the charges", tip and tip[2][1] == "charges" and tip[2][2] == "2/3",
+    tip and tip[2] and tip[2][2])
+  check("and says when it is a daily", tip and tip[3] == "a daily cooldown", tip and tip[3])
+end
+
+do
+  -- Rule 2 at group scale: a warband with no cooldowns anywhere gets no group,
+  -- the same as every other empty one.
+  local model = Roster.Build(db({ a = char({}) }), nil)
+  local found = false
+  for _, g in ipairs(model.groups) do
+    if g.label == "cooldowns" then found = true end
+  end
+  check("a warband with no cooldowns has no cooldowns group", not found)
+
+  -- A name the client would not give us is still a row: somebody is waiting on
+  -- it, and the id is at least something to search for.
+  local unnamed = Roster.Build(db({
+    a = char({ professionCooldowns = { { spellID = 999, readyTime = NOW - 10 } } }),
+  }), nil)
+  check("a cooldown with no name is labelled by its id",
+    row(unnamed, "recipe 999") ~= nil)
+end
+
 -- ── the warband bank ────────────────────────────────────────────────────────
 
 do

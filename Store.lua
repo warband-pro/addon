@@ -20,9 +20,16 @@ ns.Store = Store
 -- not (or the reverse), and until 1.8.0 either one landing moved a single
 -- shared `bank` stamp — so a reagent-bank-only read drew a green dot on bank
 -- contents that had not been looked at since the last banker visit.
+--
+-- `profession` and `professionCooldown` are two stamps for the same reason.
+-- Skill levels come back from SKILL_LINES_CHANGED at every login; cooldowns are
+-- readable only while the profession window is open, which most players do
+-- twice a week. Sharing one stamp would draw a fresh dot on a transmute timer
+-- nobody has looked at since Tuesday — the reagent bank's bug with a different
+-- window in front of it.
 local SECTIONS = {
   "bag", "bank", "reagentBank", "warbank", "currency", "instance", "vault", "mail", "auctions",
-  "profession", "gear", "talents",
+  "profession", "professionCooldown", "gear", "talents",
 }
 
 function Store.Init()
@@ -186,6 +193,60 @@ function Store.PutWarbandBank(tabs, gold, owned)
   local c = Store.Char()
   if c then c.seenAt.warbank = wb.seenAt end
   Store.Touch()
+end
+
+-- Trade skill cooldowns for one profession, merged into whatever we already
+-- know about the others.
+--
+-- **Merge, never replace** — the warband bank's rule, arrived at from the same
+-- constraint. `C_TradeSkillUI` answers for the skill line the client currently
+-- has open and for nothing else, so a walk of Alchemy sees Alchemy's recipes
+-- and reports nothing at all about the Blacksmithing cooldown stored an hour
+-- ago. Replacing the list would delete that, and stamp the loss fresh.
+--
+-- `listed` is the set of recipe ids the open window actually showed, and it is
+-- what separates the two silences. A stored recipe the window listed and said
+-- nothing about has come OFF cooldown — so its remembered ready time is pulled
+-- back to now if it was still in the future, and the row survives as the "ready"
+-- it is. A stored recipe the window did not list belongs to another profession
+-- and is left exactly as it was, stamp included.
+--
+-- Sorted by recipe id on the way out, because Bundle.JSON sorts object keys and
+-- cannot sort a list: a bundle whose bytes move without its meaning moving is
+-- one no diff can be read against.
+function Store.PutProfessionCooldowns(skillLineID, rows, listed)
+  if not Store.Ready() then return end
+  if type(skillLineID) ~= "number" or type(rows) ~= "table" then return end
+  local c = Store.Char()
+  if not c then return end
+
+  local now = ns.now()
+  local fresh = {}
+  for _, row in ipairs(rows) do
+    if type(row.spellID) == "number" then fresh[row.spellID] = row end
+  end
+
+  local merged = {}
+  for _, row in ipairs(c.professionCooldowns or {}) do
+    if type(row.spellID) == "number" and not fresh[row.spellID] then
+      if row.skillLineID == skillLineID and listed and listed[row.spellID] then
+        -- Listed and quiet: the cooldown we remembered has run out.
+        if type(row.readyTime) ~= "number" or row.readyTime > now then row.readyTime = now end
+        row.charges = nil
+      end
+      merged[#merged + 1] = row
+    end
+  end
+  for _, row in ipairs(rows) do
+    if type(row.spellID) == "number" then merged[#merged + 1] = row end
+  end
+  table.sort(merged, function(a, b) return (a.spellID or 0) < (b.spellID or 0) end)
+
+  -- An empty answer from a profession with no cooldown recipes at all is still
+  -- an answer — it says we looked — so this writes and stamps unconditionally,
+  -- the same as an empty lockout list.
+  c.professionCooldowns = merged
+  Store.Stamp("professionCooldown", c)
 end
 
 -- The oldest stamp across the stored tabs, which is how fresh the vault is as

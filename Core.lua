@@ -8,6 +8,7 @@
 local _, ns = ...
 
 local Store, Scan, Instances, Gear, UI = ns.Store, ns.Scan, ns.Instances, ns.Gear, ns.UI
+local Cooldowns = ns.Cooldowns
 
 local frame = CreateFrame("Frame", "WarbandProEventFrame")
 
@@ -25,6 +26,7 @@ local EVENTS = {
   "WEEKLY_REWARDS_UPDATE", "CHALLENGE_MODE_COMPLETED",
   "MAIL_INBOX_UPDATE", "OWNED_AUCTIONS_UPDATED",
   "SKILL_LINES_CHANGED",
+  "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED",
   "PLAYER_EQUIPMENT_CHANGED", "PLAYER_AVG_ITEM_LEVEL_UPDATE",
   "TRAIT_CONFIG_UPDATED", "ACTIVE_COMBAT_CONFIG_CHANGED", "PLAYER_SPECIALIZATION_CHANGED",
 }
@@ -179,6 +181,24 @@ end
 handlers.SKILL_LINES_CHANGED = function()
   ns.throttle("professions", 2, Scan.Professions)
 end
+
+-- Trade skill cooldowns are readable only while the profession window is open,
+-- the same rule the bank and the mailbox live under. TRADE_SKILL_SHOW is the
+-- window opening and LIST_UPDATE is the recipe list arriving a beat later —
+-- which is also the event a craft lands on, so starting a transmute updates its
+-- own row without the player closing anything. NEW_RECIPE_LEARNED catches the
+-- recipe that gains a cooldown the moment it is learned.
+--
+-- One throttle key across all three: they arrive together and the walk reads
+-- the same list each time. Two seconds, matching the professions scan above,
+-- because the list is streamed in and the first LIST_UPDATE routinely fires
+-- with nothing in it.
+local function cooldowns()
+  ns.throttle("cooldowns", 2, Cooldowns.Scan)
+end
+handlers.TRADE_SKILL_SHOW = cooldowns
+handlers.TRADE_SKILL_LIST_UPDATE = cooldowns
+handlers.NEW_RECIPE_LEARNED = cooldowns
 
 ns.onDirty("equipped", Gear.All)
 handlers.PLAYER_EQUIPMENT_CHANGED = function()

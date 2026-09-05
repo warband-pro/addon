@@ -241,6 +241,64 @@ CONTAINERS[13] = container(98)
 Scan.WarbandBank()
 check("tabs are stored in bagID order however they arrived", tabIDs() == "13,16", tabIDs())
 
+-- ── trade skill cooldowns merge by skill line, they do not replace ──────────
+
+-- The warband bank's rule, arrived at from the same constraint: C_TradeSkillUI
+-- answers for the profession whose window is open and says nothing at all about
+-- the others, so a walk of Alchemy that replaced the list would delete a
+-- Blacksmithing cooldown and stamp the loss fresh.
+
+local function cdBySpell()
+  local out = {}
+  for _, row in ipairs(Store.Char().professionCooldowns or {}) do out[row.spellID] = row end
+  return out
+end
+
+reset()
+Store.PutProfessionCooldowns(171, {
+  { spellID = 116, name = "Transmute", skillLineID = 171, readyTime = NOW + 3600 },
+}, { [116] = true, [117] = true })
+check("a walk stores the cooldown it read", cdBySpell()[116].readyTime == NOW + 3600)
+check("and stamps its own section, not the profession one",
+  stamps().professionCooldown == NOW and stamps().profession == nil)
+
+NOW = NOW + 60
+Store.PutProfessionCooldowns(164, {
+  { spellID = 900, name = "Forge", skillLineID = 164, readyTime = NOW + 7200 },
+}, { [900] = true })
+check("a walk of another profession keeps the first one's cooldown",
+  cdBySpell()[116] ~= nil and cdBySpell()[900] ~= nil)
+check("and does not disturb the untouched row's ready time",
+  cdBySpell()[116].readyTime == 1724000000 + 3600, cdBySpell()[116].readyTime)
+
+-- Listed and quiet is the case worth its own test: the window showed us the
+-- recipe and reported no cooldown on it, which means the one we remembered has
+-- run out. The row survives as the "ready" it now is, because a ready transmute
+-- is exactly what this group exists to report.
+NOW = NOW + 60
+Store.PutProfessionCooldowns(171, {}, { [116] = true, [117] = true })
+check("a recipe the window listed and said nothing about is ready now",
+  cdBySpell()[116].readyTime == NOW, cdBySpell()[116].readyTime)
+check("and the other profession's running cooldown is untouched",
+  cdBySpell()[900].readyTime == 1724000060 + 7200, cdBySpell()[900].readyTime)
+
+-- A recipe stored under this skill line that the window did NOT list is a
+-- different silence and must not be touched — the same distinction the warband
+-- bank draws between a tab that read empty and a tab that did not read.
+NOW = NOW + 60
+Store.PutProfessionCooldowns(171, {
+  { spellID = 118, name = "Mill", skillLineID = 171, readyTime = NOW + 100 },
+}, { [118] = true })
+check("a recipe this walk did not list keeps its stored ready time",
+  cdBySpell()[116].readyTime == 1724000120, cdBySpell()[116].readyTime)
+
+check("cooldowns are stored in spellID order whatever order they arrived in",
+  (function()
+    local ids = {}
+    for _, row in ipairs(Store.Char().professionCooldowns) do ids[#ids + 1] = row.spellID end
+    return table.concat(ids, ",") == "116,118,900"
+  end)())
+
 -- ── partial is a claim, and needs a denominator to make it ──────────────────
 
 reset()

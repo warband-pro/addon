@@ -47,6 +47,17 @@ MAJOR has to be a wire break.**
 
 ### Added
 
+**Trade skill cooldowns, in the Roster grid.** A `cooldowns` group under the
+professions, one row per recipe, so the alt whose transmute came off cooldown
+yesterday says `ready` instead of you logging into six characters to find out.
+A cooldown still running shows the time left; one with charges in hand shows
+`2/3`, because a charge you can spend beats a timer still counting. Hover a cell
+for the profession, the charges and how long it has been waiting.
+
+They are read while your profession window is open, the same as bags at a
+banker — open Alchemy once and the addon knows about it from then on, including
+after the cooldown runs out. Opening one profession does not forget the others.
+
 **A switch for the currency rows** — Options → *Show every currency in the
 Roster grid*. On, the grid lists every currency any character is carrying, the
 way it used to.
