@@ -643,10 +643,10 @@ none of the three is dropped; a string in which every character is dropped is
 {"guid":"Player-1-TEST","name":"Vocnar",
  "items":[ ...the clear-out list... ],
  "gear":{
-   "spec":103,"set":"warband.pro Feral","items":[ ...the Feral setup... ],
+   "spec":103,"set":"Feral","items":[ ...the Feral setup... ],
    "sets":[
-     {"spec":103,"set":"warband.pro Feral","items":[ ... ]},
-     {"spec":105,"set":"warband.pro Rest","items":[ ... ]}
+     {"spec":103,"set":"Feral","items":[ ... ]},
+     {"spec":105,"set":"Restoration","items":[ ... ]}
    ]}}
 ```
 
@@ -808,7 +808,7 @@ one direction is not a break in the others.
 | `chars[].guid` | **The match key**, exactly as `wb1!` sent it. Only guids in `WarbandProDB.chars` are kept, same as `wbc1!`. |
 | `chars[].name` | Display only. |
 | `chars[].spec` | The specialization id the solve ran for. Display and sanity only, never matched. Optional. |
-| `chars[].set` | The Equipment Manager set name to create or update. Defaults to `warband.pro` when absent — one set per character, updated in place. |
+| `chars[].set` | The name the website proposes for the Equipment Manager set. **Since addon 1.11.0 the client names the set after the spec at the keyboard** (`Protection`) and uses this only when it cannot read a spec; before that it was the name used verbatim. Defaults to `warband.pro` when absent. See "The set name" below. |
 | `items[].slot` | **The REAL inventory slot, 1-17 minus 4, uncollapsed.** `12` means finger 2. This is the one deliberate asymmetry with `gear[]`: outbound, the addon collapses paired slots because it cannot know which twin a bagged ring would fill; inbound, the website's solve knows exactly which twin it replaces, and this field is how it says so. `EquipCursorItem(slot)` is what honors it — `EquipItemByName` guarantees nothing about twins. |
 | `items[].id` | Item id, display and sanity. Optional. |
 | `items[].s` | **The identity key.** The verbatim item string, as `gear[]` sent it. An entry without one is dropped at decode. |
@@ -835,17 +835,17 @@ So a character entry may carry `sets`, one entry per spec the website solved:
 
 ```json
 {"guid":"Player-1-TEST","name":"Vocnar",
- "spec":103,"set":"warband.pro Feral","items":[ ...the Feral set... ],
+ "spec":103,"set":"Feral","items":[ ...the Feral set... ],
  "sets":[
-   {"spec":103,"set":"warband.pro Feral","items":[ ... ]},
-   {"spec":105,"set":"warband.pro Rest","items":[ ... ]}
+   {"spec":103,"set":"Feral","items":[ ... ]},
+   {"spec":105,"set":"Restoration","items":[ ... ]}
  ]}
 ```
 
 | Field | Meaning |
 | --- | --- |
 | `sets[].spec` | **Required.** The specialization id this setup was solved for, and the key it is stored under. An entry without one is dropped — it has nothing to be filed as. |
-| `sets[].set` | The Equipment Manager set name for this setup. Proposed, not final — see below. |
+| `sets[].set` | The proposed name for this setup's set. Proposed, not final — see below. |
 | `sets[].items` | Exactly the same shape as `items` above, validated by the same code. |
 
 **`sets` is additive, and safely so.** `spec`, `set` and `items` at the
@@ -865,17 +865,32 @@ claim and still applies to whoever is standing there.
 ### The set name is proposed here and settled by the client
 
 `set` is what the website would like the Equipment Manager set called. It is
-not authoritative, because **`C_EquipmentSet` enforces a name length this addon
-has no API to read**, and a constant in the website would be a guess about a
-client it never runs in. Guessing high fails in the worst direction:
-`CreateEquipmentSet` does nothing and the player gets equipped gear, no saved
-set, and no explanation.
+not authoritative, for two reasons that arrived two releases apart.
 
-So `saveSet` tries the proposed name, then progressively shorter ones, and uses
-whichever the client actually accepts — the receipt names that one. Truncation
-drops the spec before the brand: two specs colliding on one truncated name is a
-player watching one set update twice, where losing `warband.pro` leaves a set
-they cannot pick out from their own.
+**The client names the set after the spec — addon 1.11.0.** The set for the
+Protection spec is called `Protection`, wears the Protection spec's icon, and
+if the character already has a set by that name it is the one updated. That is
+`GearSet.SetName`: `GetSpecializationInfo` gives the name in the player's own
+language and the icon only the client can reach, so neither is worth carrying
+on the wire. The wire's `set` is the fallback for a character whose spec the
+client cannot read, and — since 1.8.0's `warband.pro Protection` was the name
+until now — one of the names `saveSet` looks up to **rename** rather than
+create beside: a player updating the addon keeps one set, carried forward,
+rather than two holding the same kit. A set the player already has under the
+spec's name is theirs: updated in place, its icon left alone. The website
+proposes the bare spec name since app 2.5.1 so that the two sides say the same
+thing; an older website's `warband.pro Protection` is read as a legacy name to
+migrate from.
+
+**The client's name-length limit is discovered, never assumed.**
+`C_EquipmentSet` enforces a length this addon has no API to read, and a
+constant in the website would be a guess about a client it never runs in.
+Guessing high fails in the worst direction: `CreateEquipmentSet` does nothing
+and the player gets equipped gear, no saved set, and no explanation. So
+`saveSet` tries the name, then progressively shorter ones, and uses whichever
+the client actually accepts — the receipt names that one. Spec names are
+short, so this is insurance now; it was the common path when the name carried
+the brand.
 
 ### Matching, applying, and when the set is saved
 

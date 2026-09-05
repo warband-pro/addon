@@ -74,14 +74,34 @@ _G.C_Timer = {
 -- The spec at the keyboard. `GearSet.Stored` picks the setup matching it, so
 -- every resolve below is implicitly "as Feral" until SPEC is moved.
 local SPEC = 103
+-- What the client says about each spec: the name the set is called and the
+-- icon it wears, both read here and never off the wire.
+local SPEC_INFO = {
+  [102] = { name = "Balance", icon = 136096 },
+  [103] = { name = "Feral", icon = 132115 },
+  [105] = { name = "Restoration", icon = 136041 },
+}
 _G.GetSpecialization = function() return SPEC and 1 or nil end
-_G.GetSpecializationInfo = function() return SPEC end
+_G.GetSpecializationInfo = function()
+  local info = SPEC_INFO[SPEC] or {}
+  return SPEC, info.name, nil, info.icon
+end
+local ICONS = {}       -- [id] = icon the set was created or renamed with
 _G.C_EquipmentSet = {
   GetEquipmentSetID = function(name) return SETS[name] end,
-  CreateEquipmentSet = function(name)
+  CreateEquipmentSet = function(name, icon)
     ORDER[#ORDER + 1] = "create:" .. name
     SETS[name] = nextSetID
+    ICONS[nextSetID] = icon
     nextSetID = nextSetID + 1
+  end,
+  ModifyEquipmentSet = function(id, name, icon)
+    ORDER[#ORDER + 1] = "rename:" .. id .. ":" .. name
+    for old, oldID in pairs(SETS) do
+      if oldID == id then SETS[old] = nil end
+    end
+    SETS[name] = id
+    ICONS[id] = icon
   end,
   SaveEquipmentSet = function(id) ORDER[#ORDER + 1] = "save:" .. id end,
 }
@@ -136,11 +156,11 @@ check("golden is keyed by guid", decoded and decoded.chars["Player-1-TEST"] ~= n
 local entry = decoded and decoded.chars["Player-1-TEST"]
 check("golden carries all three items", entry and #entry.items == 3)
 check("golden keeps the real finger-2 slot", entry and entry.items[2].slot == 12)
-check("golden carries the set name", entry and entry.set == "warband.pro Feral")
+check("golden carries the proposed set name", entry and entry.set == "Feral")
 check("golden carries a setup per spec", entry and entry.bySpec ~= nil
   and entry.bySpec[103] ~= nil and entry.bySpec[105] ~= nil)
 check("each setup carries its own items", entry and #entry.bySpec[105].items == 1)
-check("each setup carries its own name", entry and entry.bySpec[105].set == "warband.pro Restoration")
+check("each setup carries its own name", entry and entry.bySpec[105].set == "Restoration")
 check("golden carries the spec", entry and entry.spec == 103)
 check("golden keeps w for the missing line", entry and entry.items[3].w == "bank")
 
@@ -264,7 +284,14 @@ check("resolve finds the bagged helm with live coordinates",
   r and #r.ready == 1 and r.ready[1].bag == 0 and r.ready[1].bagSlot == 2)
 check("resolve aims the helm at its real slot", r and r.ready[1].slot == 1)
 check("resolve names the missing cleaver", r and #r.missing == 1 and r.missing[1].w == "bank")
-check("resolve carries the set name", r and r.set == "warband.pro Feral")
+check("resolve names the set after the spec at the keyboard, not the wire", r and r.set == "Feral")
+check("and carries the spec's icon for it", r and r.icon == 132115)
+check("and knows the names an older build used",
+  r and r.legacy[1] == "warband.pro Feral" and r.legacy[2] == "warband.pro" and #r.legacy == 2)
+check("an older website's branded proposal is a name to migrate from, looked up first", (function()
+  local _, _, legacy = GearSet.SetName({ set = "warband.pro Feral" })
+  return legacy[1] == "warband.pro Feral" and #legacy == 3
+end)())
 
 -- ── rows: the set as a list a person reads ──────────────────────────────────
 -- The Import tab draws one row per item on the wire, in slot order, each with
@@ -304,7 +331,8 @@ check("apply armed a pending verify", GearSet.pending ~= nil)
 
 -- The fake client equipped instantly, so the event-driven verify confirms.
 GearSet.Verify(false)
-check("verify created the set", ORDER[3] == "create:warband.pro Feral")
+check("verify created the set, named after the spec", ORDER[3] == "create:Feral")
+check("with the spec's icon", ICONS[41] == 132115)
 check("verify saved it after every equip", ORDER[4] == "save:41")
 check("verify cleared the pending", GearSet.pending == nil)
 check("the receipt names the equip, the worn item and the missing one",
@@ -312,8 +340,40 @@ check("the receipt names the equip, the worn item and the missing one",
     and printed[1]:find("equipped 1", 1, true) ~= nil
     and printed[1]:find("1 already worn", 1, true) ~= nil
     and printed[1]:find("1 missing (1 in your bank)", 1, true) ~= nil
-    and printed[1]:find('saved as "warband.pro Feral"', 1, true) ~= nil,
+    and printed[1]:find('saved as "Feral"', 1, true) ~= nil,
   printed[1])
+
+-- ── the set an older build saved is renamed, not left beside a new one ──────
+-- Until 1.11.0 the set was `warband.pro Feral`. A player updating has one of
+-- those already; saving must carry it forward under the new name and icon
+-- rather than leave two sets holding the same kit.
+
+SETS, ORDER, printed, ICONS = { ["warband.pro Feral"] = 7 }, {}, {}, {}
+GearSet.pending = { set = "Feral", icon = 132115, legacy = { "warband.pro Feral", "warband.pro" },
+  items = {}, readyCount = 0, alreadyCount = 0, missingCount = 0, bankCount = 0 }
+GearSet.Verify(true)
+check("an older build's set is renamed to the spec", ORDER[1] == "rename:7:Feral", tostring(ORDER[1]))
+check("and given the spec's icon", ICONS[7] == 132115)
+check("and saved — no second set created", ORDER[2] == "save:7" and #ORDER == 2, tostring(ORDER[2]))
+check("the receipt names the set as it is now", printed[1] and printed[1]:find('saved as "Feral"', 1, true) ~= nil)
+
+-- A set the player already has under the spec's name is theirs: updated in
+-- place, its icon untouched.
+SETS, ORDER, printed, ICONS = { ["Feral"] = 3, ["warband.pro Feral"] = 7 }, {}, {}, { [3] = 999 }
+GearSet.pending = { set = "Feral", icon = 132115, legacy = { "warband.pro Feral", "warband.pro" },
+  items = {}, readyCount = 0, alreadyCount = 0, missingCount = 0, bankCount = 0 }
+GearSet.Verify(true)
+check("a set the player already calls Feral is the one updated", ORDER[1] == "save:3" and #ORDER == 1,
+  tostring(ORDER[1]))
+check("and its icon is left alone", ICONS[3] == 999)
+
+-- No spec readable: the wire's proposal is all there is to call it.
+SPEC_INFO[103] = nil
+local fallback, fallbackIcon, fallbackLegacy = GearSet.SetName({ set = "warband.pro Feral" })
+check("with no spec name the wire's proposal names the set", fallback == "warband.pro Feral")
+check("under the addon's own icon", fallbackIcon == ns.ICON)
+check("and nothing is migrated", #fallbackLegacy == 0)
+SPEC_INFO[103] = { name = "Feral", icon = 132115 }
 
 -- ── apply: an equip the server never confirms ───────────────────────────────
 
@@ -352,7 +412,8 @@ SPEC = 105
 local resto = GearSet.Stored()
 check("standing in another spec finds that spec's setup", resto ~= nil and resto.spec == 105)
 check("and it is that setup's items, not the primary's", resto and #resto.items == 1)
-check("and that setup's own set name", resto and resto.set == "warband.pro Restoration")
+check("and the wire's own proposal for it rides along", resto and resto.set == "Restoration")
+check("but the set is called what the client calls the spec", GearSet.Resolve().set == "Restoration")
 
 SPEC = 102   -- Balance: nothing was ever solved for it
 check("a spec with no setup gets nothing rather than another spec's gear", GearSet.Stored() == nil)
@@ -383,6 +444,8 @@ _G.C_EquipmentSet.CreateEquipmentSet = function(name)
   nextSetID = nextSetID + 1
 end
 
+-- Spec names are short, so a name this long only reaches the client from a
+-- wire proposal on a character whose spec could not be read.
 SETS, ORDER, printed = {}, {}, {}
 GearSet.pending = { set = "warband.pro Restoration", items = {}, readyCount = 0,
   alreadyCount = 0, missingCount = 0, bankCount = 0 }

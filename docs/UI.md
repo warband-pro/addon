@@ -355,6 +355,14 @@ misrouted call fails toward a sentence rather than "invalid":
   receipt. An ordinary button, not a secure one — equipping out of combat is
   not protected, and the tab is gone before combat can make it so.
 
+  **The set is called what the spec is called, with the spec's icon — since
+  1.11.0.** `Protection`, not `warband.pro Protection`: the header line, the
+  button's save and the receipt all use the client's own name for the spec at
+  the keyboard, and a set an older build saved under the branded name is
+  renamed to it rather than left beside a new one. A set the player already
+  has under that name is updated in place with its icon untouched. The wire's
+  proposed name is only used when the client cannot read a spec.
+
   **Since 1.10.0 the set is drawn under the counts, slot by slot.** One row
   per item on the wire, in slot order: the item's icon, the slot (`ring 2`,
   `main hand`), the item's name in its quality colour with its item level,

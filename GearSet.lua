@@ -43,14 +43,55 @@ local function storedRecord()
   return db.gearset[guid]
 end
 
---- The spec this character is playing right now, or nil.
-local function activeSpecID()
+--- The spec this character is playing right now: id, name, icon — or nil.
+--- The name and icon are what the Equipment Manager set is called and wears,
+--- so they come from the client and never from the wire: the client's name
+--- is in the player's own language and the icon is only reachable here.
+local function activeSpec()
   local index = ns.safe(GetSpecialization)
   if not index then return nil end
   return ns.safe(function()
-    local id = GetSpecializationInfo(index)
-    return id
+    local id, name, _, icon = GetSpecializationInfo(index)
+    return id, name, icon
   end)
+end
+
+local function activeSpecID()
+  local id = activeSpec()
+  return id
+end
+
+--- The brand the set used to carry in its name. Kept only so a set saved by
+--- an older build can be found and renamed rather than left beside a new one.
+local LEGACY_BRAND = "warband.pro"
+
+--- What the Equipment Manager set for a stored setup is called, and its icon:
+--- `name, icon, legacy`, where `legacy` lists the names an older build may
+--- have saved this same set under.
+---
+--- **The set is named after the spec, and nothing else — since 1.11.0.** It
+--- was `warband.pro Protection`: the brand first so a player could pick ours
+--- out from their own, then the spec so two setups could coexist. The
+--- maintainer's read after living with it was the AskMrRobot one — the set
+--- for the Protection spec is called `Protection`, wears the Protection
+--- icon, and if you already have one by that name it is the one that gets
+--- updated. The brand was answering a question nobody asked, and the icon is
+--- what actually picks a set out of a list.
+---
+--- The wire still proposes a name (`set`), and it is the fallback for a
+--- character whose spec the client cannot read — an unkeyed record from an
+--- older website applies to whoever is standing there, and the client has to
+--- call it something. When the spec is known, the client's own word for it
+--- wins, in the player's own language.
+function GearSet.SetName(stored)
+  local proposed = stored and stored.set or LEGACY_BRAND
+  local _, specName, icon = activeSpec()
+  if not specName or specName == "" then
+    return proposed, ns.ICON, {}
+  end
+  local legacy = { LEGACY_BRAND .. " " .. specName, LEGACY_BRAND }
+  if proposed ~= specName then table.insert(legacy, 1, proposed) end
+  return specName, icon or ns.ICON, legacy
 end
 
 --- The stored setup for the spec at the keyboard, or nil.
@@ -259,11 +300,16 @@ function GearSet.Resolve()
       end
     end
   end
+  local set, icon, legacy = GearSet.SetName(stored)
   return {
     already = already,
     ready = ready,
     missing = missing,
-    set = stored.set or "warband.pro",
+    -- The name the CLIENT will save under, so the panel's header and the
+    -- receipt name the set that will actually exist — not the wire's proposal.
+    set = set,
+    icon = icon,
+    legacy = legacy,
     generatedAt = stored.generatedAt,
   }
 end
@@ -349,31 +395,52 @@ local NAME_FALLBACKS = { 24, 16, 11 }
 --- Find-or-create the named Equipment Manager set and snapshot the paperdoll
 --- into it. Out-of-combat only; callers guard.
 ---
---- **The client's name-length limit is discovered, never assumed.** Set names
---- gained a spec suffix in 1.8.0 (`warband.pro Restoration`), which is longer
---- than anything this ever asked for before, and `C_EquipmentSet` enforces a
---- maximum this addon has no API to read. Hardcoding a guess fails in the
---- worst direction — `CreateEquipmentSet` simply does nothing and the player
---- gets equipped gear with no saved set and no explanation. So the full name
---- is tried first and shorter ones after, and whichever the client actually
---- accepts is the one used. A create that works costs exactly one attempt.
+--- **The client's name-length limit is discovered, never assumed.**
+--- `C_EquipmentSet` enforces a maximum this addon has no API to read, and
+--- hardcoding a guess fails in the worst direction — `CreateEquipmentSet`
+--- simply does nothing and the player gets equipped gear with no saved set
+--- and no explanation. So the full name is tried first and shorter ones
+--- after, and whichever the client actually accepts is the one used. A
+--- create that works costs exactly one attempt. Spec names are short, so
+--- since 1.11.0 the fallbacks are insurance rather than the common path;
+--- they earned their place when the name was `warband.pro Restoration`.
 ---
---- Truncation drops the spec before the brand: two specs colliding on one
---- truncated name means a player watching one set update twice, where losing
---- `warband.pro` leaves a set they cannot identify among their own.
-local function saveSet(name)
+--- **A set an older build saved is renamed, not left behind.** Until 1.11.0
+--- the set was `warband.pro Protection`; a player updating would otherwise
+--- end an evening with that set AND a `Protection` set holding the same kit,
+--- and the Equipment Manager has room for ten. So before creating, the names
+--- an older build used (`legacy`) are looked up and the first one found is
+--- renamed to `name` with `icon` via ModifyEquipmentSet — one set, carried
+--- forward. A set the player already has under the new name is theirs: it is
+--- updated in place and its icon is left alone; the icon is set only on a set
+--- this addon creates or migrates.
+local function saveSet(name, icon, legacy)
   local es = C_EquipmentSet
   if not es then return false, nil end
+  icon = icon or ns.ICON
 
   local function tryName(candidate)
     if not candidate or candidate == "" then return nil end
     local id = ns.safe(es.GetEquipmentSetID, candidate)
     if id then return id end
-    ns.safe(es.CreateEquipmentSet, candidate, ns.ICON)
+    ns.safe(es.CreateEquipmentSet, candidate, icon)
     return ns.safe(es.GetEquipmentSetID, candidate)
   end
 
-  local id = tryName(name)
+  local id = ns.safe(es.GetEquipmentSetID, name)
+  if not id then
+    for _, old in ipairs(legacy or {}) do
+      local oldID = ns.safe(es.GetEquipmentSetID, old)
+      if oldID then
+        ns.safe(es.ModifyEquipmentSet, oldID, name, icon)
+        -- Only if the client took the new name. A rename it refused leaves
+        -- the old set as it was and the create path below takes over.
+        id = ns.safe(es.GetEquipmentSetID, name)
+        break
+      end
+    end
+  end
+  if not id then id = tryName(name) end
   if not id then
     for _, len in ipairs(NAME_FALLBACKS) do
       if #name > len then
@@ -427,7 +494,7 @@ function GearSet.Verify(fromDeadline)
   GearSet.pending = nil
   -- The name the client accepted, which may be shorter than the one asked
   -- for — the receipt must say what is actually in the Equipment Manager.
-  local saved, savedName = saveSet(p.set)
+  local saved, savedName = saveSet(p.set, p.icon, p.legacy)
   p.saved = saved
   if savedName then p.set = savedName end
   receipt(p, verified)
@@ -456,6 +523,8 @@ function GearSet.Apply()
 
   GearSet.pending = {
     set = r.set,
+    icon = r.icon,
+    legacy = r.legacy,
     items = r.ready,
     readyCount = #r.ready,
     alreadyCount = #r.already,
