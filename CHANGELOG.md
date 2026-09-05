@@ -45,6 +45,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-09-05 — the export says how much rested you have banked
+
 ### Added
 
 **The export carries how much rested experience each character has.** It always
