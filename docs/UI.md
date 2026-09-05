@@ -355,6 +355,22 @@ misrouted call fails toward a sentence rather than "invalid":
   receipt. An ordinary button, not a secure one — equipping out of combat is
   not protected, and the tab is gone before combat can make it so.
 
+  **Since 1.10.0 the set is drawn under the counts, slot by slot.** One row
+  per item on the wire, in slot order: the item's icon, the slot (`ring 2`,
+  `main hand`), the item's name in its quality colour with its item level,
+  and where it is right now — `worn` (muted; AMR's `E`), `in bags` (green;
+  the button will equip it), `in your bank` or `not in your bags` (yellow;
+  an errand first). Hovering a row opens the client's own item tooltip off
+  the wire's item string, so the stats of what the site picked are readable
+  without leaving the tab. The model is `GearSet.Rows`/`GearSet.StateText`,
+  pure and tested; `UI.lua` only lays it out. An item the client has never
+  seen this session has no name yet and is drawn as `item 221151` until
+  `GET_ITEM_INFO_RECEIVED` redraws the rows. The junk well anchors under the
+  list, so a set of three costs three lines and no set costs none. This is
+  the delta the maintainer's own AskMrRobot comparison named (app#71): their
+  import screen shows the set and marks what is already on; ours showed a
+  count.
+
   **Since 1.8.0 the row is about the setup for the spec you are in.** A paste
   stores one setup per spec the website solved, so switching spec switches
   which set this row offers — no dropdown, because there is exactly one setup

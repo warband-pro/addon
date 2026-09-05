@@ -45,6 +45,10 @@ local MUTED, WARN, BAD, GOOD = "808080", "ffd100", "ff2020", "00ff00"
 local TAB_ROSTER, TAB_EXPORT, TAB_IMPORT, TAB_OPTIONS = 1, 2, 3, 4
 local MAX_ROWS = 8
 local JUNK_ROWS = 12
+-- The gear-set list: one row per item on the wire. Sixteen is every real slot,
+-- so the pool never has to grow, and the well below anchors under whatever is
+-- drawn rather than under a fixed height.
+local GS_ROWS, GS_LINE = 16, 16
 
 -- The grid's geometry. Two numbers are fixed because the text decides them: a
 -- label column has to hold "Nerub-ar Palace (Heroic)", and a cell has to hold
@@ -92,7 +96,7 @@ local WIN_MAX_W, WIN_MAX_H = 1600, 1000
 local frame, panels, tabs
 local editBox, header, footer, rows, help
 local junkPaste, junkHeader, junkFooter, junkRows, junkChild
-local gsHeader, gsButton
+local gsHeader, gsButton, gsList, gsRows
 local rosterHead, rosterFoot, rosterCols, rosterLines, rosterChild, rosterPrev, rosterNext
 local rosterScroll
 local optionChecks = {}
@@ -398,6 +402,107 @@ local function buildJunkRow(parent, i)
   return row
 end
 
+--- One gear-set row: the item's icon, the slot it is for, the item's name in
+--- its quality colour with its item level, and where it is right now.
+---
+--- A Frame with the mouse enabled rather than a Button: nothing here is
+--- pressed. The hover is the client's own item tooltip off the wire's item
+--- string — `SetHyperlink` takes an `item:` string directly — so a player
+--- can read the stats of the thing the site picked without leaving the tab,
+--- which is the other half of what the AMR screen does with its icons.
+local function buildGearRow(parent, i)
+  local row = CreateFrame("Frame", nil, parent)
+  row:SetHeight(GS_LINE)
+  row:SetPoint("TOPLEFT", 0, -(i - 1) * GS_LINE)
+  row:SetPoint("TOPRIGHT", 0, -(i - 1) * GS_LINE)
+  row:EnableMouse(true)
+
+  row.icon = row:CreateTexture(nil, "ARTWORK")
+  row.icon:SetSize(GS_LINE - 2, GS_LINE - 2)
+  row.icon:SetPoint("LEFT", 2, 0)
+  -- The stock icon border is baked into the texture's outer 6%; cropping it
+  -- is what every action bar does, and it is why a 14px icon still reads.
+  row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+  row.slot = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  row.slot:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+  row.slot:SetWidth(64)
+  row.slot:SetJustifyH("LEFT")
+  row.slot:SetWordWrap(false)
+
+  row.state = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.state:SetPoint("RIGHT", -4, 0)
+  row.state:SetJustifyH("RIGHT")
+  row.state:SetWordWrap(false)
+
+  row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  row.label:SetPoint("LEFT", row.slot, "RIGHT", 4, 0)
+  row.label:SetPoint("RIGHT", row.state, "LEFT", -8, 0)
+  row.label:SetJustifyH("LEFT")
+  row.label:SetWordWrap(false)
+
+  row:SetScript("OnEnter", function(self)
+    if not self.s then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    -- The client's own item tooltip for the wire's item string. A string the
+    -- client cannot resolve leaves the tooltip empty rather than raising.
+    ns.safe(GameTooltip.SetHyperlink, GameTooltip, self.s)
+    GameTooltip:Show()
+  end)
+  row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  return row
+end
+
+--- Name, quality and icon for an item string, from the client's item cache.
+---
+--- `C_Item.GetItemInfo` answers nil for an item this session has never seen —
+--- the one in your bank — and GET_ITEM_INFO_RECEIVED (Core.lua) redraws when
+--- it arrives; until then the row says `item <id>` in plain text. The icon
+--- is asked for by id when the info is not there yet, because
+--- `GetItemIconByID` is instant for any id the client has art for.
+local function itemLook(row)
+  local name, quality, icon = ns.safe(function(s)
+    local n, _, q, _, _, _, _, _, _, tex = C_Item.GetItemInfo(s)
+    return n, q, tex
+  end, row.s)
+  if not icon and row.id then icon = ns.safe(C_Item.GetItemIconByID, row.id) end
+  local ilvl = ns.safe(C_Item.GetDetailedItemLevelInfo, row.s)
+  return name, quality, icon, ilvl
+end
+
+local GS_TONE = { good = GOOD, warn = WARN, muted = MUTED }
+
+--- Lay the set out, one row per item, and size the list to what it drew.
+local function renderGearRows(r)
+  local rowsData = ns.GearSet.Rows(r)
+  local shown = math.min(#rowsData, GS_ROWS)
+  for i = 1, GS_ROWS do
+    local w = gsRows[i]
+    local d = rowsData[i]
+    if not d or i > shown then
+      w.s = nil
+      w:Hide()
+    else
+      local name, quality, icon, ilvl = itemLook(d)
+      local hex = QUALITY_HEX[quality or 1] or "ffffff"
+      w.s = d.s
+      w.icon:SetTexture(icon or ns.ICON)
+      w.slot:SetText(d.name)
+      w.label:SetText(format("|cff%s%s|r%s",
+        name and hex or MUTED,
+        name or (d.id and ("item " .. d.id) or "?"),
+        ilvl and format("  |cff%s%d|r", MUTED, ilvl) or ""))
+      local text, tone = ns.GearSet.StateText(d)
+      w.state:SetText(format("|cff%s%s|r", GS_TONE[tone] or MUTED, text))
+      w:Show()
+    end
+  end
+  -- A hidden list still needs a height, or the well anchored under it sits on
+  -- the header. 1 rather than 0: some clients treat a zero-height frame as
+  -- unanchored and the well jumps.
+  gsList:SetHeight(shown > 0 and shown * GS_LINE + 6 or 1)
+end
+
 local function buildImport()
   local p = panels[TAB_IMPORT]
 
@@ -521,8 +626,22 @@ local function buildImport()
   gsHeader:SetJustifyH("LEFT")
   gsHeader:SetWordWrap(false)
 
+  -- The set itself, slot by slot, under the line of counts. The counts say
+  -- what the button will do; these say to WHICH items — the piece AMR's
+  -- import screen has and this tab did not (app#71). Sized at render to the
+  -- rows it draws, and the junk well hangs off its bottom edge, so a set of
+  -- three costs three lines and no set costs none.
+  gsList = CreateFrame("Frame", nil, p)
+  gsList:SetPoint("TOPLEFT", 0, -84)
+  gsList:SetPoint("TOPRIGHT", -20, -84)
+  gsList:SetHeight(1)
+  gsRows = {}
+  for i = 1, GS_ROWS do
+    gsRows[i] = buildGearRow(gsList, i)
+  end
+
   local well = makeWell(p)
-  well:SetPoint("TOPLEFT", 0, -84)
+  well:SetPoint("TOPLEFT", gsList, "BOTTOMLEFT", 0, 0)
   well:SetPoint("BOTTOMRIGHT", -20, 18)
 
   local scroll = CreateFrame("ScrollFrame", "WarbandProJunkScroll", p, "UIPanelScrollFrameTemplate")
@@ -565,8 +684,10 @@ function UI.RenderGearSet()
       and format("|cff%sgear set: none for this spec — %d stored for others|r", MUTED, stored)
       or "")
     gsButton:Hide()
+    renderGearRows(nil)
     return
   end
+  renderGearRows(r)
   local parts = {}
   if #r.ready > 0 then parts[#parts + 1] = format("%d to equip", #r.ready) end
   if #r.already > 0 then parts[#parts + 1] = format("|cff%s%d already worn|r", MUTED, #r.already) end

@@ -45,7 +45,16 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-09-05 — the set you pasted, slot by slot
+
 ### Added
+
+**The From warband.pro tab shows the gear set itself.** Under the line that
+counts what the button will do, one row per piece: its icon, the slot it goes
+in, its name and item level, and where it is right now — `worn`, `in bags`, or
+`in your bank` when it needs fetching first. Hover a row for the item's own
+tooltip. Before this the tab said `3 to equip · 1 already worn` and left you
+to trust it; now you can see which three.
 
 **Trade skill cooldowns, in the Roster grid.** A `cooldowns` group under the
 professions, one row per recipe, so the alt whose transmute came off cooldown

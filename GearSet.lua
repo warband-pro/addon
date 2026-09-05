@@ -250,7 +250,10 @@ function GearSet.Resolve()
     else
       local found = byString[it.s]
       if found then
-        ready[#ready + 1] = { slot = it.slot, s = it.s, bag = found.bag, bagSlot = found.slot }
+        -- The wire's own fields ride along with the live coordinates: the
+        -- Import tab's rows ask an item's icon by `id` before the client has
+        -- its name, and a row is the same shape whichever bucket it is in.
+        ready[#ready + 1] = { slot = it.slot, s = it.s, id = it.id, w = it.w, bag = found.bag, bagSlot = found.slot }
       else
         missing[#missing + 1] = it
       end
@@ -263,6 +266,80 @@ function GearSet.Resolve()
     set = stored.set or "warband.pro",
     generatedAt = stored.generatedAt,
   }
+end
+
+-- ── the set, as a list a person reads ───────────────────────────────────────
+--
+-- The Import tab drew the stored set as one line of counts — `3 to equip ·
+-- 1 already worn · 1 missing` — and a button, which is a receipt of what the
+-- button would do and not a picture of the set. The maintainer's own walk
+-- through AskMrRobot's addon (app#71) put the gap in one sentence: their
+-- import shows the equipment set, slot by slot, with a mark on every slot
+-- that is already worn. So does this now. Rows() is the model and UI.lua is
+-- left with layout, the Roster.lua rule: everything that decides what a row
+-- SAYS is here, pure, and tested in tools/gearset-test.lua.
+--
+-- This is still the addon rendering a fact and not a judgement (the app's
+-- the-loop.md draws that line): which item the site chose is the site's
+-- decision, already made; where that item is right now is something only
+-- the client standing in the game can know, and it is the only thing a row
+-- adds.
+
+--- The inventory slot, as a player names it. Real slots only, the wire's own
+--- range (1-17 minus the shirt); `ring 1`/`ring 2` rather than `finger`
+--- because the Equipment Manager's own tooltip says ring.
+GearSet.SLOT_NAMES = {
+  [1] = "head", [2] = "neck", [3] = "shoulder", [5] = "chest", [6] = "waist",
+  [7] = "legs", [8] = "feet", [9] = "wrist", [10] = "hands",
+  [11] = "ring 1", [12] = "ring 2", [13] = "trinket 1", [14] = "trinket 2",
+  [15] = "back", [16] = "main hand", [17] = "off hand",
+}
+
+--- The resolve as rows, one per item on the wire, in slot order.
+---
+--- Each row carries the wire's identity (`s`, `id`, `slot`, `w`) and one of
+--- three states, which are exactly Resolve's three buckets: `worn` (the slot
+--- already holds it), `ready` (in a carried bag, so the button will equip it)
+--- and `missing` (nowhere reachable). Slot order rather than state order,
+--- because a set is read top to bottom like a paperdoll, and the state is
+--- what the eye picks out — grouping by state would make `ring 2` land above
+--- `head` for no reason a player can see.
+function GearSet.Rows(r)
+  if not r then return {} end
+  local rows = {}
+  local function add(list, state)
+    for _, it in ipairs(list or {}) do
+      rows[#rows + 1] = {
+        slot = it.slot,
+        name = GearSet.SLOT_NAMES[it.slot] or ("slot " .. tostring(it.slot)),
+        s = it.s,
+        id = it.id,
+        w = it.w,
+        state = state,
+      }
+    end
+  end
+  add(r.already, "worn")
+  add(r.ready, "ready")
+  add(r.missing, "missing")
+  table.sort(rows, function(a, b) return a.slot < b.slot end)
+  return rows
+end
+
+--- What the row's state says, and in what tone: `text, tone`, where tone is
+--- one of `good`, `warn`, `muted` and the colours are UI.lua's to pick.
+---
+--- `worn` is muted because it asks nothing of the player — it is AMR's `E`,
+--- the mark that says this slot is already right. `ready` is the good news
+--- and the thing the button will act on. Missing splits on the wire's `w`:
+--- an item the site last saw in a bank is a walk, an item it saw in a bag
+--- that is no longer there has moved since the paste, and the two are
+--- different errands.
+function GearSet.StateText(row)
+  if row.state == "worn" then return "worn", "muted" end
+  if row.state == "ready" then return "in bags", "good" end
+  if row.w == "bank" or row.w == "warbank" then return "in your bank", "warn" end
+  return "not in your bags", "warn"
 end
 
 --- How short a set name is retried down to before giving up. Each step is one
