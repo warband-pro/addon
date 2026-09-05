@@ -266,6 +266,31 @@ check("resolve aims the helm at its real slot", r and r.ready[1].slot == 1)
 check("resolve names the missing cleaver", r and #r.missing == 1 and r.missing[1].w == "bank")
 check("resolve carries the set name", r and r.set == "warband.pro Feral")
 
+-- ── rows: the set as a list a person reads ──────────────────────────────────
+-- The Import tab draws one row per item on the wire, in slot order, each with
+-- the state Resolve found it in. The model is here so the layout has nothing
+-- to decide.
+
+local rows = GearSet.Rows(r)
+check("one row per item on the wire", #rows == 3)
+check("rows come in slot order, not state order",
+  rows[1].slot == 1 and rows[2].slot == 12 and rows[3].slot == 16)
+check("a row names its slot as a player would", rows[1].name == "head" and rows[2].name == "ring 2"
+  and rows[3].name == "main hand")
+check("the bagged helm is ready", rows[1].state == "ready")
+check("the worn ring is worn", rows[2].state == "worn")
+check("the absent cleaver is missing", rows[3].state == "missing")
+check("a row keeps the wire's identity for the tooltip", rows[1].s == HELM and rows[1].id == 221151)
+check("no resolve, no rows", #GearSet.Rows(nil) == 0)
+
+local function stateOf(row) local t, tone = GearSet.StateText(row) return t .. "/" .. tone end
+check("worn is the quiet mark — AMR's E", stateOf(rows[2]) == "worn/muted")
+check("in bags is the good news", stateOf(rows[1]) == "in bags/good")
+check("missing from a bank is a walk", stateOf(rows[3]) == "in your bank/warn")
+check("missing with no bank hint says the bags", stateOf({ state = "missing" }) == "not in your bags/warn")
+check("a slot the table does not know still gets a name", GearSet.Rows({ already = { { slot = 99, s = "x" } } })[1].name
+  == "slot 99")
+
 -- ── apply: equips land before the save, and the save snapshots after ────────
 
 ORDER = {}

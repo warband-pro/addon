@@ -29,6 +29,7 @@ local EVENTS = {
   "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED",
   "PLAYER_EQUIPMENT_CHANGED", "PLAYER_AVG_ITEM_LEVEL_UPDATE",
   "TRAIT_CONFIG_UPDATED", "ACTIVE_COMBAT_CONFIG_CHANGED", "PLAYER_SPECIALIZATION_CHANGED",
+  "GET_ITEM_INFO_RECEIVED",
 }
 
 local registered = {}
@@ -209,6 +210,16 @@ handlers.PLAYER_EQUIPMENT_CHANGED = function()
   if ns.GearSet.pending then ns.throttle("gearset", 0.5, ns.GearSet.Verify) end
 end
 handlers.PLAYER_AVG_ITEM_LEVEL_UPDATE = function() ns.dirty("equipped") end
+
+-- The gear-set rows name items by their item string, and an item the client
+-- has never seen this session — the one in your bank, typically — has no name
+-- or quality until the server answers. The row is drawn as `item 221151` and
+-- redrawn here when the answer lands; one event per item, so the throttle
+-- collapses a set's worth into one repaint. Only while the panel is up, for
+-- the reason BAG_UPDATE_DELAYED gives: this is a redraw, never a scan.
+handlers.GET_ITEM_INFO_RECEIVED = function()
+  if UI.JunkIsShown() then ns.throttle("gearset-rows", 0.3, UI.RenderGearSet) end
+end
 
 ns.onDirty("talents", Gear.Talents)
 handlers.TRAIT_CONFIG_UPDATED = function() ns.dirty("talents") end
