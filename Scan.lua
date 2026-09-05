@@ -164,6 +164,13 @@ function Scan.Identity()
   c.level = UnitLevel("player")
   c.xp = UnitXP("player")
   c.restXP = ns.safe(GetXPExhaustion)
+  -- The denominator `restXP` is useless without. Rested is a fraction of a
+  -- level, and experience per level is not a constant, so the same 400,000
+  -- rested is over a level at 81 and a fraction of one at 89 — a consumer
+  -- comparing two characters on the raw number compares nothing. No Blizzard
+  -- endpoint publishes experience at all, so if this does not send it, it is
+  -- not knowable anywhere.
+  c.xpMax = UnitXPMax("player")
   c.lastZone = ns.safe(GetZoneText)
   c.hearthZone = ns.safe(GetBindLocation)
   local avg, equipped = ns.safe(GetAverageItemLevel)
