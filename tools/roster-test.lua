@@ -241,7 +241,10 @@ do
     a = char({ currencies = {
       { id = 2815, name = "Resonance Crystals", quantity = 4500, maxQuantity = 20000 },
       { id = 3008, name = "Valorstones", quantity = 1900, maxQuantity = 2000 },
-      { id = 1, name = "Gold Dust", quantity = 12000, maxQuantity = 0 },
+      -- Uncapped, and kept LIVE by `earnedThisWeek` so this stays a test about
+      -- how an uncapped currency renders. What decides whether it gets a row at
+      -- all has its own block below.
+      { id = 1, name = "Gold Dust", quantity = 12000, maxQuantity = 0, earnedThisWeek = 40 },
     } }),
   }), nil)
 
@@ -249,12 +252,102 @@ do
     textAt(model, "Resonance Crystals", 1) == "4,500/20,000",
     textAt(model, "Resonance Crystals", 1))
   check("near the cap it warns", row(model, "Valorstones").cells[1].tone == "warn")
+  check("under it, a cap is not an opinion",
+    row(model, "Resonance Crystals").cells[1].tone == "plain")
   -- maxQuantity 0 means uncapped, per CONTRACT.md, and `12000/0` is not a
   -- fraction anyone can read.
   check("an uncapped currency renders as a bare number",
     textAt(model, "Gold Dust", 1) == "12,000", textAt(model, "Gold Dust", 1))
   check("currencies sort by name",
     model.groups[1].rows[1].label == "Gold Dust", model.groups[1].rows[1].label)
+end
+
+do
+  -- The colour rule. SavedInstances' green for "under the cap" is decoration
+  -- rather than state, so `plain` is what fine looks like and the two tones
+  -- left are the two things a player can act on.
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 1, name = "Full", quantity = 2000, maxQuantity = 2000 },
+      { id = 2, name = "Over", quantity = 2400, maxQuantity = 2000 },
+      { id = 3, name = "Nearly", quantity = 1800, maxQuantity = 2000 },
+      { id = 4, name = "Weekly done", quantity = 300, maxQuantity = 0,
+        weeklyMax = 1500, earnedThisWeek = 1500 },
+      { id = 5, name = "Weekly going", quantity = 300, maxQuantity = 0,
+        weeklyMax = 1500, earnedThisWeek = 320 },
+    } }),
+  }), nil)
+
+  check("at the cap is bad, not a warning", row(model, "Full").cells[1].tone == "bad")
+  check("past the cap counts as at it", row(model, "Over").cells[1].tone == "bad")
+  check("nine tenths of the way is the warning worth having",
+    row(model, "Nearly").cells[1].tone == "warn")
+  check("a weekly allowance already earned warns too",
+    row(model, "Weekly done").cells[1].tone == "warn")
+  check("a weekly still running does not",
+    row(model, "Weekly going").cells[1].tone == "plain")
+  check("and the hover says what being at the cap costs",
+    row(model, "Full").cells[1].tip[1] == "at cap — anything more is lost",
+    row(model, "Full").cells[1].tip[1])
+end
+
+do
+  -- The filter: a currency earns a row when the game is still metering it for
+  -- somebody. Anything else is a pile left over from an expansion nobody here
+  -- is playing, and it was the majority of the group.
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 1, name = "Capped", quantity = 10, maxQuantity = 2000 },
+      { id = 2, name = "Weekly", quantity = 10, maxQuantity = 0, weeklyMax = 1500 },
+      { id = 3, name = "Earning", quantity = 10, maxQuantity = 0, earnedThisWeek = 5 },
+      { id = 4, name = "Timewarped Badge", quantity = 4000, maxQuantity = 0 },
+      { id = 5, name = "Old Mark", quantity = 12, maxQuantity = 0, earnedThisWeek = 0 },
+    } }),
+  }), nil)
+
+  check("a total cap keeps a currency", row(model, "Capped") ~= nil)
+  check("a weekly cap keeps a currency", row(model, "Weekly") ~= nil)
+  check("earning any of it this week keeps a currency", row(model, "Earning") ~= nil)
+  check("an uncapped pile nobody is earning is left out",
+    row(model, "Timewarped Badge") == nil)
+  check("and earning none of it this week is not earning it",
+    row(model, "Old Mark") == nil)
+
+  -- Honest about the omission, the way the glance's `+2` is: a header that
+  -- silently drops two rows is a bug report waiting to be filed.
+  local _, g = row(model, "Capped")
+  check("the group header says how many it left out", g.label == "currencies · 2 hidden",
+    g.label)
+end
+
+do
+  -- The switch. One checkbox on the Options tab, not SavedInstances' checklist
+  -- of every currency in the game — and it reaches the model on `db.opts`,
+  -- where every other switch in this addon lives.
+  local chars = {
+    a = char({ currencies = {
+      { id = 1, name = "Capped", quantity = 10, maxQuantity = 2000 },
+      { id = 4, name = "Timewarped Badge", quantity = 4000, maxQuantity = 0 },
+    } }),
+  }
+  local shown = db(chars)
+  shown.opts = { allCurrencies = true }
+  local model = Roster.Build(shown, nil)
+
+  check("the option shows what the filter left out", row(model, "Timewarped Badge") ~= nil)
+  local _, g = row(model, "Capped")
+  check("and there is nothing hidden left to count", g.label == "currencies", g.label)
+end
+
+do
+  -- A warband holding nothing but legacy currencies has a group with no rows,
+  -- and rule 2 drops it — the same as every other empty group. The switch is
+  -- still on the Options tab, which is where the player who wants them looks.
+  local model = Roster.Build(db({
+    a = char({ currencies = { { id = 4, name = "Timewarped Badge", quantity = 4000 } } }),
+  }), nil)
+  check("a group whose every row was filtered is not drawn",
+    row(model, "Timewarped Badge") == nil and model.groups[1] == nil)
 end
 
 -- ── professions ─────────────────────────────────────────────────────────────

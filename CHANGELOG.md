@@ -45,6 +45,12 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**A switch for the currency rows** — Options → *Show every currency in the
+Roster grid*. On, the grid lists every currency any character is carrying, the
+way it used to.
+
 ### Fixed
 
 **The Roster grid stopped drawing after 24 rows.** If you had a full spread of
@@ -54,6 +60,18 @@ into empty space where the rest of your grid should have been. Every row the
 grid has is now drawn.
 
 ### Changed
+
+**The currency rows are this season's, not every currency you have ever held.**
+The grid keeps a currency with a cap, a weekly cap, or something earned towards
+it this week by anybody in the warband — and the group header counts what it
+left out, so `currencies · 4 hidden` tells you the Timewarped Badges are still
+there rather than gone.
+
+**A currency at its cap is red now, not orange.** Orange is nine tenths of the
+way there, which is while it is still worth going to spend, or a weekly
+allowance you have already earned this week. Red is the one that costs you
+something, and it is the colour the minimap hover has used for it since 1.9.0 —
+the grid was disagreeing with the hover about the same currency.
 
 **The window resizes, and it opens wide enough for eight characters.** Drag the
 corner. It remembers the size and where you put it, so a warband of twelve is a

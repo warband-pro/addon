@@ -78,8 +78,15 @@ local ROSTER_GUTTER = 6
 -- warband is the complaint.** The minimum stays at the old 560 so a player who
 -- wants it narrow can still have it; below that the label column and a usable
 -- cell stop fitting together.
+--
+-- **The minimum height is set by the Options tab, not the grid.** Its controls
+-- are laid out top-down at a fixed pitch against a version line pinned to the
+-- panel's bottom, so the tallest tab decides how short the window may get. The
+-- fifth checkbox arrived with the currency filter and 420 no longer cleared the
+-- footer; 460 does, with room for a description that wraps to three lines at
+-- the minimum width.
 local WIN_DEF_W, WIN_DEF_H = 680, 520
-local WIN_MIN_W, WIN_MIN_H = 560, 420
+local WIN_MIN_W, WIN_MIN_H = 560, 460
 local WIN_MAX_W, WIN_MAX_H = 1600, 1000
 
 local frame, panels, tabs
@@ -1191,6 +1198,20 @@ local function buildOptions()
       o.minimap = v
       ns.Store.Touch()
       UI.RefreshMinimap()
+    end)
+
+  makeOption(p, -264,
+    "Show every currency in the Roster grid",
+    "The grid lists the currencies the game is still metering — one with a cap, a weekly cap, "
+      .. "or something earned towards it this week — and its header says how many it left out. "
+      .. "Turn this on to list every currency any character is carrying.",
+    function() local o = opts() return o and o.allCurrencies end,
+    function(v)
+      local o = opts()
+      if not o then return end
+      o.allCurrencies = v
+      ns.Store.Touch()
+      UI.RenderRoster()
     end)
 
   local version = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")

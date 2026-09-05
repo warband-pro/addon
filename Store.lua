@@ -56,6 +56,10 @@ function Store.Init()
   -- home for it, and a DB written before the button existed does not have to be
   -- rewritten to gain one.
   if db.opts.minimap == nil then db.opts.minimap = true end
+  -- Off, so the grid shows the currencies the game is still metering and says
+  -- how many it left out. Roster.lua carries the rule and why it is a rule
+  -- rather than SavedInstances' per-currency checklist.
+  if db.opts.allCurrencies == nil then db.opts.allCurrencies = false end
 
   _G.WarbandProDB = db
   Store.db = db
