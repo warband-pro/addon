@@ -45,6 +45,17 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-09-05 — the set is called what the spec is called
+
+### Changed
+
+**The saved set is named after the spec and wears its icon.** `Protection`,
+with the Protection icon — not `warband.pro Protection` with a void crystal.
+If you already have a set called `Protection`, that is the one that gets
+updated. A set this addon saved under the old name is renamed to the new one
+the first time you press equip, so you do not end up with two sets holding the
+same gear.
+
 ## [1.10.0] — 2026-09-05 — the set you pasted, slot by slot
 
 ### Added
