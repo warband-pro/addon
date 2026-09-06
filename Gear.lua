@@ -269,6 +269,22 @@ end
 --- which is Store.Put's rule and matters more here than anywhere: a player who
 --- logs in, gets a failed read, and pastes must not lose the three loadouts
 --- they captured last week.
+---
+--- **Accumulation is why a deleted build has to be actively removed.** Nothing
+--- else in this file ever needs to: a spec the player abandons is still a spec
+--- they have, so `specs` only ever grows honestly. A loadout is the opposite —
+--- the player deletes it in the talent UI and it is gone, and a list that only
+--- merges keeps offering it to warband.pro forever. That is what a player sees
+--- as builds in the website's dropdown that the game does not show them.
+---
+--- The removal rides on enumeration and nothing else, because enumeration is
+--- the only read that can distinguish "deleted" from "not observed yet".
+--- Accumulation cannot: it says which build is on, never which builds are all
+--- of them. So a pass with no enumeration prunes nothing and behaves exactly
+--- as it did before. An **empty** enumeration prunes nothing either — the
+--- player always has an active config, so an empty list is far likelier to be
+--- a not-yet-loaded read than a genuinely empty shelf, and pruning on it would
+--- wipe the accumulated list at the one moment the evidence is weakest.
 local function captureLoadouts(found, specID, activeConfigID, activeName, activeString)
   local ct, tr = C_ClassTalents, C_Traits
   found.loadouts = found.loadouts or {}
@@ -291,21 +307,35 @@ local function captureLoadouts(found, specID, activeConfigID, activeName, active
   end
 
   -- (1) Everything the client will name and serialize for us.
-  if ct and tr then
-    local ids = ns.safe(ct.GetConfigIDsBySpecID, specID)
-    if type(ids) == "table" then
-      for _, id in ipairs(ids) do
-        local info = ns.safe(tr.GetConfigInfo, id)
-        local name = type(info) == "table" and type(info.name) == "string" and info.name ~= "" and info.name or nil
-        -- Asked per config rather than once: this is the call that may refuse
-        -- an inactive loadout, and one refusal must not lose the others.
-        local str = ns.safe(function() return (tr.GenerateImportString(id)) end)
-        put(id, name, str)
-      end
+  local ids
+  if ct and tr then ids = ns.safe(ct.GetConfigIDsBySpecID, specID) end
+  local enumerated = type(ids) == "table" and #ids > 0
+
+  -- (2) Builds the player has deleted, dropped before anything is added — a
+  -- list already at MAX_LOADOUTS must have room for what is still real, or the
+  -- cap would hold stale entries in place against their replacements.
+  if enumerated then
+    local live = {}
+    for _, id in ipairs(ids) do live[id] = true end
+    -- The active config need not be a saved loadout, so it is never pruned.
+    if type(activeConfigID) == "number" then live[activeConfigID] = true end
+    for i = #list, 1, -1 do
+      if not live[list[i].id] then table.remove(list, i) end
     end
   end
 
-  -- (2) The one the player is on, which is the read that has always worked.
+  if enumerated then
+    for _, id in ipairs(ids) do
+      local info = ns.safe(tr.GetConfigInfo, id)
+      local name = type(info) == "table" and type(info.name) == "string" and info.name ~= "" and info.name or nil
+      -- Asked per config rather than once: this is the call that may refuse
+      -- an inactive loadout, and one refusal must not lose the others.
+      local str = ns.safe(function() return (tr.GenerateImportString(id)) end)
+      put(id, name, str)
+    end
+  end
+
+  -- (3) The one the player is on, which is the read that has always worked.
   put(activeConfigID, activeName, activeString)
 end
 
