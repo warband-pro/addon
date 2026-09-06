@@ -45,6 +45,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.12.1] — 2026-09-06 — a build you delete stops being exported
+
 ### Fixed
 
 **A talent build you delete stops being exported.** The addon added every saved
