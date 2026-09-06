@@ -45,6 +45,15 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+**A talent build you delete stops being exported.** The addon added every saved
+build it saw and never took one away, so a loadout you deleted in the talent UI
+kept going out and warband.pro kept listing it beside the ones you still have.
+It now drops a build the client no longer lists for that spec. A scan that
+cannot read your saved builds at all still changes nothing, so a bad read on
+login does not cost you the ones it captured earlier.
+
 ## [1.12.0] — 2026-09-05 — the export says how much rested you have banked
 
 ### Added

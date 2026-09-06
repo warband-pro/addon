@@ -322,6 +322,69 @@ ACTIVE_CONFIG = 1
 ns.Gear.Talents()
 eq(#loadouts(), ns.MAX_LOADOUTS, "the list is capped so a build-hoarder cannot flood the wire")
 
+-- ── a build the player deleted stops riding the wire ────────────────────────
+-- Accumulation alone can only ever add, so a loadout deleted in the talent UI
+-- kept showing up on warband.pro. Enumeration is the only read that can tell
+-- "deleted" from "not observed yet", so it is the only thing that may prune.
+
+freshChar()
+CONFIGS = { ids = { 1, 2, 3 }, names = { [1] = "Raid", [2] = "M+", [3] = "Delve" } }
+STRINGS = { [1] = "RAIDSTR", [2] = "MPLUSSTR", [3] = "DELVESTR" }
+ACTIVE_CONFIG = 1
+ns.Gear.Talents()
+eq(#loadouts(), 3, "three builds to start with")
+
+CONFIGS = { ids = { 1, 3 }, names = { [1] = "Raid", [3] = "Delve" } }
+STRINGS = { [1] = "RAIDSTR", [3] = "DELVESTR" }
+ns.Gear.Talents()
+eq(#loadouts(), 2, "a build deleted in the talent UI is dropped, not kept forever")
+eq(byName("M+"), nil, "and it is the deleted one that went")
+eq(byName("Raid") and byName("Raid").s, "RAIDSTR", "the survivors keep their strings")
+
+-- The active config is not necessarily a saved loadout, so it never prunes.
+ACTIVE_CONFIG = 9
+STRINGS = { [1] = "RAIDSTR", [3] = "DELVESTR", [9] = "ACTIVESTR" }
+CONFIGS.names[9] = "Scratch"
+ns.Gear.Talents()
+eq(byName("Scratch") and byName("Scratch").s, "ACTIVESTR", "the build being worn survives enumeration")
+
+-- No enumeration at all prunes nothing — the pass behaves as it always did.
+CONFIGS = { ids = nil, names = {} }
+STRINGS = {}
+ns.Gear.Talents()
+eq(#loadouts(), 3, "a pass without enumeration leaves the stored list alone")
+
+-- An empty enumeration is far likelier to be a not-yet-loaded read than an
+-- empty shelf, and wiping the list on it would be the costliest way to be wrong.
+CONFIGS = { ids = {}, names = {} }
+ns.Gear.Talents()
+eq(#loadouts(), 3, "an empty enumeration is treated as no evidence, not as zero builds")
+
+-- Pruning runs before anything is added, so a full list has room for a real
+-- build rather than holding a deleted one in place against it.
+freshChar()
+local capIds, capNames, capStrings = {}, {}, {}
+for i = 1, ns.MAX_LOADOUTS do
+  capIds[i] = i
+  capNames[i] = "Build " .. i
+  capStrings[i] = "S" .. i
+end
+CONFIGS = { ids = capIds, names = capNames }
+STRINGS = capStrings
+ACTIVE_CONFIG = 1
+ns.Gear.Talents()
+eq(#loadouts(), ns.MAX_LOADOUTS, "the list starts full")
+
+capIds[ns.MAX_LOADOUTS] = 99
+capNames[99] = "Replacement"
+capStrings[99] = "S99"
+CONFIGS = { ids = capIds, names = capNames }
+STRINGS = capStrings
+ns.Gear.Talents()
+eq(#loadouts(), ns.MAX_LOADOUTS, "and stays capped")
+eq(byName("Replacement") and byName("Replacement").s, "S99", "a replacement build fits once the deleted one goes")
+eq(byName("Build " .. ns.MAX_LOADOUTS), nil, "the build it replaced is gone")
+
 -- ── verdict ─────────────────────────────────────────────────────────────────
 
 print(string.format("gear-test: %d passed, %d failed", passed, failed))

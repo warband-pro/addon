@@ -481,6 +481,18 @@ between their builds, the same way `specs` fills in across a spec switch. The
 website must therefore be correct with a partial list, and must not assume
 three entries because it names three content types.
 
+**Unlike `specs`, this list also shrinks.** A spec the player abandons is still
+a spec they have, but a loadout they delete in the talent UI is gone, and until
+1.12.1 nothing removed it — it kept riding the wire and warband.pro kept
+offering builds the game no longer showed. An entry is dropped when (1) returns
+a non-empty list that does not name its `id`. Only enumeration can prune,
+because only enumeration claims to be the whole shelf: accumulation says which
+build is on, never which builds are all of them. So a scan with no enumeration,
+or one whose enumeration comes back empty, removes nothing — the player always
+has an active config, so an empty list reads as "not loaded yet", not "no
+builds". The build the player is currently on is never pruned, because the
+active config need not itself be a saved loadout.
+
 At most `ns.MAX_LOADOUTS` (8) entries are kept per spec, oldest-capped rather
 than evicted: past the cap a new config id is dropped and existing entries keep
 updating. The cap is a byte ceiling, not a guess at how many builds anyone has.
