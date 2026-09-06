@@ -1,6 +1,6 @@
 ## Interface: 120100
-## Title: Warband.pro Companion
-## Title-enUS: Warband.pro Companion
+## Title: Warband.pro
+## Title-enUS: Warband.pro
 ## Notes: Companion for warband.pro — gathers bags, bank, warband bank, gear, talents, currencies, lockouts from every alt | warband.pro
 ## Notes-enUS: Companion addon for warband.pro — collects bags, bank, warband bank, gear, talents, currencies, lockouts from every alt to answer "who should I play tonight" | warband.pro
 ## Author: warband.pro
@@ -9,7 +9,7 @@
 ## IconTexture: Interface\Icons\inv_enchant_voidcrystal
 ## AddonCompartmentFunc: WarbandPro_OnAddonCompartmentClick
 ## Category-enUS: warband.pro
-## X-DisplayName: Warband.pro Companion
+## X-DisplayName: Warband.pro
 ## X-Description: Companion addon for warband.pro — the site that tells you who to play tonight. Gear, talents, bags, bank, warband bank, currencies, lockouts. Lightweight, retail Midnight only, no auto-upload. Play normally, paste once into warband.pro.
 ## X-Website: https://warband.pro
 ## X-Site: https://warband.pro

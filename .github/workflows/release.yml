@@ -186,7 +186,7 @@ jobs:
         uses: SethCohen/github-releases-to-discord@v1
         with:
           webhook_url: ${{ env.DISCORD_WEBHOOK }}
-          username: 'Warband.pro Companion'
+          username: 'Warband.pro'
           # Passed explicitly rather than read from github.event.release, which
           # is empty here — this job runs on a tag push, not a release event.
           release_name: ${{ steps.release.outputs.name }}

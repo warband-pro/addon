@@ -1370,7 +1370,7 @@ local function buildOptions()
   version:SetPoint("BOTTOMLEFT", 0, 2)
   version:SetPoint("BOTTOMRIGHT", 0, 2)
   version:SetJustifyH("LEFT")
-  version:SetText(format("Warband.pro Companion v%s  ·  no network calls — the export moves only when you copy it",
+  version:SetText(format("Warband.pro v%s  ·  no network calls — the export moves only when you copy it",
     ns.VERSION))
 end
 
@@ -1471,9 +1471,9 @@ local function build()
   -- Mixin methods, guarded: a client where PortraitFrame lost one of these
   -- should cost the title or the icon, never the window.
   if frame.SetTitle then
-    frame:SetTitle("Warband.pro Companion")
+    frame:SetTitle("Warband.pro")
   elseif frame.TitleContainer and frame.TitleContainer.TitleText then
-    frame.TitleContainer.TitleText:SetText("Warband.pro Companion")
+    frame.TitleContainer.TitleText:SetText("Warband.pro")
   end
   if frame.SetPortraitToAsset then
     frame:SetPortraitToAsset(ns.ICON)
@@ -1788,7 +1788,7 @@ local function minimapTooltip(self)
   local g = ns.Roster.Glance(ns.Store.db, ns.safe(UnitGUID, "player"))
 
   GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-  GameTooltip:AddLine("Warband.pro Companion")
+  GameTooltip:AddLine("Warband.pro")
   GameTooltip:AddLine(format("%s %d character%s  ·  freshest %s", DOT[g.dot] or DOT.never,
     g.characters, g.characters == 1 and "" or "s", g.ago), 1, 1, 1)
 
@@ -1901,5 +1901,5 @@ end
 -- raw token when there is none. Both were missing, so the binding sat under a
 -- heading called WARBANDPRO as a row called WARBANDPRO_TOGGLE — findable, but
 -- shouting, and not the "Key Bindings > WarbandPro" docs/FLOW.md promises.
-_G.BINDING_HEADER_WARBANDPRO = "Warband.pro Companion"
+_G.BINDING_HEADER_WARBANDPRO = "Warband.pro"
 _G.BINDING_NAME_WARBANDPRO_TOGGLE = "Open the export window"

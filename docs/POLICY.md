@@ -34,7 +34,7 @@ Nothing here transmits — the player is the transport.
 | Clear, informative description; functional detail, not generic terms | ⚠️ **manual** | Paste [STORE.md](STORE.md). Do **not** paste the repo README — it is written for contributors and contains development planning. |
 | Clear summary, not duplicating the description | ⚠️ **manual** | Summary line is at the top of [STORE.md](STORE.md). |
 | Name and description in English | ✅ | Both English. |
-| Name excludes versions and technical detail | ✅ **enforced** | Fails if `## Title:` grows a version number. Project name: "Warband.pro Companion". |
+| Name excludes versions and technical detail | ✅ **enforced** | Fails if `## Title:` grows a version number. Project name: "Warband.pro". |
 | Project avatar, 400×400, not a solid colour, no copyrighted imagery | ❌ **to do** | See the warning below — this one has a trap in it. |
 | Distinct assets, name, and description | ✅ | Original addon, not a fork. |
 | Third-party content credited and correctly licensed | ✅ | LibDeflate by Haoqian He, zlib license — notice retained in `Vendor/LibDeflate.lua`, credited in `LICENSE` and in the store description. |

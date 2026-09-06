@@ -17,7 +17,7 @@ highlighted export box and FLOW.md counts that path at under two seconds, so
 every door that existed before still opens the tab it always opened.
 
 ```
-+--[crystal]--- Warband.pro Companion ---------------------[x]-+
++--[crystal]--- Warband.pro -------------------------------[x]-+
 |  6 characters · freshest 12m ago · warband bank 1h (Vocnar)  |
 |  * Vocnar-Wyrmrest Accord  12m ago  bank 1h ago              |
 |  * Voctara-Wyrmrest Accord  3d ago                           |
@@ -55,7 +55,7 @@ The grid. Every character across the top, everything this addon knows about
 them down the side.
 
 ```
-+--[crystal]--- Warband.pro Companion ---------------------[x]-+
++--[crystal]--- Warband.pro -------------------------------[x]-+
 |  6 characters                                                |
 |                *Vocnar *Voctara *Voctesa *Vocgrim  ...       |
 |                 80·621  80·618   80·614   77·602             |
@@ -507,7 +507,7 @@ who turned this button off goes looking.
 #### The hover — SavedInstances' primary tooltip
 
 ```
-Warband.pro Companion
+Warband.pro
 * 6 characters  ·  freshest 12m ago
 
 vault ready       Vocnar 3 slots  Voctara 1 slot
@@ -592,8 +592,8 @@ client still hangs off an event and a throttle (`Init.lua`).
 From `docs/QA.md` checklist expanded:
 
 - /warband opens in one click on the minimap button — or the Compartment,
-  or the slash command, or the keybinding (Key Bindings > Warband.pro
-  Companion), all landing on the Export tab
+  or the slash command, or the keybinding (Key Bindings > Warband.pro),
+  all landing on the Export tab
 - Auto-highlighted on open without mouse drag (human just hits Ctrl-C)
 - Ctrl-A + Ctrl-C works, pastes into Notepad startswith wb1! exact len reported at bottom.
 - Esc closes, second open same behavior.
