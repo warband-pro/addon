@@ -45,6 +45,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.13.0] — 2026-09-06 — fold away the part of the grid you are not reading
+
 ### Added
 
 **Click a group in the Roster grid to fold it away.** Seven groups of rows
