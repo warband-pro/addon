@@ -45,6 +45,16 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**Click a group in the Roster grid to fold it away.** Seven groups of rows
+against a window that shows about forty of them means you scroll past
+professions and pockets every time you want to check a lockout. Click a group's
+label — `currencies`, `lockouts`, any of them — and its rows fold up behind the
+header, which keeps a `+` and the number of rows it is holding so you can tell
+a group you shut from one that had nothing in it. Click it again and they come
+back. Which groups are folded is remembered between sessions.
+
 ## [1.12.1] — 2026-09-06 — a build you delete stops being exported
 
 ### Fixed

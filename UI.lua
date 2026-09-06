@@ -947,8 +947,22 @@ local function makeRosterLine(i)
   -- cell tooltips that are the whole point of the grid.
   rowHit:SetFrameLevel(rosterChild:GetFrameLevel())
   rowHit:EnableMouse(false)
-  rowHit:SetScript("OnEnter", function(self) if self.hi then self.hi:Show() end end)
-  rowHit:SetScript("OnLeave", function(self) if self.hi then self.hi:Hide() end end)
+  rowHit:SetScript("OnEnter", function(self)
+    if self.hi then self.hi:Show() end
+    -- Only a group header says anything on hover, and what it says is the one
+    -- thing a `+` in front of a word does not: which way the click goes.
+    if self.group then showTip(self, self.group, { self.hint }) end
+  end)
+  rowHit:SetScript("OnLeave", function(self)
+    if self.hi then self.hi:Hide() end
+    GameTooltip:Hide()
+  end)
+  -- A group header is the only clickable line, and `group` is both the flag and
+  -- the key: a data row clears it on every render, so a pooled widget that used
+  -- to be a header cannot keep shutting somebody else's group.
+  rowHit:SetScript("OnMouseUp", function(self, button)
+    if self.group and button == "LeftButton" then UI.ToggleRosterGroup(self.group) end
+  end)
 
   local hi = rosterChild:CreateTexture(nil, "ARTWORK")
   hi:SetPoint("TOPLEFT", 0, y)
@@ -1107,29 +1121,13 @@ function UI.RenderRoster()
   end
 
   -- The model is per-column already, so the page has to pull the same slice out
-  -- of every row that it pulled out of the column list — the cell index is the
-  -- column index, and they must not drift.
-  local lines, n = {}, 0
-  for _, g in ipairs(model.groups) do
-    n = n + 1
-    lines[n] = { head = g.label }
-    for _, r in ipairs(g.rows) do
-      local cells, any = {}, false
-      for i = 1, nCols do
-        local src = shown[i] and r.cells[first + i]
-        cells[i] = src
-        if src then any = true end
-      end
-      -- A row can be empty for THIS page while carrying values on another —
-      -- one alt's lockout is not the next six characters' business.
-      if any then
-        n = n + 1
-        lines[n] = { label = r.label, cells = cells }
-      end
-    end
-    -- A group whose every row fell off this page leaves its header behind.
-    if lines[n].head then n = n - 1 end
-  end
+  -- of every row that it pulled out of the column list. `Roster.Lines` owns
+  -- that arithmetic and the shut-group rule together, because they are the same
+  -- question asked of a row and of the header above it.
+  local opts = db and db.opts
+  local lines = ns.Roster.Lines(model.groups, first, nCols,
+    type(opts) == "table" and type(opts.rosterShut) == "table" and opts.rosterShut or nil)
+  local n = #lines
 
   -- Grow to exactly what this render needs. Every line the model produced gets
   -- a widget, which is the whole of the fix for the old 24-row ceiling.
@@ -1173,20 +1171,29 @@ function UI.RenderRoster()
       w.label:SetText("")
       w.stripe:Hide()
       w.rowHit:EnableMouse(false)
+      w.rowHit.group, w.rowHit.hint = nil, nil
       blank(w)
     elseif line.head then
       -- A group header is the rule between groups as well as its name: the
       -- stripe under it is what stops `currencies` reading as one more row of
       -- the block above it.
-      w.label:SetText(format("|cff%s%s|r", MUTED, line.head))
+      --
+      -- The `+`/`-` in front of it is the whole of the affordance. A shut group
+      -- names the count it is holding, because `pockets` with a rule under it
+      -- and nothing else looks like a group that had nothing to say.
+      w.label:SetText(format("|cff%s%s %s%s|r", MUTED, line.closed and "+" or "-", line.head,
+        line.closed and format("  (%d)", line.hidden) or ""))
       w.stripe:SetColorTexture(1, 1, 1, 0.05)
       w.stripe:Show()
-      w.rowHit:EnableMouse(false)
+      w.rowHit:EnableMouse(true)
+      w.rowHit.group = line.head
+      w.rowHit.hint = line.closed and "click to open" or "click to close"
       blank(w)
     else
       w.label:SetText(line.label)
       w.stripe:Hide()
       w.rowHit:EnableMouse(true)
+      w.rowHit.group, w.rowHit.hint = nil, nil
       for j = 1, #w.cells do
         local c = j <= nCols and line.cells[j] or nil
         local hit = w.hits[j]
@@ -1215,7 +1222,12 @@ function UI.RenderRoster()
   if #all == 0 then
     rosterHead:SetText(format("|cff%sno characters scanned yet — log in on a character and it lands here|r",
       MUTED))
-  elseif n == 0 then
+  -- The MODEL's groups, not the lines drawn. A group exists only because some
+  -- character has a value in it, so an empty model is the one honest "nothing
+  -- read yet" — whereas no lines can now also mean the player shut every group,
+  -- and telling them to go and play one would be the grid stating something it
+  -- can see is false.
+  elseif #model.groups == 0 then
     rosterHead:SetText(format("|cff%s%d character%s, and nothing read yet — play one and it fills in|r",
       MUTED, #all, #all == 1 and "" or "s"))
   else
@@ -1237,6 +1249,25 @@ function UI.RenderRoster()
   rosterNext:SetShown(pages > 1)
   rosterPrev:SetEnabled(UI.rosterPage > 1)
   rosterNext:SetEnabled(UI.rosterPage < pages)
+end
+
+--- Shut a group, or open it again, and remember which.
+---
+--- The set is keyed by the group's LABEL rather than by its position, because
+--- which groups a warband has depends on what has been scanned — an index would
+--- move under the player the first time a lockout appeared and shut whatever
+--- landed in that slot instead.
+---
+--- Only the shut ones are stored, and a group that is opened drops out of the
+--- table rather than storing `false`. The default is every group open, so an
+--- addon that has never had this clicked carries no key at all.
+function UI.ToggleRosterGroup(label)
+  local o = ns.Store.db and ns.Store.db.opts
+  if not o or not label then return end
+  if type(o.rosterShut) ~= "table" then o.rosterShut = {} end
+  o.rosterShut[label] = (not o.rosterShut[label]) or nil
+  ns.Store.Touch()
+  UI.RenderRoster()
 end
 
 -- ── options tab ─────────────────────────────────────────────────────────────

@@ -762,6 +762,86 @@ do
   check("so is a missing one", ns.hence(nil) == nil)
 end
 
+-- ── Roster.Lines, the flattening the grid draws ─────────────────────────────
+
+-- Hand-built groups rather than a Build() model: what is under test is the
+-- flattening and the page slice, and a fixture that had to produce a real
+-- lockout to test a header would be testing lockouts again.
+local function fixture()
+  return {
+    {
+      label = "this week",
+      rows = {
+        { label = "vault · raid", cells = { { text = "1/2" }, { text = "0/2" }, { text = "2/2" } } },
+        { label = "keystone", cells = { nil, { text = "+8" }, nil } },
+      },
+    },
+    {
+      label = "lockouts",
+      -- Nobody on the first page is saved to this; the third character is.
+      rows = { { label = "Liberation (Heroic)", cells = { nil, nil, { text = "3/8" } } } },
+    },
+  }
+end
+
+local function labels(lines)
+  local out = {}
+  for i, l in ipairs(lines) do out[i] = l.head and ("# " .. l.head) or l.label end
+  return table.concat(out, " | ")
+end
+
+do
+  local lines = Roster.Lines(fixture(), 0, 3, nil)
+  check("every group and row is drawn when they all fit",
+    labels(lines) == "# this week | vault · raid | keystone | # lockouts | Liberation (Heroic)",
+    labels(lines))
+  check("a header carries how many rows hang under it", lines[1].hidden == 2, lines[1].hidden)
+  check("and is open by default", lines[1].closed == false)
+  check("a row keeps the page's cells in column order", lines[2].cells[3].text == "2/2")
+  check("an absent cell stays absent", lines[3].cells[1] == nil)
+end
+
+-- The page slice. Two columns wide, so the third character is on page two —
+-- and the lockout only that character has must go with them.
+do
+  local page1 = Roster.Lines(fixture(), 0, 2, nil)
+  check("a group nobody on this page has a value for is not drawn at all",
+    labels(page1) == "# this week | vault · raid | keystone", labels(page1))
+
+  local page2 = Roster.Lines(fixture(), 2, 1, nil)
+  check("and appears on the page whose character carries it",
+    labels(page2) == "# this week | vault · raid | # lockouts | Liberation (Heroic)", labels(page2))
+  check("the slice moves with the page", page2[2].cells[1].text == "2/2")
+end
+
+-- Shutting a group keeps the header and the count, and drops only the rows.
+do
+  local lines = Roster.Lines(fixture(), 0, 3, { ["this week"] = true })
+  check("a shut group keeps its header",
+    labels(lines) == "# this week | # lockouts | Liberation (Heroic)", labels(lines))
+  check("and says how many rows it is standing in for", lines[1].hidden == 2, lines[1].hidden)
+  check("and knows it is shut", lines[1].closed == true)
+  check("a group nobody shut is untouched", lines[2].closed == false)
+end
+
+-- Shut is not the same as empty: a group with nothing on this page leaves, shut
+-- or not, so a header can never outlive its last row.
+do
+  local lines = Roster.Lines(fixture(), 2, 1, { ["lockouts"] = true })
+  check("a shut group with rows on this page stays",
+    labels(lines) == "# this week | vault · raid | # lockouts", labels(lines))
+
+  local none = Roster.Lines(fixture(), 0, 2, { ["lockouts"] = true })
+  check("a shut group with none does not",
+    labels(none) == "# this week | vault · raid | keystone", labels(none))
+end
+
+do
+  check("no groups is no lines", #Roster.Lines({}, 0, 4, nil) == 0)
+  check("no columns is no lines", #Roster.Lines(fixture(), 0, 0, nil) == 0)
+  check("and a missing group list is not an error", #Roster.Lines(nil, 0, 4, nil) == 0)
+end
+
 -- ── result ──────────────────────────────────────────────────────────────────
 
 print(format("\n%d passed, %d failed", pass, fail))

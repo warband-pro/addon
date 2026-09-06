@@ -751,6 +751,65 @@ function Roster.Build(db, selfGuid)
   }
 end
 
+-- ── the drawable lines ──────────────────────────────────────────────────────
+
+--- Flatten the model's groups into the lines a page of the grid draws.
+---
+--- A group header is a line with no cells, which is what lets the whole grid be
+--- one column of uniform rows — the label column and the cells stay aligned
+--- without a layout pass, and the header is the rule between two groups as well
+--- as its name.
+---
+--- This lived in UI.lua until the grid learned to shut a group. Two things made
+--- that the wrong home. The count a shut header carries is a fact about the
+--- model rather than about the widget pool, and the rule the header has to
+--- agree with — *a row nobody on THIS page has a value for is not drawn* — was
+--- about to be written twice, once for the rows and once for the header they
+--- hang under. Two copies of that rule is how a header outlives its last row.
+---
+--- `first` and `nCols` are the visible slice of the column list: the grid pages
+--- sideways when the window is too narrow for the whole warband, and a cell
+--- index is a column index, so the slice taken out of every row must be the
+--- slice taken out of the column list.
+---
+--- `shut` is a set of group labels, straight off `db.opts`. **A shut group
+--- keeps its header** — closing something must never hide the way back — and
+--- the header carries how many rows it stands in for, because a heading with
+--- nothing under it and no number reads as a group that turned out to be empty.
+function Roster.Lines(groups, first, nCols, shut)
+  first, nCols, shut = first or 0, nCols or 0, shut or {}
+  local out, n = {}, 0
+  for _, g in ipairs(groups or {}) do
+    local closed = shut[g.label] and true or false
+    n = n + 1
+    local head = { head = g.label, closed = closed, hidden = 0 }
+    out[n] = head
+    for _, r in ipairs(g.rows) do
+      local cells, any = {}, false
+      for i = 1, nCols do
+        local src = r.cells[first + i]
+        cells[i] = src
+        if src then any = true end
+      end
+      -- A row can be empty for THIS page while carrying values on another —
+      -- one alt's lockout is not the next six characters' business.
+      if any then
+        head.hidden = head.hidden + 1
+        if not closed then
+          n = n + 1
+          out[n] = { label = r.label, cells = cells }
+        end
+      end
+    end
+    -- A group whose every row fell off this page leaves its header behind.
+    if head.hidden == 0 then
+      out[n] = nil
+      n = n - 1
+    end
+  end
+  return out
+end
+
 -- ── the glance ──────────────────────────────────────────────────────────────
 
 -- **SavedInstances' primary tooltip — the half of its interface that is not the

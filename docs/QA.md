@@ -124,6 +124,26 @@ numbers.
 - [ ] Move the mouse from a cell that has a tooltip to a blank one — the old
       tooltip disappears rather than following the cursor
 
+### Shutting a group (unreleased)
+
+The rules are in `tools/roster-test.lua`; what a test cannot see is that the
+click lands on the header rather than on the row under it, and that a widget
+that used to be a header stops being clickable when it becomes a data row.
+
+- [ ] Click a group's label — its rows fold away, the header stays with a `+`
+      in front of it and the count of rows it is holding
+- [ ] Click it again — the same rows come back, in the same order
+- [ ] Hover a header — it highlights and says which way the click goes; hover a
+      data row — it highlights and says nothing
+- [ ] Click a data row — nothing happens, and no group shuts
+- [ ] Shut a group, `/reload`, reopen — it is still shut. Shut every group,
+      `/reload` — the window opens on seven headers and no rows, and each one
+      opens again
+- [ ] Shut a group whose rows all belong to one character, then page past that
+      character — the header goes too, count and all
+- [ ] Shut the tallest group and scroll — the scroll bar shortens to the rows
+      that are left rather than scrolling into empty space
+
 ### The resizable window (unreleased)
 
 The grid now measures itself, so the picture depends on the window and on the
