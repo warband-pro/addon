@@ -60,15 +60,15 @@ them down the side.
 |                *Vocnar *Voctara *Voctesa *Vocgrim  ...       |
 |                 80·621  80·618   80·614   77·602             |
 |  +--------------------------------------------------------+  |
-|  | this week                                              |  |
+|  | - this week                                            |  |
 |  | vault · raid     1/3     2/3     --      1/3           |  |
 |  | vault · mythic+  8/8 (1) 4/8     --      1/8           |  |
 |  | keystone         +12     +9      --      --            |  |
-|  | lockouts                                               |  |
+|  | - lockouts                                             |  |
 |  | Nerub-ar (Heroic) 2/8    8/8     --      --            |  |
-|  | currencies                                             |  |
+|  | - currencies                                           |  |
 |  | Valorstones      1,900/2,000  240/2,000  --            |  |
-|  | pockets                                                |  |
+|  | - pockets                                              |  |
 |  | gold             48,205g 1,204g  980g    12g           |  |
 |  +--------------------------------------------------------+  |
 |  warband bank 1h ago (by Vocnar) · 5,000g                  // |
@@ -112,6 +112,30 @@ every rule below.
 3. **Nothing in it reads the game.** Every number already went through
    `ns.safe` on the way into the DB. Reading it back out is table work, so the
    grid cannot throw in the middle of a raid.
+
+**A group shuts, and stays shut.** Click a group's label and its rows fold
+away; the header stays, with a `+` in front of it and the number of rows it is
+holding — `+ currencies  (11)`. Click it again and they come back. Which groups
+are shut lives in `opts.rosterShut`, keyed by the group's label rather than its
+position, because which groups a warband has depends on what has been scanned
+and an index would move under the player the first time a lockout appeared.
+Only the shut ones are stored, so an addon nobody has clicked this on carries
+no key at all.
+
+This is the half of SavedInstances' category config that is worth having
+without the config: seven groups against a window that shows about forty rows
+means the grid is a scroll, and a player who is looking at lockouts is not
+looking at professions. Shutting is in-place and reversible in one click, which
+a checkbox on another tab is not.
+
+**A shut group is not an empty one, and the count is what says so.** A header
+with a rule under it and nothing else is exactly what a group that turned out
+to have nothing looks like — and a group with nothing to say is not drawn at
+all (rule 2 above), so the two states must not render the same. `Roster.Lines`
+owns both, which is why the flattening moved out of `UI.lua` and into the
+model: the page slice and the shut set answer the same question about a row and
+about the header above it, and two copies of that rule is how a header outlives
+its last row.
 
 **The grid fits the warband, and the window resizes (unreleased).** Two fixed
 numbers remain, and only because the text decides them: a label column wide
