@@ -24,7 +24,7 @@ carries development planning a moderator would (fairly) read as unfinished.
 
 ### What it does
 
-Warband.pro Companion records a snapshot of each character as you play, and
+Warband.pro records a snapshot of each character as you play, and
 gives you every one of them back as a single copyable string.
 
 Log in on a character and the addon quietly stores what that character has. Log

@@ -1,15 +1,29 @@
-# Deploying Warband.pro Companion — all sites
+# Deploying Warband.pro — all sites
 
-This addon ships as **Warband.pro Companion** everywhere, pointing back to https://warband.pro.
+This addon ships as **Warband.pro** everywhere, pointing back to https://warband.pro.
 
 ## Name law
 
-- **Official name:** Warband.pro Companion
-- **Toc Title:** `Warband.pro Companion` (folder stays `WarbandPro` — WoW folder name rule)
-- **Package-as:** `WarbandPro` — zip name `WarbandPro-v1.0.0.zip` — WoW will still show "Warband.pro Companion" in addon list because Title in .toc wins.
-- **Short slug for managers:** WarbandPro or warband-pro-companion depending on site. CurseForge lets you pick display name independently — set display name to Warband.pro Companion.
+- **Official name:** Warband.pro
+- **Toc Title:** `Warband.pro` (folder stays `WarbandPro` — WoW folder name rule)
+- **Package-as:** `WarbandPro` — zip name `WarbandPro-v1.0.0.zip` — WoW will still show "Warband.pro" in addon list because Title in .toc wins.
+- **Slug on both stores:** `warband-pro` —
+  https://www.curseforge.com/wow/addons/warband-pro and
+  https://addons.wago.io/addons/warband-pro. CurseForge lets you pick display
+  name independently — set display name to Warband.pro.
 
-Why not rename folder to Companion? Existing installs would duplicate, SavedVariables would orphan, and managers key on folder name. Keeping WarbandPro folder with Companion title is how Altoholic, Rarity Companion etc do it.
+**The name is the site, and the addon is a companion to it — that is a sentence
+in the description, never part of the name.** It shipped as "Warband.pro
+Companion" from 1.0.0 until the rename, and the problem was not the length: an
+unrelated addon called **Warband Companion** already exists, so a player
+searching their manager got two results that read as the same thing. The word
+that disambiguates is `.pro`, and it only does that work when nothing follows
+it. Every "companion" line in this file is still correct — they describe what
+the addon is *for*, and none of them is the name.
+
+Why not rename the folder? Existing installs would duplicate, SavedVariables
+would orphan, and managers key on folder name. The folder has always been
+`WarbandPro` and the rename does not touch it, so an update is an update.
 
 ## One source, three sites
 
@@ -23,13 +37,13 @@ Toc now has placeholders `000000` — replace once you create projects. Release 
 
 ## Create projects (do once)
 
-1. **CurseForge:** New addon → name Warband.pro Companion, category Companion, game WoW Retail. Upload any zip manually first (validates). Copy Project ID from URL or About box → paste into toc `## X-Curse-Project-ID:`. Add `CF_API_KEY` secret in GitHub repo settings Secrets → Actions.
+1. **CurseForge:** New addon → name Warband.pro, category Companion, game WoW Retail. Upload any zip manually first (validates). Copy Project ID from URL or About box → paste into toc `## X-Curse-Project-ID:`. Add `CF_API_KEY` secret in GitHub repo settings Secrets → Actions.
 
-2. **Wago:** New → Addon → name Warband.pro Companion, link GitHub warband-pro/addon, category Utility. Copy slug ID from URL → `X-Wago-ID`. Add `WAGO_API_TOKEN`.
+2. **Wago:** New → Addon → name Warband.pro, link GitHub warband-pro/addon, category Utility. Copy slug ID from URL → `X-Wago-ID`. Add `WAGO_API_TOKEN`.
 
 3. **WoWI:** New addon → same name, category warband.pro. Copy ID → `X-WoWI-ID`. Token `WOWI_API_TOKEN`.
 
-Add all as same text `Warband.pro Companion` so managers dedupe.
+Add all as same text `Warband.pro` so managers dedupe.
 
 ## What players see
 
@@ -61,7 +75,7 @@ So both addon list tooltip (Notes field) and site pages reinforce companion natu
 - [ ] Secrets added: CF_API_KEY, WAGO_API_TOKEN, WOWI_API_TOKEN (any missing = site skipped, not failed)
 - [ ] Tag: `git tag -a v1.0.0 -m v1.0.0 && git push origin v1.0.0` OR Actions → Release → Run workflow → 1.0.0
 - [ ] Verify GitHub Release has zip `WarbandPro-v1.0.0.zip` + notes from changelog
-- [ ] Verify CF / Wago / WoWI listings show "Warband.pro Companion" not just WarbandPro, description points to https://warband.pro, external link present
+- [ ] Verify CF / Wago / WoWI listings show "Warband.pro" not just WarbandPro, description points to https://warband.pro, external link present
 - [ ] After publish, install via CurseForge app / WowUp from each site once to confirm zip loads and `/warband` opens without needing /reload second time.
 
 ## Post-launch trim (shipping light)
@@ -79,8 +93,8 @@ Every public place must say companion, not standalone tracker:
 - Wago summary same.
 - WoWI description same.
 - In-game Notes field: "Companion for warband.pro —"
-- On warband.pro site: /addon or /settings/import mentions "install the Warband.pro Companion addon"
+- On warband.pro site: /addon or /settings/import mentions "install the Warband.pro addon"
 
 No place says "Warband.pro is an addon" — it's the site. Addon is companion.
 
-Source: README.md line 1 says # Warband.pro Companion, toc Title same. Keep them in sync.
+Source: README.md line 1 says # Warband.pro, toc Title same. Keep them in sync.

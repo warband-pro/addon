@@ -1,6 +1,6 @@
 # Changelog
 
-Release notes for Warband.pro Companion. This is what players read, not the commit log.
+Release notes for Warband.pro. This is what players read, not the commit log.
 
 **One section goes out, not this file.** `tools/notes.mjs` cuts the section matching the tag out of here, and the release workflow hands the packager that and nothing else — so the GitHub release body, the CurseForge and Wago description and the Discord embed all carry one version's notes. See exactly what will publish:
 
@@ -44,6 +44,18 @@ they are in [docs/CONTRACT.md](docs/CONTRACT.md), which is law for this repo and
 MAJOR has to be a wire break.**
 
 ## [Unreleased]
+
+### Changed
+
+**The addon is now called Warband.pro, not Warband.pro Companion.** There is
+already an unrelated addon named Warband Companion, so the two sat next to each
+other in every addon manager's search results reading as the same thing. The
+name in your addon list, the window title, the minimap tooltip and the Key
+Bindings section all say `Warband.pro` now — so if you had the export bound to a
+key, that section moved and the binding itself did not. Nothing else changed:
+same folder, same `WarbandProDB`, same `/warband`, same saved data, and the
+update installs over what you have. It is still the companion to warband.pro;
+that is what it does rather than what it is called.
 
 ## [1.13.0] — 2026-09-06 — fold away the part of the grid you are not reading
 

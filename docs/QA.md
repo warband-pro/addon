@@ -68,7 +68,7 @@ meet a live client is this list. So run it, do not skim it.
 - [ ] Options > Show the minimap button, uncheck — icon goes; check — it returns to the same spot
 - [ ] /warband minimap off, then on — same result, and chat says which
 - [ ] Enter combat and click the icon — chat says it will open when you drop out, and it does
-- [ ] Key Bindings has a section "Warband.pro Companion" with one row, "Open the export window", unbound
+- [ ] Key Bindings has a section "Warband.pro" with one row, "Open the export window", unbound
 - [ ] Bind it and press — window opens on the export tab; press again — closes
 - [ ] No LUA_WARNING about Bindings.xml at login, and BugSack is empty
 

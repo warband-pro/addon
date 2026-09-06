@@ -191,7 +191,7 @@ project is created:
 
 ```
 ## X-Curse-Project-ID: 000000
-## X-Wago-ID: RNLkzbGo  (warband-pro-companion)
+## X-Wago-ID: RNLkzbGo  (warband-pro)
 ## X-WoWI-ID: 00000
 ```
 

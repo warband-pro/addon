@@ -1,4 +1,4 @@
-# Warband.pro Companion
+# Warband.pro
 
 [![CI](https://github.com/warband-pro/addon/actions/workflows/ci.yml/badge.svg)](https://github.com/warband-pro/addon/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -72,7 +72,7 @@ Single-line hash, not human-readable on purpose: `wb1!<base64url(deflate(json))>
 
 ## Install
 
-**Release (once live):** CurseForge, Wago, WoWI — search "Warband.pro Companion" in your manager (CurseForge app, WowUp, etc).
+**Release:** [CurseForge](https://www.curseforge.com/wow/addons/warband-pro) or [Wago](https://addons.wago.io/addons/warband-pro) — or search "Warband.pro" in your manager (CurseForge app, WowUp, etc). The unrelated **Warband Companion** is a different addon; the one you want is the one whose name ends in `.pro`.
 
 **Pre-release test:** Actions → CI → latest main run → Artifacts → `WarbandPro-<sha>.zip` — unzip into `_retail_/Interface/AddOns/`.
 
@@ -149,4 +149,4 @@ Locked: multi-char default ✓, staleness per-section stamps ✓, retail Midnigh
 Open 4 before 1.0: itemName in bundle or id-only + Game Data lookup?, warbank stamp shared vs per-char?, recipe totalRecipes static fetch?, CF vs Wago first? — minimap settled in 1.5.0: on by default, hand-built, no LibDBIcon.
 
 ---
-Next: scaffold toc+init skeleton done, addon+import sink patch live — prompt ready in docs/PROMPT.md. All deploys target "Warband.pro Companion" pointing to [warband.pro](https://warband.pro).
+Next: scaffold toc+init skeleton done, addon+import sink patch live — prompt ready in docs/PROMPT.md. All deploys target "Warband.pro" pointing to [warband.pro](https://warband.pro).
