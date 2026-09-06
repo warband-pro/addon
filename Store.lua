@@ -310,6 +310,24 @@ function Store.DropJunk(removedGuids)
   end
 end
 
+-- One orphan rule, two callers. The warbank tabs are account-wide and survive
+-- a Forget or a Prune, but the "seen by <deleted char>" attribution must not —
+-- a dangling seenByGuid points at nothing.
+local function clearOrphans(removedGuids)
+  local wb = Store.db.warbandBank
+  if not wb then return false end
+  if wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
+    wb.seenByGuid = nil
+    wb.seenByName = nil
+    return true
+  end
+  if not wb.seenByGuid and wb.seenByName then
+    wb.seenByName = nil
+    return true
+  end
+  return false
+end
+
 function Store.Forget(name)
   if not Store.Ready() or type(name) ~= "string" or name == "" then return 0 end
   local want, removed = name:lower(), 0
@@ -321,18 +339,7 @@ function Store.Forget(name)
       removed = removed + 1
     end
   end
-  local wb = Store.db.warbandBank
-  local cleared = false
-  if wb then
-    if wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
-      wb.seenByGuid = nil
-      wb.seenByName = nil
-      cleared = true
-    elseif not wb.seenByGuid and wb.seenByName then
-      wb.seenByName = nil
-      cleared = true
-    end
-  end
+  local cleared = clearOrphans(removedGuids)
   if removed > 0 or cleared then
     Store.DropJunk(removedGuids)
     Store.Touch()
@@ -358,18 +365,7 @@ function Store.Prune()
       removed = removed + 1
     end
   end
-  local wb = Store.db.warbandBank
-  local cleared = false
-  if wb then
-    if wb.seenByGuid and (removedGuids[wb.seenByGuid] or not Store.db.chars[wb.seenByGuid]) then
-      wb.seenByGuid = nil
-      wb.seenByName = nil
-      cleared = true
-    elseif not wb.seenByGuid and wb.seenByName then
-      wb.seenByName = nil
-      cleared = true
-    end
-  end
+  local cleared = clearOrphans(removedGuids)
   Store.DropJunk(removedGuids)
   if removed > 0 or cleared then
     Store.Touch()
