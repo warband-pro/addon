@@ -247,45 +247,54 @@ end
 
 --- Every saved loadout this spec has, merged into what is already stored.
 ---
---- **Two mechanisms, and the second is the one that makes this reliable.**
+--- **Enumeration is the whole list, and it is the only thing that may write to
+--- it.** `C_ClassTalents.GetConfigIDsBySpecID` names the player's saved
+--- loadouts and `C_Traits.GenerateImportString` is asked for each, so all three
+--- of somebody's raid/M+/delve builds arrive in one pass and warband.pro has
+--- them the first time they paste.
 ---
---- 1. *Enumeration.* `C_ClassTalents.GetConfigIDsBySpecID` lists the player's
----    saved loadouts and `C_Traits.GenerateImportString` is asked for each.
----    When that works, all three of somebody's raid/M+/delve builds arrive in
----    one pass and warband.pro has them the first time they paste.
---- 2. *Accumulation.* The loadout the player is actually ON is recorded every
----    time, name included. This is the guarantee: it uses only the call this
----    file has always made successfully, so even if `GenerateImportString`
----    turns out to refuse an inactive config, the list still fills in as the
----    player switches builds — the same snapshot-accumulates model that fills
----    `specs` across a spec switch.
+--- **This file used to record the active config as a fourth build, and that was
+--- wrong.** `GetActiveConfigID` does not return a saved loadout — it returns the
+--- config the player is playing, which the client names after the
+--- specialization. So a Protection paladin's shelf came out as `Raid`, `M+`,
+--- `Delve` and `Protection`, and the fourth one is a build the talent UI never
+--- shows them. The starter build is the same shape and goes the same way: it is
+--- not in the enumeration, so it is not on the wire.
 ---
---- The uncertainty is real and unmeasured — nothing in this container runs the
---- client — so the design does not depend on resolving it. Enumeration is an
---- accelerator; accumulation is the floor. If (1) never returns anything, this
---- is strictly better than what came before and nothing regresses.
+--- That `put` was there as a floor, against the possibility that
+--- `GenerateImportString` refuses a config that is not active — unmeasured when
+--- it was written, because nothing in this container runs the client.
+--- **Measured 2026-09-07** on a live retail client: one pass returned all three
+--- saved builds *with* their strings, and the only thing the floor added was
+--- the spec-named entry. It is gone rather than guarded, because the case it
+--- was built for needs nothing: a client that refuses inactive configs still
+--- answers for the active one, and the active one is in the enumeration
+--- whenever it is a build the player saved. Enumeration failing at all now
+--- yields no named builds rather than one wrong one, and `found.loadout` beside
+--- this is untouched — that field is the active build's string and always was.
 ---
 --- A read that fails leaves the stored value alone rather than clearing it,
 --- which is Store.Put's rule and matters more here than anywhere: a player who
 --- logs in, gets a failed read, and pastes must not lose the three loadouts
 --- they captured last week.
 ---
---- **Accumulation is why a deleted build has to be actively removed.** Nothing
---- else in this file ever needs to: a spec the player abandons is still a spec
---- they have, so `specs` only ever grows honestly. A loadout is the opposite —
---- the player deletes it in the talent UI and it is gone, and a list that only
---- merges keeps offering it to warband.pro forever. That is what a player sees
---- as builds in the website's dropdown that the game does not show them.
+--- **A deleted build has to be actively removed.** Nothing else in this file
+--- ever needs to: a spec the player abandons is still a spec they have, so
+--- `specs` only ever grows honestly. A loadout is the opposite — the player
+--- deletes it in the talent UI and it is gone, and a list that only merges
+--- keeps offering it to warband.pro forever. That is what a player sees as
+--- builds in the website's dropdown that the game does not show them.
 ---
 --- The removal rides on enumeration and nothing else, because enumeration is
---- the only read that can distinguish "deleted" from "not observed yet".
---- Accumulation cannot: it says which build is on, never which builds are all
---- of them. So a pass with no enumeration prunes nothing and behaves exactly
---- as it did before. An **empty** enumeration prunes nothing either — the
---- player always has an active config, so an empty list is far likelier to be
---- a not-yet-loaded read than a genuinely empty shelf, and pruning on it would
---- wipe the accumulated list at the one moment the evidence is weakest.
-local function captureLoadouts(found, specID, activeConfigID, activeName, activeString)
+--- the only read that claims to be the whole shelf. So a pass with no
+--- enumeration prunes nothing and behaves exactly as it did before. An
+--- **empty** enumeration prunes nothing either — the player always has an
+--- active config, so an empty list is far likelier to be a not-yet-loaded read
+--- than a genuinely empty shelf, and pruning on it would wipe the stored list
+--- at the one moment the evidence is weakest. Nothing is exempt from that
+--- sweep any more, which is how the spec-named entry leaves a saved DB that
+--- already has one.
+local function captureLoadouts(found, specID)
   local ct, tr = C_ClassTalents, C_Traits
   found.loadouts = found.loadouts or {}
   local list = found.loadouts
@@ -311,16 +320,19 @@ local function captureLoadouts(found, specID, activeConfigID, activeName, active
   if ct and tr then ids = ns.safe(ct.GetConfigIDsBySpecID, specID) end
   local enumerated = type(ids) == "table" and #ids > 0
 
+  -- What the client currently calls a saved build, and the only reason an
+  -- entry is on the wire at all.
+  local saved = {}
+  if enumerated then
+    for _, id in ipairs(ids) do saved[id] = true end
+  end
+
   -- (2) Builds the player has deleted, dropped before anything is added — a
   -- list already at MAX_LOADOUTS must have room for what is still real, or the
   -- cap would hold stale entries in place against their replacements.
   if enumerated then
-    local live = {}
-    for _, id in ipairs(ids) do live[id] = true end
-    -- The active config need not be a saved loadout, so it is never pruned.
-    if type(activeConfigID) == "number" then live[activeConfigID] = true end
     for i = #list, 1, -1 do
-      if not live[list[i].id] then table.remove(list, i) end
+      if not saved[list[i].id] then table.remove(list, i) end
     end
   end
 
@@ -335,8 +347,6 @@ local function captureLoadouts(found, specID, activeConfigID, activeName, active
     end
   end
 
-  -- (3) The one the player is on, which is the read that has always worked.
-  put(activeConfigID, activeName, activeString)
 end
 
 -- Only the active spec's loadout is readable at any moment, so entries
@@ -385,11 +395,7 @@ function Gear.Talents()
   -- `loadout` above stays exactly as it was — it is what the website's
   -- resolveTalents reads, and this must not move underneath it. `loadouts` is
   -- additive beside it.
-  local activeName = ns.safe(function()
-    local cfg = C_Traits and C_Traits.GetConfigInfo(configID)
-    return type(cfg) == "table" and cfg.name or nil
-  end)
-  captureLoadouts(found, info.id, configID, activeName, loadout)
+  captureLoadouts(found, info.id)
   found.seenAt = ns.now()
 
   local now = ns.now()

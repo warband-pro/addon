@@ -57,6 +57,16 @@ same folder, same `WarbandProDB`, same `/warband`, same saved data, and the
 update installs over what you have. It is still the companion to warband.pro;
 that is what it does rather than what it is called.
 
+### Fixed
+
+**A build named after your spec stops showing up on warband.pro.** If you play
+Protection, the site listed a fourth build called `Protection` beside the ones
+you saved, and there was nothing in the talent UI to delete because you never
+made it — it was the config you are currently playing, which the game names
+after your spec, and the addon was exporting it as though you had saved it.
+Only the builds the talent UI lists go out now, so the starter build stays out
+too. One export after updating clears the extra one off your character page.
+
 ## [1.13.0] — 2026-09-06 — fold away the part of the grid you are not reading
 
 ### Added
