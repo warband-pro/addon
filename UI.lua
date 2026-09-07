@@ -488,10 +488,15 @@ local function renderGearRows(r)
       w.s = d.s
       w.icon:SetTexture(icon or ns.ICON)
       w.slot:SetText(d.name)
-      w.label:SetText(format("|cff%s%s|r%s",
+      -- Name, then the client's item level, then — when the site sent one —
+      -- its estimated gain, in the good tone because a row here is a swap
+      -- the site is proposing and the figure is why.
+      local gain = ns.GearSet.GainText(d)
+      w.label:SetText(format("|cff%s%s|r%s%s",
         name and hex or MUTED,
         name or (d.id and ("item " .. d.id) or "?"),
-        ilvl and format("  |cff%s%d|r", MUTED, ilvl) or ""))
+        ilvl and format("  |cff%s%d|r", MUTED, ilvl) or "",
+        gain ~= "" and format("  |cff%s%s|r", GOOD, gain) or ""))
       local text, tone = ns.GearSet.StateText(d)
       w.state:SetText(format("|cff%s%s|r", GS_TONE[tone] or MUTED, text))
       w:Show()
@@ -689,7 +694,13 @@ function UI.RenderGearSet()
   end
   renderGearRows(r)
   local parts = {}
-  if #r.ready > 0 then parts[#parts + 1] = format("%d to equip", #r.ready) end
+  if #r.ready > 0 then
+    -- What the button is worth, when the site priced it: the same figure the
+    -- rows carry, summed over the ones the button will actually equip.
+    local gain = ns.GearSet.Gain(r)
+    parts[#parts + 1] = format("%d to equip%s", #r.ready,
+      gain and format("  |cff%s%s|r", GOOD, ns.GearSet.GainText({ g = gain })) or "")
+  end
   if #r.already > 0 then parts[#parts + 1] = format("|cff%s%d already worn|r", MUTED, #r.already) end
   if #r.missing > 0 then
     local bank = 0

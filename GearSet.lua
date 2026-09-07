@@ -294,7 +294,9 @@ function GearSet.Resolve()
         -- The wire's own fields ride along with the live coordinates: the
         -- Import tab's rows ask an item's icon by `id` before the client has
         -- its name, and a row is the same shape whichever bucket it is in.
-        ready[#ready + 1] = { slot = it.slot, s = it.s, id = it.id, w = it.w, bag = found.bag, bagSlot = found.slot }
+        ready[#ready + 1] = {
+          slot = it.slot, s = it.s, id = it.id, w = it.w, g = it.g, bag = found.bag, bagSlot = found.slot,
+        }
       else
         missing[#missing + 1] = it
       end
@@ -361,6 +363,7 @@ function GearSet.Rows(r)
         s = it.s,
         id = it.id,
         w = it.w,
+        g = it.g,
         state = state,
       }
     end
@@ -386,6 +389,37 @@ function GearSet.StateText(row)
   if row.state == "ready" then return "in bags", "good" end
   if row.w == "bank" or row.w == "warbank" then return "in your bank", "warn" end
   return "not in your bags", "warn"
+end
+
+--- The site's estimated gain for a row, as it prints — `+2.1% est.` — or ""
+--- when the wire carried none. The number is the website's, made against
+--- SimulationCraft's season tables, and the suffix is what says so; this
+--- side formats it and never computes, ranks or acts on it. Tenths of a
+--- percent on the wire so the JSON stays free of floats.
+function GearSet.GainText(row)
+  local g = row and row.g
+  if type(g) ~= "number" then return "" end
+  g = math.floor(g + 0.5)
+  local sign = g < 0 and "-" or "+"
+  local abs = math.abs(g)
+  return string.format("%s%d.%d%% est.", sign, math.floor(abs / 10), abs % 10)
+end
+
+--- What equipping the ready rows is worth, summed, in tenths of a percent —
+--- or nil when none of them carried a gain. Ready rows only: the worn ones
+--- are already on, and a total that counted them would promise a gain the
+--- player already has.
+function GearSet.Gain(r)
+  if not r then return nil end
+  local total, any = 0, false
+  for _, it in ipairs(r.ready or {}) do
+    if type(it.g) == "number" then
+      total = total + it.g
+      any = true
+    end
+  end
+  if not any then return nil end
+  return math.floor(total + 0.5)
 end
 
 --- How short a set name is retried down to before giving up. Each step is one

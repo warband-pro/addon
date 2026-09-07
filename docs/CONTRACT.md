@@ -850,6 +850,7 @@ one direction is not a break in the others.
 | `items[].id` | Item id, display and sanity. Optional. |
 | `items[].s` | **The identity key.** The verbatim item string, as `gear[]` sent it. An entry without one is dropped at decode. |
 | `items[].w` | Where the site last saw the item (`bag`/`bank`/`warbank`). Optional — it powers the "in your bank — retrieve it first" line when the item is not in the carried bags. |
+| `items[].g` | The site's estimated gain for the swap, in **tenths of a percent** (`21` prints as `+2.1% est.`), made against its season SimulationCraft tables. Optional, **display only**: the Import tab prints it beside the row and sums it in the status line, and nothing here ranks or acts on it. Not the same field as the clear-out list's `g` (item levels behind), which is scoped to `r == "gap"`. Added 2026-09-07; an older client drops it and draws what it drew before. |
 
 **Only the slots that change ride the wire.** Slots the solve left alone are
 omitted: `C_EquipmentSet.SaveEquipmentSet` snapshots the live paperdoll, so

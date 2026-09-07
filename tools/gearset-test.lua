@@ -318,6 +318,20 @@ check("missing with no bank hint says the bags", stateOf({ state = "missing" }) 
 check("a slot the table does not know still gets a name", GearSet.Rows({ already = { { slot = 99, s = "x" } } })[1].name
   == "slot 99")
 
+-- ── the site's estimated gain rides display-only ────────────────────────────
+-- `g` is tenths of a percent, the website's own estimate against its season
+-- sim tables. This side prints it and never ranks or acts on it; a wire
+-- without it draws exactly what it drew before.
+
+check("a row carries the wire's gain", GearSet.Rows({ ready = { { slot = 1, s = "x", g = 21 } } })[1].g == 21)
+check("a gain prints as a percentage with the site's suffix", GearSet.GainText({ g = 21 }) == "+2.1% est.")
+check("a negative gain keeps its sign", GearSet.GainText({ g = -4 }) == "-0.4% est.")
+check("a whole percent still shows its tenth", GearSet.GainText({ g = 120 }) == "+12.0% est.")
+check("no gain on the wire, no text", GearSet.GainText({}) == "" and GearSet.GainText(nil) == "")
+check("the set's gain sums only what the button will equip",
+  GearSet.Gain({ ready = { { g = 21 }, { g = 5 } }, already = { { g = 100 } } }) == 26)
+check("a set with nothing priced has no gain", GearSet.Gain({ ready = { {} } }) == nil and GearSet.Gain(nil) == nil)
+
 -- ── apply: equips land before the save, and the save snapshots after ────────
 
 ORDER = {}
