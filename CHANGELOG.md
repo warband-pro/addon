@@ -45,6 +45,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.14.0] — 2026-09-07 — the set you pasted says what each piece is worth
+
 ### Added
 
 **The set you pasted says what each piece is worth.** Beside every row on the
