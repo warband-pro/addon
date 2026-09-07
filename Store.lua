@@ -288,24 +288,30 @@ end
 -- Account-wide orphan guard: if the forgotten character was the one who last
 -- saw the warbank, clear the attribution — the vault tabs are account-wide
 -- and remain, but "by Vocnar" must not point at a deleted GUID.
---- Drop stored cleanup lists for characters that no longer exist.
+--- Drop stored inbox entries for characters that no longer exist.
 ---
---- A junk list is keyed by guid like everything else, so forgetting a character
---- without this leaves a list nothing can ever render and nothing can ever
---- clear — the same orphan the warband bank's attribution would become, handled
---- in the same two places for the same reason.
-function Store.DropJunk(removedGuids)
+--- The junk list and the pasted gear-set record are both keyed by guid like
+--- everything else, so forgetting a character without this leaves entries
+--- nothing can ever render and nothing can ever clear — the same orphan the
+--- warband bank's attribution would become, handled in the same two places
+--- for the same reason. Worse than invisible: a re-scanned character would
+--- resurrect its stale pasted set and /warband equip would act on it.
+function Store.DropInbox(removedGuids)
   local db = Store.db
-  local junk = db and db.junk
-  if not junk then return end
-  if removedGuids then
-    for guid in pairs(removedGuids) do
-      junk[guid] = nil
-    end
-  end
-  for guid in pairs(junk) do
-    if not db.chars[guid] then
-      junk[guid] = nil
+  if not db then return end
+  for _, key in ipairs({ "junk", "gearset" }) do
+    local inbox = db[key]
+    if inbox then
+      if removedGuids then
+        for guid in pairs(removedGuids) do
+          inbox[guid] = nil
+        end
+      end
+      for guid in pairs(inbox) do
+        if not db.chars[guid] then
+          inbox[guid] = nil
+        end
+      end
     end
   end
 end
@@ -341,7 +347,7 @@ function Store.Forget(name)
   end
   local cleared = clearOrphans(removedGuids)
   if removed > 0 or cleared then
-    Store.DropJunk(removedGuids)
+    Store.DropInbox(removedGuids)
     Store.Touch()
   end
   return removed
@@ -366,7 +372,7 @@ function Store.Prune()
     end
   end
   local cleared = clearOrphans(removedGuids)
-  Store.DropJunk(removedGuids)
+  Store.DropInbox(removedGuids)
   if removed > 0 or cleared then
     Store.Touch()
   end

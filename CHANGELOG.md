@@ -45,6 +45,10 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+**A forgotten character's pasted gear set is dropped with its junk list.** Forgetting a character cleared its junk list but left its pasted gear-set record behind, so a re-scan resurrected the stale set and `/warband equip` would act on it. The same purge now covers both.
+
 ## [1.14.0] — 2026-09-07 — the set you pasted says what each piece is worth
 
 ### Added
