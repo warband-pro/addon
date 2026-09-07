@@ -445,6 +445,11 @@ end
 --- `s` is the identity, `slot` is the destination. A real slot only: 1-17
 --- minus 4 (shirt) — the collapsed representatives gear[] uses outbound are
 --- never valid here, and 18/19 hold nothing equippable this addon should touch.
+---
+--- `g` is display only: the site's estimated gain for the swap, in tenths of
+--- a percent, printed beside the row and never acted on. A build that does
+--- not know it drops it and shows what it showed before — the additive
+--- direction `sets` established, and the opposite of the rejected `keep`.
 function Import.GearSetItems(raw)
   local items, n = {}, 0
   if type(raw) ~= "table" then return items end
@@ -458,6 +463,7 @@ function Import.GearSetItems(raw)
         s = it.s,
         id = type(it.id) == "number" and it.id or nil,
         w = type(it.w) == "string" and it.w or nil,
+        g = type(it.g) == "number" and it.g or nil,
       }
     end
   end

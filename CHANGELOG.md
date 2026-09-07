@@ -45,6 +45,16 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**The set you pasted says what each piece is worth.** Beside every row on the
+From warband.pro tab, and in the line that counts what the button will do, the
+site's own estimate now shows — `+2.1% est.` on a ring, `3 to equip +4.6%
+est.` on the set. The figure is warband.pro's, made against SimulationCraft's
+tables for the season, and the addon only prints it: nothing here ranks your
+gear or decides for you. A string from an older site build carries no figure
+and the tab looks exactly as it did.
+
 ### Changed
 
 **The addon is now called Warband.pro, not Warband.pro Companion.** There is
