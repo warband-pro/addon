@@ -217,10 +217,11 @@ eq(a and a.classID, 4, "the memo holds classID from position 6")
 eq(a and a.subclassID, 1, "the memo holds subclassID from position 7")
 
 -- ── saved talent loadouts ───────────────────────────────────────────────────
--- Two mechanisms and the second is the floor: enumeration fills the list at
--- once when the client allows it, and the loadout the player is ON is recorded
--- every pass regardless. These tests exercise both, and the case that matters
--- most is enumeration failing entirely.
+-- Enumeration is the only writer: a build is on the wire because
+-- GetConfigIDsBySpecID lists it, and for no other reason. The two cases worth
+-- holding are a client that will not serialize an inactive config — names
+-- still arrive, strings fill in as the player switches — and the config the
+-- player is *on*, which is not a saved build and must not look like one.
 
 local CHAR
 ns.Store.Char = function() return CHAR end
@@ -272,8 +273,8 @@ eq(#loadouts(), 3, "enumeration captures every saved loadout in one pass")
 eq(byName("M+") and byName("M+").s, "MPLUSSTR", "each carries its own import string")
 eq(byName("Raid") and byName("Raid").id, 1, "each carries its config id")
 
--- The case the design is actually built for: the client refuses to serialize
--- anything but the active config. The active one must still land.
+-- The client refuses to serialize anything but the active config. Every build
+-- is still named, and the active one still carries its string.
 freshChar()
 CONFIGS = { ids = { 1, 2, 3 }, names = { [1] = "Raid", [2] = "M+", [3] = "Delve" } }
 STRINGS = { [1] = "RAIDSTR" }
@@ -282,7 +283,7 @@ ns.Gear.Talents()
 eq(byName("Raid") and byName("Raid").s, "RAIDSTR", "the active loadout lands even when the others refuse")
 check(byName("M+") and byName("M+").s == nil, "a refused loadout is named but carries no string")
 
--- …and switching to it later fills it in, which is the accumulate guarantee.
+-- …and switching to it later fills it in, one build at a time.
 ACTIVE_CONFIG = 2
 STRINGS = { [2] = "MPLUSSTR" }
 ns.Gear.Talents()
@@ -291,22 +292,29 @@ eq(byName("Raid") and byName("Raid").s, "RAIDSTR", "and the one captured earlier
 eq(#loadouts(), 3, "still three, merged by config id rather than appended")
 
 -- Enumeration absent entirely — an older client, or an API that is not there.
+-- Nothing is named, which is the honest answer: the active config is not a
+-- saved build, and offering it as one is the bug this replaced.
 freshChar()
 CONFIGS = { ids = nil, names = {} }
 STRINGS = { [7] = "ONLYSTR" }
 ACTIVE_CONFIG = 7
 ns.Gear.Talents()
-eq(#loadouts(), 1, "with no enumeration at all the active loadout is still captured")
-eq(loadouts()[1].s, "ONLYSTR", "and carries its string")
+eq(#loadouts(), 0, "with no enumeration there are no named builds rather than a wrong one")
 
--- The field the website already depends on must not move.
+-- The field the website already depends on must not move — it is the active
+-- build's string, and it lands whether or not anything could be enumerated.
 eq(CHAR.talents.specs[1].loadout, "ONLYSTR", "the active `loadout` field is unchanged")
 eq(CHAR.talents.activeSpecID, 73, "and activeSpecID still rides")
 
 -- A failed read never clears what is stored.
+freshChar()
+CONFIGS = { ids = { 1 }, names = { [1] = "Raid" } }
+STRINGS = { [1] = "RAIDSTR" }
+ACTIVE_CONFIG = 1
+ns.Gear.Talents()
 STRINGS = {}
 ns.Gear.Talents()
-eq(loadouts()[1].s, "ONLYSTR", "a failed read leaves the stored string alone")
+eq(byName("Raid") and byName("Raid").s, "RAIDSTR", "a failed read leaves the stored string alone")
 
 -- The ceiling holds.
 freshChar()
@@ -341,24 +349,37 @@ eq(#loadouts(), 2, "a build deleted in the talent UI is dropped, not kept foreve
 eq(byName("M+"), nil, "and it is the deleted one that went")
 eq(byName("Raid") and byName("Raid").s, "RAIDSTR", "the survivors keep their strings")
 
--- The active config is not necessarily a saved loadout, so it never prunes.
+-- ── the config the player is on is not a build they saved ───────────────────
+-- GetActiveConfigID answers with the config being played, which the client
+-- names after the specialization. Storing it put a `Protection` on the shelf
+-- of every Protection character, and the talent UI has no such build to delete.
 ACTIVE_CONFIG = 9
 STRINGS = { [1] = "RAIDSTR", [3] = "DELVESTR", [9] = "ACTIVESTR" }
-CONFIGS.names[9] = "Scratch"
+CONFIGS.names[9] = "Protection"
 ns.Gear.Talents()
-eq(byName("Scratch") and byName("Scratch").s, "ACTIVESTR", "the build being worn survives enumeration")
+eq(byName("Protection"), nil, "the spec-named active config is not offered as a saved build")
+eq(#loadouts(), 2, "the shelf is still the builds the game lists")
+
+-- A saved DB written before this fix carries that entry already, and nothing
+-- is exempt from the sweep any more, so the next scan is what removes it.
+local stale = loadouts()
+stale[#stale + 1] = { id = 9, name = "Protection", s = "ACTIVESTR", seenAt = 1723999999 }
+eq(#loadouts(), 3, "a stale entry from an older version starts out stored")
+ns.Gear.Talents()
+eq(byName("Protection"), nil, "and one pass sweeps it out")
+eq(#loadouts(), 2, "leaving the two the game lists")
 
 -- No enumeration at all prunes nothing — the pass behaves as it always did.
 CONFIGS = { ids = nil, names = {} }
 STRINGS = {}
 ns.Gear.Talents()
-eq(#loadouts(), 3, "a pass without enumeration leaves the stored list alone")
+eq(#loadouts(), 2, "a pass without enumeration leaves the stored list alone")
 
 -- An empty enumeration is far likelier to be a not-yet-loaded read than an
 -- empty shelf, and wiping the list on it would be the costliest way to be wrong.
 CONFIGS = { ids = {}, names = {} }
 ns.Gear.Talents()
-eq(#loadouts(), 3, "an empty enumeration is treated as no evidence, not as zero builds")
+eq(#loadouts(), 2, "an empty enumeration is treated as no evidence, not as zero builds")
 
 -- Pruning runs before anything is added, so a full list has room for a real
 -- build rather than holding a deleted one in place against it.

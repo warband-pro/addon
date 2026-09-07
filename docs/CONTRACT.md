@@ -466,32 +466,42 @@ whatever was stored alone rather than clearing it, so an entry can carry a name
 with no string, or a string with no name, until a later pass fills the other
 in. A consumer must treat a missing `s` as "not readable yet", never as empty.
 
-The list is built by two mechanisms and **only the second is guaranteed**:
+**`C_ClassTalents.GetConfigIDsBySpecID` is the only thing that puts an entry
+on this list**, with `C_Traits.GenerateImportString` asked per config. When
+that read works every build arrives in one pass; when it does not, the list
+does not grow. The website must therefore be correct with a partial list — and
+with an empty one — and must not assume three entries because it names three
+content types.
 
-1. *Enumeration* — `C_ClassTalents.GetConfigIDsBySpecID` lists the saved
-   loadouts and `C_Traits.GenerateImportString` is asked for each. When this
-   works, every build arrives in one pass.
-2. *Accumulation* — the build the player is actually on is recorded every scan,
-   name included, using only the call this addon has always made successfully.
+**The config the player is *on* is not one of these.** `GetActiveConfigID`
+answers with the config being played, and the client names it after the
+specialization, so recording it put a `Protection` beside a Protection
+character's real `Raid`/`M+`/`Delve` — a build warband.pro offered and the
+talent UI had no way to delete. It was recorded anyway, as a floor against the
+possibility that `GenerateImportString` refuses an inactive config.
+That possibility was unmeasured when it was written; **measured 2026-09-07** on
+a live retail client, one pass returned all three saved builds with their
+strings and the only thing the floor added was the spec-named entry. The floor
+is gone, and the case it was built for needs nothing: a client that refuses
+inactive configs still answers for the active one, which is in the enumeration
+whenever it is a build the player saved. The starter build is excluded by the
+same rule and for the same reason — it is not in the enumeration.
 
-Whether the client will serialize a config that is not active is **unmeasured**
-— nothing in CI runs the game — so the format does not depend on the answer.
-If (1) returns nothing, `loadouts` still fills in as the player switches
-between their builds, the same way `specs` fills in across a spec switch. The
-website must therefore be correct with a partial list, and must not assume
-three entries because it names three content types.
+`loadout` above is unaffected and always was: it is the active build's string,
+read directly, and it lands whether or not anything could be enumerated.
 
 **Unlike `specs`, this list also shrinks.** A spec the player abandons is still
 a spec they have, but a loadout they delete in the talent UI is gone, and until
 1.12.1 nothing removed it — it kept riding the wire and warband.pro kept
-offering builds the game no longer showed. An entry is dropped when (1) returns
-a non-empty list that does not name its `id`. Only enumeration can prune,
-because only enumeration claims to be the whole shelf: accumulation says which
-build is on, never which builds are all of them. So a scan with no enumeration,
-or one whose enumeration comes back empty, removes nothing — the player always
-has an active config, so an empty list reads as "not loaded yet", not "no
-builds". The build the player is currently on is never pruned, because the
-active config need not itself be a saved loadout.
+offering builds the game no longer showed. An entry is dropped when enumeration
+returns a non-empty list that does not name its `id`. Only enumeration can
+prune, because only enumeration claims to be the whole shelf. So a scan with no
+enumeration, or one whose enumeration comes back empty, removes nothing — the
+player always has an active config, so an empty list reads as "not loaded yet",
+not "no builds". **Nothing is exempt from that sweep**, which is how the
+spec-named active config leaves a saved DB written by an older version. It was
+exempt, on the reasoning that the active config need not be a saved loadout —
+which is exactly why it should never have been stored.
 
 At most `ns.MAX_LOADOUTS` (8) entries are kept per spec, oldest-capped rather
 than evicted: past the cap a new config id is dropped and existing entries keep
