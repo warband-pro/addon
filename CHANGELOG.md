@@ -82,6 +82,12 @@ and equips the gear in one press. It does not change your specialization —
 a setup applies to the spec you are standing in, and asking for another spec's
 set still says so and does nothing.
 
+**Combat logging can turn itself on in raids.** Off by default, in Options:
+with it on, `/combatlog` starts when you zone into a raid and stops when you
+leave, so a Warcraft Logs upload has the pulls in it. Raids only. It stays off
+unless you ask because it writes a file that grows with every pull, and that is
+not a cost to hand somebody who never wanted it.
+
 **The paste now carries a shopping list.** Gems and enchants the solved set
 wants and you do not have show under the set on the From warband.pro tab —
 one row per thing to buy, with how many and which slots want them, so four

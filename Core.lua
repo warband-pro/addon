@@ -26,6 +26,7 @@ local EVENTS = {
   "WEEKLY_REWARDS_UPDATE", "CHALLENGE_MODE_COMPLETED",
   "MAIL_INBOX_UPDATE", "OWNED_AUCTIONS_UPDATED",
   "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED",
+  "PLAYER_DIFFICULTY_CHANGED",
   "SKILL_LINES_CHANGED",
   "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED",
   "PLAYER_EQUIPMENT_CHANGED", "PLAYER_AVG_ITEM_LEVEL_UPDATE",
@@ -87,6 +88,10 @@ handlers.PLAYER_ENTERING_WORLD = function()
     Scan.Money()
     Instances.Request()
   end)
+  -- Zoning is the event that decides whether you are in a raid, so it is the
+  -- one that turns combat logging on and off. Throttled with everything else
+  -- that fires on a loading screen.
+  ns.throttle("combatlog", 2, ns.syncCombatLog)
 end
 
 -- A ding is the one identity fact that used to need a loading screen to be
@@ -270,6 +275,36 @@ end
 handlers.AUCTION_HOUSE_CLOSED = function()
   ns.GearSet.ahOpen = false
 end
+
+-- Combat logging on when you zone into a raid, off when you leave.
+--
+-- Off by default and behind an option, because it is the only thing this addon
+-- does that writes outside the game: `WoWCombatLog.txt` grows with every pull
+-- and somebody who never asked for it should not find a file they have to
+-- delete.
+--
+-- **Raids only, and only the current expansion's**, which is the whole of what
+-- makes this safe to automate: `GetInstanceInfo` names the type, and a player
+-- who wants a log of a dungeon or an old raid turns it on themselves. Wrong in
+-- the quiet direction either way — a log that did not start costs one pull's
+-- data, and one that did not stop costs disk.
+--
+-- Both calls go through ns.safe like everything else: a client that renamed
+-- `LoggingCombat` costs this feature and nothing else.
+local function syncCombatLog()
+  local o = ns.Store.db and ns.Store.db.opts
+  if not o or not o.autoLog then return end
+  local kind = ns.safe(function() return (select(2, GetInstanceInfo())) end)
+  local want = kind == "raid"
+  local now = ns.safe(LoggingCombat)
+  if now == want then return end
+  ns.safe(LoggingCombat, want)
+  ns.print(want and "combat logging on — raid" or "combat logging off")
+end
+
+ns.syncCombatLog = syncCombatLog
+
+handlers.PLAYER_DIFFICULTY_CHANGED = syncCombatLog
 
 frame:SetScript("OnEvent", function(_, event, arg1)
   local handler = handlers[event]

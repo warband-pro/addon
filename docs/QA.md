@@ -131,6 +131,10 @@ numbers.
 - [ ] Open the auction house and left-click a shopping row — it searches for
       that item by name. Click one with the auction house shut — nothing
       happens, and no error
+- [ ] Options → combat logging on, then zone into a raid: logging starts and
+      says so. Leave: it stops. Zone into a DUNGEON with it on: nothing happens
+- [ ] Turn it on while already standing in a raid — it starts immediately
+      rather than waiting for the next loading screen
 - [ ] Hover a currency with a weekly cap — "this week 320/1,500"
 - [ ] Hover a column header — realm, guild, level, item level, gold, last zone,
       when it was scanned

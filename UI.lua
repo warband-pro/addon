@@ -1409,6 +1409,23 @@ local function buildOptions()
       UI.RenderRoster()
     end)
 
+  makeOption(p, -330,
+    "Turn combat logging on in raids",
+    "Starts /combatlog when you zone into a raid and stops it when you leave, so an upload to "
+      .. "Warcraft Logs has the pulls in it. Raids only, and off by default — it writes a file "
+      .. "that grows with every pull, which is not a cost to hand somebody who did not ask.",
+    function() local o = opts() return o and o.autoLog end,
+    function(v)
+      local o = opts()
+      if not o then return end
+      o.autoLog = v
+      ns.Store.Touch()
+      -- Applied now rather than at the next loading screen: turning it on
+      -- while already standing in the raid is exactly when somebody turns it
+      -- on, and waiting would look broken.
+      ns.syncCombatLog()
+    end)
+
   local version = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   version:SetPoint("BOTTOMLEFT", 0, 2)
   version:SetPoint("BOTTOMRIGHT", 0, 2)
