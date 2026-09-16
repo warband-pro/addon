@@ -34,6 +34,11 @@ local C = C_Container
 -- How long Verify waits for the server before saving what actually verified.
 local DEADLINE_SEC = 3
 
+--- Whether the auction house window is open, set from the event in Core.lua.
+--- `Junk.merchantOpen`'s twin, and for the same reason: the one thing a
+--- shopping-list row can do is search for what it names, and only there.
+GearSet.ahOpen = false
+
 --- The whole stored record for the character at the keyboard, or nil.
 local function storedRecord()
   local db = Store.db
@@ -216,13 +221,59 @@ function GearSet.Save(decoded)
         -- Carried on the same record rather than a fourth top-level table:
         -- a build assignment is about which setup to wear on which night, so
         -- it belongs beside the setups, and one record means one write.
+        --
+        -- **Both of these are carried FORWARD, not written here**, and that is
+        -- the trap this record keeps setting: the record is replaced wholesale,
+        -- so a section that is not named on this line is deleted by a paste
+        -- that had nothing to say about it. `builds` learned that in 1.8.0 and
+        -- `shop` re-learned it the same way in 1.15.0, with a test that saved a
+        -- list and then pasted a gear-only string over it.
         builds = (db.gearset[guid] or {}).builds,
+        shop = (db.gearset[guid] or {}).shop,
       }
       kept = kept + 1
     end
   end
   Store.Touch()
   return kept
+end
+
+--- Store the shopping list — the gems and enchants the solved set wants and
+--- this character does not have.
+---
+--- Written separately from the setups for the reason every other section here
+--- is: a string can carry one and not the other, and an absent section is
+--- skipped rather than cleared. A player who pastes a gear-only string must not
+--- silently lose the list of what to go and buy for it.
+---
+--- Kept on the gearset record rather than a fourth table, because the list is
+--- *about* the set — it is what the set is missing — and one record means one
+--- write.
+function GearSet.SaveShop(decoded)
+  local db = Store.db
+  if not db or type(decoded) ~= "table" or type(decoded.chars) ~= "table" then return 0 end
+  db.gearset = db.gearset or {}
+  local kept = 0
+  for guid, entry in pairs(decoded.chars) do
+    if db.chars[guid] and entry.shop then
+      local rec = db.gearset[guid]
+      if not rec then
+        rec = { generatedAt = decoded.generatedAt }
+        db.gearset[guid] = rec
+      end
+      rec.shop = entry.shop
+      kept = kept + 1
+    end
+  end
+  Store.Touch()
+  return kept
+end
+
+--- The stored shopping list for the character at the keyboard, or nil.
+function GearSet.Shop()
+  local rec = storedRecord()
+  local list = rec and rec.shop
+  return type(list) == "table" and #list > 0 and list or nil
 end
 
 --- Store the build assignments — which saved talent build is for raid, for m+,
@@ -401,7 +452,6 @@ GearSet.SLOT_NAMES = {
 --- what the eye picks out — grouping by state would make `ring 2` land above
 --- `head` for no reason a player can see.
 function GearSet.Rows(r)
-  if not r then return {} end
   local rows = {}
   local function add(list, state)
     for _, it in ipairs(list or {}) do
@@ -416,10 +466,38 @@ function GearSet.Rows(r)
       }
     end
   end
-  add(r.already, "worn")
-  add(r.ready, "ready")
-  add(r.missing, "missing")
-  table.sort(rows, function(a, b) return a.slot < b.slot end)
+  if r then
+    add(r.already, "worn")
+    add(r.ready, "ready")
+    add(r.missing, "missing")
+    table.sort(rows, function(a, b) return a.slot < b.slot end)
+  end
+
+  -- The shopping list rides the SAME rows the panel already draws, appended
+  -- after the gear and deliberately outside the sort: these are not slots and
+  -- have no slot number to sort by, and a list of things to buy belongs under
+  -- the set it is for rather than interleaved with it.
+  --
+  -- Reusing the row model rather than growing a second one is the point. The
+  -- panel's frame pool, its icon lookup and its tooltip all work unchanged,
+  -- and everything deciding what a row SAYS stays here where it is tested —
+  -- `docs/TESTING.md`'s "a display gets a model, and the model gets the tests".
+  for _, e in ipairs(GearSet.Shop() or {}) do
+    rows[#rows + 1] = {
+      slot = nil,
+      name = e.k == "enchant" and "enchant" or "gem",
+      id = e.id,
+      -- No `s`: a shopping row names something that is NOT in a bag, so there
+      -- is no item string to match and nothing for a click to act on. Every
+      -- action in this file keys on `s`, so its absence is what keeps a buy
+      -- row inert rather than a check at each call site.
+      s = nil,
+      buy = e.n or 1,
+      d = e.d,
+      sl = e.sl,
+      state = "buy",
+    }
+  end
   return rows
 end
 
@@ -435,6 +513,14 @@ end
 function GearSet.StateText(row)
   if row.state == "worn" then return "worn", "muted" end
   if row.state == "ready" then return "in bags", "good" end
+  if row.state == "buy" then
+    -- How many, and what for. The count is the trip — four sockets wanting one
+    -- gem is one stack of four — and the slots are why four, which is the
+    -- difference between a shopping list and a number.
+    local n = row.buy or 1
+    local where = row.sl and #row.sl > 0 and (" for " .. table.concat(row.sl, ", ")) or ""
+    return string.format("buy %d%s", n, where), "warn"
+  end
   if row.w == "bank" or row.w == "warbank" then return "in your bank", "warn" end
   return "not in your bags", "warn"
 end
@@ -553,6 +639,13 @@ local function receipt(p, verified)
   end
   local unconfirmed = p.readyCount - verified
   if unconfirmed > 0 then parts[#parts + 1] = unconfirmed .. " did not equip" end
+  -- The talent half, named where it happened. Silent when no build was
+  -- assigned to this night, which is the common case and not worth a line.
+  if type(p.build) == "string" then
+    parts[#parts + 1] = "build \"" .. p.build .. "\""
+  elseif p.build then
+    parts[#parts + 1] = "build loaded"
+  end
   if p.saved then parts[#parts + 1] = "saved as \"" .. p.set .. "\"" end
   ns.print(table.concat(parts, " · "))
 end
@@ -583,12 +676,64 @@ function GearSet.Verify(fromDeadline)
   if ns.UI and ns.UI.RenderGearSet then ns.UI.RenderGearSet() end
 end
 
+--- Load the talent build assigned to this kind of night, if there is one.
+---
+--- The other half of a setup. `setups.ts` on the website binds a gear set and a
+--- talent build to the same content precisely because a raid kit without the
+--- raid build is half an answer, and the player then does the other half by
+--- hand — which is the click AskMrRobot's addon saved them and this one did
+--- not.
+---
+--- Returns the build's name on success, nil on anything else. Nil covers a
+--- content with no assignment, a config this character no longer has, a client
+--- without the API, and combat — and the caller reports "equipped" either way,
+--- because the gear half genuinely happened and a failure here is a talent
+--- build that stayed where it was, not a half-applied one.
+---
+--- **Never in combat, and never a queue.** The same rule every other action in
+--- this file follows: `LoadConfig` is refused in combat by the client anyway,
+--- and deferring it would apply a build minutes later in a fight the player has
+--- long since finished.
+---
+--- **The spec itself is not switched**, deliberately. Changing specialization
+--- is a cast with its own protections, and this addon has not measured what an
+--- addon may and may not do there; a setup is applied to the spec you are
+--- standing in. `Stored` already refuses to hand over another spec's kit, so
+--- the worst case is that nothing happens and the panel says which spec the
+--- setup was for.
+function GearSet.ApplyBuild(content)
+  if not content or InCombatLockdown() then return nil end
+  local id = GearSet.BuildFor(content)
+  if not id then return nil end
+  local ct = C_ClassTalents
+  if not ct or type(ct.LoadConfig) ~= "function" then return nil end
+
+  local name = GearSet.BuildName(content)
+  -- `true` is autoApply: commit the build rather than only staging it in the
+  -- talent UI, which is what a player pressing an equip button means.
+  local ok = ns.safe(ct.LoadConfig, id, true)
+  if ok == false or ok == nil then return nil end
+  -- The client remembers which saved build is "current" for the spec; without
+  -- this the talent UI keeps showing the previous one as selected.
+  if type(ct.UpdateLastSelectedSavedConfigID) == "function" then
+    local spec = activeSpecID()
+    if spec then ns.safe(ct.UpdateLastSelectedSavedConfigID, spec, id) end
+  end
+  return name or true
+end
+
 --- Equip every ready item and arm the verify-then-save. Returns the resolve
 --- it acted on, or nil when there was nothing to act on at all.
 function GearSet.Apply(content)
   if InCombatLockdown() then return nil end
   local r = GearSet.Resolve(content)
   if not r then return nil end
+
+  -- The talent half, before the equips: a build load is one call that either
+  -- works or does not, where the equips are a string of server round-trips
+  -- this function then has to wait on. Doing it first means the receipt can
+  -- name it, and means a build that fails does not leave the gear unapplied.
+  r.build = GearSet.ApplyBuild(content)
 
   local bankCount = 0
   for _, it in ipairs(r.missing) do
@@ -612,6 +757,11 @@ function GearSet.Apply(content)
     alreadyCount = #r.already,
     missingCount = #r.missing,
     bankCount = bankCount,
+    -- What ApplyBuild did, so the receipt can name it. `true` means a build
+    -- loaded whose name this character could not look up, which is a real
+    -- state — the assignment names a config id and the name comes from the
+    -- addon's own capture, which a fresh character may not have yet.
+    build = r.build,
   }
   if #r.ready == 0 then
     -- Nothing to wait for: everything wearable is worn (or missing). Save
@@ -621,4 +771,38 @@ function GearSet.Apply(content)
     ns.safe(C_Timer.After, DEADLINE_SEC, function() GearSet.Verify(true) end)
   end
   return r
+end
+
+--- Search the auction house for what a shopping row names.
+---
+--- **Returns false for every reason it did not, and there are several**: the
+--- window is shut, the client has no browse API, the row names something whose
+--- name this session has never cached. The caller says so rather than leaving a
+--- click that looks broken.
+---
+--- `SendBrowseQuery` is wrapped like every other client call here. This addon
+--- has not measured what that API does across every retail build, and the
+--- doctrine covers exactly that case: a section that cannot be read goes
+--- missing rather than throwing, and a search that does not happen costs one
+--- click.
+function GearSet.SearchAuction(row)
+  if not GearSet.ahOpen or type(row) ~= "table" or row.state ~= "buy" then return false end
+  local ah = C_AuctionHouse
+  if not ah or type(ah.SendBrowseQuery) ~= "function" then return false end
+
+  -- The NAME, not the id: the auction house browses by text, and an id means
+  -- nothing in that box. An item this session has not cached has no name yet,
+  -- and searching for the wrong thing is worse than not searching.
+  local name = row.id and ns.safe(function() return (C_Item.GetItemInfo(row.id)) end)
+  if type(name) ~= "string" or name == "" then return false end
+
+  local ok = ns.safe(ah.SendBrowseQuery, {
+    searchString = name,
+    sorts = {},
+    filters = {},
+    itemClassFilters = {},
+    minLevel = 0,
+    maxLevel = 0,
+  })
+  return ok ~= nil
 end

@@ -25,6 +25,7 @@ local EVENTS = {
   "UPDATE_INSTANCE_INFO", "BOSS_KILL", "ENCOUNTER_END",
   "WEEKLY_REWARDS_UPDATE", "CHALLENGE_MODE_COMPLETED",
   "MAIL_INBOX_UPDATE", "OWNED_AUCTIONS_UPDATED",
+  "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED",
   "SKILL_LINES_CHANGED",
   "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED",
   "PLAYER_EQUIPMENT_CHANGED", "PLAYER_AVG_ITEM_LEVEL_UPDATE",
@@ -256,6 +257,18 @@ end
 handlers.MERCHANT_CLOSED = function()
   ns.Junk.merchantOpen = false
   UI.MerchantChanged(false)
+end
+
+-- The same flag, for the other window this addon can do something useful in
+-- front of. A shopping-list row searches the auction house for what it names,
+-- and only while the auction house is open — read from the event rather than
+-- from a frame, exactly as `merchantOpen` is, so nothing has to guess.
+handlers.AUCTION_HOUSE_SHOW = function()
+  ns.GearSet.ahOpen = true
+end
+
+handlers.AUCTION_HOUSE_CLOSED = function()
+  ns.GearSet.ahOpen = false
 end
 
 frame:SetScript("OnEvent", function(_, event, arg1)

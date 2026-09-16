@@ -956,6 +956,42 @@ or nothing at all — never another spec's gear. A record with no spec anywhere
 (an older website, or a character whose spec could not be resolved) makes no
 claim and still applies to whoever is standing there.
 
+### `shop[]` — gems and enchants to go and get, added in 1.15.0
+
+The fourth section on `wbc1!`, and **the first that is a list rather than an
+instruction**. Every other section names an item the addon can find in a bag
+and act on: sell it, equip it, load it. A shopping entry names something that
+is *not* in the bags yet, so the addon can only ever display it — which is
+exactly why it is safe to send and why it needs none of the item-string
+discipline the rest of this wire runs on. There is no action a wrong match
+could take.
+
+```json
+"shop":[
+  {"id":100,"k":"gem","n":3,"d":"+300 Critical Strike","sl":["head","neck","neck"]},
+  {"id":200,"k":"enchant","n":1,"d":"Enchanted: +325 Haste","sl":["chest"]}
+]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The gem's item id, or the enchant's enchantment id. **Required**; an entry without a positive one is dropped. |
+| `k` | `gem` or `enchant`. A third kind is dropped rather than shown unlabelled — a row has to say which it is to be worth a line. |
+| `n` | How many. Four sockets wanting one gem is **one row of four**, not four rows: the count is the trip. Defaults to 1. |
+| `d` | The website's own words for it, verbatim — `+300 Critical Strike`. What the player is choosing between, and usually more use than the item's name. |
+| `sl` | The slots that want it. This is *why* four, which is the whole difference between a shopping list and a number. |
+
+**No `seenOn`.** The website knows which of your alts already wears one, and
+deliberately does not send it: that is a fact about the warband, and the addon
+is standing on one character with its own alts' bags in front of it. Sending it
+would hand the client a staler copy of something it can read better.
+
+**The list rides the rows the gear panel already draws**, appended after the
+gear and outside the slot sort — a shopping entry has no slot to sort by and
+belongs under the set it is for. Its one action is a left click while the
+auction house is open, which browses for the item by NAME (an id means nothing
+in that box), and does nothing at all otherwise.
+
 ### The set name is proposed here and settled by the client
 
 `set` is what the website would like the Equipment Manager set called. It is

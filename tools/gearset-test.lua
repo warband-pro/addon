@@ -106,6 +106,28 @@ _G.C_EquipmentSet = {
   SaveEquipmentSet = function(id) ORDER[#ORDER + 1] = "save:" .. id end,
 }
 
+-- The talent half. `LOAD_RESULT` is what the client answers; `LAST_SELECTED`
+-- records the follow-up call that stops the talent UI showing the previous
+-- build as current.
+-- The item cache, as far as the shopping list needs it: an id this session has
+-- seen has a name, and one it has not answers nothing. `SearchAuction` browses
+-- by name, so the second case must not search at all.
+_G.C_Item = {
+  GetItemInfo = function(id) return id == 101 and "name" or nil end,
+}
+
+local LOAD_RESULT = true
+local LAST_SELECTED
+_G.C_ClassTalents = {
+  LoadConfig = function(id, autoApply)
+    ORDER[#ORDER + 1] = "load:" .. id .. ":" .. tostring(autoApply)
+    return LOAD_RESULT
+  end,
+  UpdateLastSelectedSavedConfigID = function(spec, id)
+    LAST_SELECTED = spec .. ":" .. id
+  end,
+}
+
 -- ── load the real code ──────────────────────────────────────────────────────
 
 local ns = {}
@@ -490,6 +512,136 @@ check("apply acts on the night it was given", keyApply ~= nil and #keyApply.read
 check("and equips that night's item into that night's slot",
   ORDER[2] == "equip:5", tostring(ORDER[2]))
 GearSet.pending = nil
+
+-- ── the talent half of a setup ──────────────────────────────────────────────
+-- A raid kit without the raid build is half an answer, and the player does the
+-- other half by hand — which is the click this was missing.
+
+inflated = '{"v":1,"generatedAt":1,"chars":[{"guid":"Player-1-TEST","name":"Vocnar",' ..
+  '"spec":103,"set":"Feral","items":[{"slot":1,"s":"item:9"}],' ..
+  '"sets":[{"spec":103,"set":"Feral","c":"raid","items":[{"slot":1,"s":"item:9"}]}]}]}'
+GearSet.Save(Import.DecodeInbound("wbg1!AAAA"))
+-- Build assignments ride the plan wire, never the equip one — `wbg1!` predates
+-- them and carries no `builds` at all.
+GearSet.SaveBuilds({
+  generatedAt = 1,
+  chars = { ["Player-1-TEST"] = { builds = { [103] = { raid = 7 } } } },
+})
+SPEC = 103
+
+-- The addon's own capture is where a build's NAME comes from — the wire
+-- carries only the id, because the site is naming one of the addon's builds
+-- rather than handing back a string it exported an hour ago.
+ns.Store.db.chars["Player-1-TEST"].talents = {
+  specs = { { specID = 103, loadouts = { { id = 7, name = "Raid ST", s = "AAA" } } } },
+}
+
+ORDER, LAST_SELECTED, printed = {}, nil, {}
+local loaded = GearSet.ApplyBuild("raid")
+check("the assigned build is loaded", loaded == "Raid ST", tostring(loaded))
+check("and committed rather than only staged", ORDER[1] == "load:7:true", tostring(ORDER[1]))
+check("and the client is told which saved build is current now", LAST_SELECTED == "103:7", tostring(LAST_SELECTED))
+
+ORDER = {}
+check("a night with no build assigned loads nothing", GearSet.ApplyBuild("mplus") == nil)
+check("and touched nothing", #ORDER == 0)
+
+ORDER = {}
+check("no content, no build — the bare command is unchanged", GearSet.ApplyBuild(nil) == nil)
+check("and touched nothing either", #ORDER == 0)
+
+inCombat = true
+ORDER = {}
+check("combat refuses the load, like every other action here", GearSet.ApplyBuild("raid") == nil)
+check("and touched nothing at all", #ORDER == 0)
+inCombat = false
+
+LOAD_RESULT = false
+check("a client that refuses the load reports nothing rather than claiming it", GearSet.ApplyBuild("raid") == nil)
+LOAD_RESULT = true
+
+-- The gear half must not be held hostage by the talent half.
+BAGS = { [0] = { [1] = { itemID = 221151, hyperlink = link("item:9", "Helm") } } }
+SETS, ORDER, printed = {}, {}, {}
+local both = GearSet.Apply("raid")
+check("apply does the talent half and the gear half", both ~= nil and #both.ready == 1)
+check("the build loads before the equips", ORDER[1] == "load:7:true", tostring(ORDER[1]))
+GearSet.Verify(true)
+check("and the receipt names the build",
+  printed[1] ~= nil and printed[1]:find('build "Raid ST"', 1, true) ~= nil, printed[1])
+
+-- ── the shopping list (1.15.0) ──────────────────────────────────────────────
+-- The one section that is a list rather than an instruction: these are gems and
+-- enchants that are NOT in a bag, so nothing can act on them and the addon can
+-- only show them.
+
+check("stores the shopping list", (function()
+  local kept = GearSet.SaveShop({
+    generatedAt = 700,
+    chars = {
+      ["Player-1-TEST"] = {
+        shop = {
+          { id = 100, k = "gem", n = 3, d = "+300 Critical Strike", sl = { "head", "neck", "neck" } },
+          { id = 200, k = "enchant", n = 1, d = "Enchanted: +325 Haste", sl = { "chest" } },
+        },
+      },
+    },
+  })
+  return kept == 1 and #ns.Store.db.gearset["Player-1-TEST"].shop == 2
+end)())
+
+check("a paste carrying no shopping list leaves the stored one alone", (function()
+  GearSet.SaveShop({ generatedAt = 800, chars = { ["Player-1-TEST"] = { junk = {} } } })
+  return GearSet.Shop() ~= nil and #GearSet.Shop() == 2
+end)())
+
+check("ignores a guid this account has never scanned", (function()
+  local kept = GearSet.SaveShop({
+    generatedAt = 800,
+    chars = { ["Player-9-NOPE"] = { shop = { { id = 1, k = "gem" } } } },
+  })
+  return kept == 0
+end)())
+
+-- The list rides the SAME rows the panel already draws, so the frame pool, the
+-- icon lookup and the tooltip all work unchanged.
+local shopRows = GearSet.Rows(nil)
+check("a shopping list renders with no gear set at all", #shopRows == 2, tostring(#shopRows))
+check("a buy row carries no item string — nothing can act on it", shopRows[1].s == nil)
+check("a buy row is labelled by its kind", shopRows[1].name == "gem" and shopRows[2].name == "enchant")
+check("and carries the site's own words for it", shopRows[1].d == "+300 Critical Strike")
+
+local text, tone = GearSet.StateText(shopRows[1])
+check("a buy row says how many and what for", text == "buy 3 for head, neck, neck", text)
+check("and reads as something still to do", tone == "warn")
+check("a single is still said as a number", GearSet.StateText(shopRows[2]) == "buy 1 for chest",
+  GearSet.StateText(shopRows[2]))
+
+-- Appended after the gear, outside the slot sort — a shopping entry has no
+-- slot to sort by and belongs under the set it is for.
+inflated = '{"v":1,"generatedAt":1,"chars":[{"guid":"Player-1-TEST","name":"Vocnar",' ..
+  '"spec":103,"set":"Feral","items":[{"slot":1,"s":"item:9"}]}]}'
+GearSet.Save(Import.DecodeInbound("wbg1!AAAA"))
+local mixed = GearSet.Rows(GearSet.Resolve())
+check("gear comes first and the list follows", mixed[1].state ~= "buy" and mixed[#mixed].state == "buy")
+
+-- The auction-house search is the one thing a buy row can do, and it does
+-- nothing at all while the window is shut.
+GearSet.ahOpen = false
+check("no search while the auction house is shut", GearSet.SearchAuction(shopRows[1]) == false)
+GearSet.ahOpen = true
+check("and none for a row that is not a shopping row", GearSet.SearchAuction({ state = "ready", id = 1 }) == false)
+check("and none for something that is not a row at all", GearSet.SearchAuction(nil) == false)
+_G.C_AuctionHouse = nil
+check("a client with no browse api searches nothing", GearSet.SearchAuction(shopRows[1]) == false)
+
+local SEARCHED = nil
+_G.C_AuctionHouse = { SendBrowseQuery = function(q) SEARCHED = q and q.searchString; return true end }
+check("an uncached item has no name to search for", GearSet.SearchAuction({ state = "buy", id = 777 }) == false)
+check("and nothing was sent", SEARCHED == nil)
+check("a cached item searches by NAME, not by id", GearSet.SearchAuction({ state = "buy", id = 101 }) == true)
+check("and it is the name the auction house will show", SEARCHED == "name", tostring(SEARCHED))
+GearSet.ahOpen = false
 
 -- ── the set name is discovered, never assumed ───────────────────────────────
 -- C_EquipmentSet enforces a length this addon cannot read, so the full name is

@@ -384,6 +384,45 @@ function Import.GearSetSets(raw)
   return bySpec, byContent, n
 end
 
+--- The shopping list off one character entry — gems and enchants the solved set
+--- wants and this character does not have.
+---
+--- **The one section that is a list rather than an instruction.** Everything
+--- else on this wire names an item the addon can find in a bag and act on; a
+--- shopping entry names something that is not there yet, so the addon can only
+--- ever show it. That is why it needs none of the item-string discipline the
+--- rest of this file runs on: there is no action a wrong match could take.
+---
+--- `k` is dropped when it is not one of the two kinds this build knows, rather
+--- than passed through — a row has to say "gem" or "enchant" to be worth a
+--- line, and an unknown third kind is a row that cannot be labelled.
+local function readShop(raw)
+  if type(raw) ~= "table" then return nil end
+  local out, n = nil, 0
+  for _, e in ipairs(raw) do
+    if type(e) == "table" and type(e.id) == "number" and e.id > 0
+      and (e.k == "gem" or e.k == "enchant") then
+      local slots
+      if type(e.sl) == "table" then
+        slots = {}
+        for _, sl in ipairs(e.sl) do
+          if type(sl) == "string" then slots[#slots + 1] = sl end
+        end
+      end
+      out = out or {}
+      n = n + 1
+      out[n] = {
+        id = e.id,
+        k = e.k,
+        n = type(e.n) == "number" and e.n > 0 and e.n or 1,
+        d = type(e.d) == "string" and e.d or nil,
+        sl = slots,
+      }
+    end
+  end
+  return out
+end
+
 local function readGear(raw)
   if type(raw) ~= "table" then return nil end
 
@@ -429,36 +468,40 @@ function Import.DecodePlan(paste)
   if type(payload.chars) ~= "table" then return nil, "not_json" end
 
   local chars = {}
-  local nJunk, nSets, nBuilds = 0, 0, 0
+  local nJunk, nSets, nBuilds, nShop = 0, 0, 0, 0
   for _, c in ipairs(payload.chars) do
     if type(c) == "table" and type(c.guid) == "string" and c.guid ~= "" then
       local junk = Import.CleanupItems(c.items)
       local gear = readGear(c.gear)
       local builds = readBuilds(c.builds)
+      local shop = readShop(c.shop)
       -- Any one section is enough. A character with setups and nothing to
       -- sell is a normal entry, which is the case the cleanup-only reader
       -- could not express — it required `items` and dropped the rest.
-      if junk or gear or builds then
+      if junk or gear or builds or shop then
         chars[c.guid] = {
           name = type(c.name) == "string" and c.name or "?",
           junk = junk,
           gear = gear,
           builds = builds,
+          shop = shop,
         }
         if junk then nJunk = nJunk + 1 end
         if gear then nSets = nSets + 1 end
         if builds then nBuilds = nBuilds + 1 end
+        if shop then nShop = nShop + 1 end
       end
     end
   end
 
-  if nJunk + nSets + nBuilds == 0 then return nil, "no_items" end
+  if nJunk + nSets + nBuilds + nShop == 0 then return nil, "no_items" end
   return {
     generatedAt = payload.generatedAt,
     chars = chars,
     nJunk = nJunk,
     nSets = nSets,
     nBuilds = nBuilds,
+    nShop = nShop,
   }
 end
 

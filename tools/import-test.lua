@@ -281,6 +281,35 @@ if all then
   check("and still keys by spec", g.bySpec and g.bySpec[105] ~= nil)
 end
 
+-- ── shop: the one section that is a list rather than an instruction ────────
+
+local SHOP = '"shop":[{"id":100,"k":"gem","n":3,"d":"+300 Critical Strike","sl":["head","neck","neck"]},' ..
+  '{"id":200,"k":"enchant","n":1,"d":"Enchanted: +325 Haste","sl":["chest"]},' ..
+  '{"id":0,"k":"gem","n":1},{"id":300,"k":"sticker","n":1}]'
+
+local shopped = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N",' .. SHOP .. '}]}')
+check("a shopping list alone is enough to keep a character", shopped ~= nil and shopped.nShop == 1)
+if shopped then
+  local list = shopped.chars["G"].shop
+  check("the two real entries survive", list and #list == 2, list and #list)
+  check("a gem carries its count and what it is for",
+    list and list[1].id == 100 and list[1].n == 3 and #list[1].sl == 3)
+  check("and the site's own words for it", list and list[1].d == "+300 Critical Strike")
+  check("an entry with no usable id is dropped", (function()
+    for _, e in ipairs(list or {}) do if e.id == 0 then return false end end
+    return true
+  end)())
+  check("a kind this build cannot label is dropped rather than shown unlabelled", (function()
+    for _, e in ipairs(list or {}) do if e.id == 300 then return false end end
+    return true
+  end)())
+end
+
+check("a string with no shop section files none", (function()
+  local p2 = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N",' .. JUNK .. '}]}')
+  return p2 ~= nil and p2.nShop == 0 and p2.chars["G"].shop == nil
+end)())
+
 check("a string empty of all three is still no_items", (function()
   inflated = '{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N"}]}'
   local _, c = Import.DecodePlan("wbc1!AAAA")

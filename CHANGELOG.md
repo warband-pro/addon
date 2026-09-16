@@ -76,6 +76,18 @@ pick one, which is what you want on an action bar.
 Asking for a night you have no set for says so and equips nothing, rather than
 putting on a different night's gear.
 
+**Equipping a setup loads its talent build too.** If you have told warband.pro
+which of your saved builds is your raid build, `/warband equip raid` loads it
+and equips the gear in one press. It does not change your specialization —
+a setup applies to the spec you are standing in, and asking for another spec's
+set still says so and does nothing.
+
+**The paste now carries a shopping list.** Gems and enchants the solved set
+wants and you do not have show under the set on the From warband.pro tab —
+one row per thing to buy, with how many and which slots want them, so four
+sockets wanting one gem is one stack of four rather than four lines. With the
+auction house open, clicking a row searches for it.
+
 ### Fixed
 
 **A forgotten character's pasted gear set is dropped with its junk list.** Forgetting a character cleared its junk list but left its pasted gear-set record behind, so a re-scan resurrected the stale set and `/warband equip` would act on it. The same purge now covers both.
