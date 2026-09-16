@@ -29,7 +29,7 @@ ns.Store = Store
 -- window in front of it.
 local SECTIONS = {
   "bag", "bank", "reagentBank", "warbank", "currency", "instance", "vault", "mail", "auctions",
-  "profession", "professionCooldown", "gear", "talents",
+  "profession", "professionCooldown", "gear", "talents", "tradingPost",
 }
 
 function Store.Init()
@@ -50,6 +50,10 @@ function Store.Init()
   db.v = ns.WIRE_V
   db.chars = db.chars or {}
   db.warbandBank = db.warbandBank or { seenAt = nil, seenByGuid = nil, seenByName = nil, tabs = {} }
+  -- Account-wide like the warband bank, and at the root for the same reason:
+  -- the trading post is the account's, not a character's. Every field inside
+  -- stays nil until something reads it — see Store.PutTradingPost.
+  db.tradingPost = db.tradingPost or {}
   db.lastExport = db.lastExport or 0
   -- Whether this install has ever told the player it is here. One line, once,
   -- on the first login after install — see Core.lua's PLAYER_LOGIN.
@@ -197,6 +201,72 @@ function Store.PutWarbandBank(tabs, gold, owned)
   wb.seenByName = UnitName("player")
   local c = Store.Char()
   if c then c.seenAt.warbank = wb.seenAt end
+  Store.Touch()
+end
+
+-- The trading post: this month's offerings, the tender balance, and how far
+-- the Traveler's Log has got.
+--
+-- Account-wide, so it sits at the root beside the warband bank rather than on
+-- the character who happened to look. Everything below follows the same rule
+-- the rest of this file follows — **a read that did not happen leaves what we
+-- knew alone** — but there is one thing here that no other section has, and it
+-- is the reason this is not just another `Store.Put`:
+--
+-- **The offerings expire.** Bags go stale; a trading post month goes *wrong*.
+-- On the first of the month the shelf is replaced wholesale, and a stored list
+-- from last month is not an old reading of the same fact, it is a list of
+-- things that are no longer purchasable at any price. So the month it was read
+-- in is stored beside it, and a reader that finds a different month must treat
+-- the list as absent rather than as stale. Nothing here deletes it on a date
+-- rollover — the addon may not be running when the month turns, and a stamp
+-- the consumer can check is more honest than a sweep that may never fire.
+--
+-- Each field is individually optional, and that is not defensive habit either:
+-- the tender balance comes off the currency API and is readable anywhere, while
+-- the offerings need the trading post frame to have been opened at least once
+-- this month. So the common state is a real tender number beside no items at
+-- all, and blanking one because the other was unreadable would lose the half
+-- that did arrive.
+function Store.PutTradingPost(read)
+  if not Store.Ready() or type(read) ~= "table" then return end
+  local tp = Store.db.tradingPost
+  if type(tp) ~= "table" then
+    tp = {}
+    Store.db.tradingPost = tp
+  end
+  local now = ns.now()
+  local touched = false
+
+  if type(read.tender) == "number" then
+    tp.tender = read.tender
+    tp.tenderSeenAt = now
+    touched = true
+  end
+
+  -- The month rides with the items rather than standing on its own. A month
+  -- with no items read is a month nobody looked at, and recording it alone
+  -- would let a later reader conclude the shelf was empty.
+  if type(read.items) == "table" and #read.items > 0 then
+    tp.items = read.items
+    tp.month = read.month
+    tp.itemsSeenAt = now
+    touched = true
+  end
+
+  if type(read.activities) == "table" and #read.activities > 0 then
+    tp.activities = read.activities
+    tp.activitiesMonth = read.month
+    tp.activitiesSeenAt = now
+    touched = true
+  end
+
+  if not touched then return end
+  tp.seenAt = now
+  tp.seenByGuid = UnitGUID("player")
+  tp.seenByName = UnitName("player")
+  local c = Store.Char()
+  if c then c.seenAt.tradingPost = tp.seenAt end
   Store.Touch()
 end
 

@@ -143,6 +143,23 @@ end
 handlers.CURRENCY_DISPLAY_UPDATE = currencies
 handlers.CURRENCY_TRANSFER_LOG_UPDATE = currencies
 
+-- The trading post populates when the player opens it, so the shelf is
+-- readable exactly while that frame is up. Throttled at two seconds rather
+-- than one: the client fires several of these as the frame fills, and every
+-- one of them would otherwise walk the whole shelf again.
+--
+-- `PERKS_PROGRAM_CURRENCY_REFRESH` is here for the tender balance, which moves
+-- when something is bought. It is the one of the three that is worth a scan
+-- without the frame open at all, and it costs a single currency read.
+local function tradingPost()
+  ns.throttle("tradingPost", 2, Scan.TradingPost)
+end
+handlers.PERKS_PROGRAM_OPEN = tradingPost
+handlers.PERKS_PROGRAM_DATA_REFRESH = tradingPost
+handlers.PERKS_PROGRAM_CURRENCY_REFRESH = tradingPost
+handlers.PERKS_ACTIVITIES_UPDATED = tradingPost
+handlers.PERKS_ACTIVITY_COMPLETED = tradingPost
+
 -- Bank contents are readable only while the frame is open, and the warband
 -- tabs populate a beat after it opens — walked together, same as before.
 ns.onDirty("bank", function()

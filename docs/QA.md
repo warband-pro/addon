@@ -261,6 +261,47 @@ merge check possible.
 - [ ] A window left at the old 420 minimum by an earlier build opens at 460
       rather than off-screen or unresizable
 
+## The trading post (unreleased)
+
+**This section settles the API names, and nothing else in this repo can.**
+`tools/freshness-test.lua` covers the bookkeeping either side of the read —
+that each field survives a pass that could not see it, that the month rides
+with the shelf, that an unread section is absent rather than empty — against a
+fake client. What it cannot check is whether `C_PerksProgram`,
+`C_PerksActivities` and `C_DateAndTime` answer at all, because those names were
+read off Blizzard's UI rather than from anything runnable here. Every call goes
+through `ns.safe`, so a wrong name costs this one section silently — which is
+exactly why it needs a person to look.
+
+Run this **before the first release that carries it**, and note the month: the
+shelf only exists once the trading post has been opened in the current one.
+
+- [ ] Log in without visiting the trading post. `/warband` → the string
+      contains `"tradingPost"` with a `tender` number and **no** `items` — a
+      balance with no shelf is the correct reading here, not a failure
+- [ ] The tender number matches the one in the game's own currency panel
+      (Trader's Tender, currency 2032)
+- [ ] Open the trading post, then `/warband` again. `items` is now present and
+      its length matches the number of things on the shelf
+- [ ] `month` reads as the current `YYYY-MM` **on realm time** — check this
+      near a month boundary if you can, because a player east of their realm is
+      the case it exists for
+- [ ] An item you have already bought this month carries `"purchased":true`;
+      one you have not carries no `purchased` key at all
+- [ ] `items[].itemID` is the item you end up owning, not the shelf entry —
+      spot-check one against the item's id on Wowhead. This is the id
+      warband.pro joins to your collection, so a wrong one silently reports a
+      mount you own as missing
+- [ ] Open the Traveler's Log. `activities` appears, with `completed` present
+      only on the ones that are done
+- [ ] Buy something. The tender balance in the next string has gone down by the
+      price, and `purchased` is now on that item
+- [ ] **If any of the above is missing entirely**, the API name is wrong rather
+      than the logic. Check `Scan.TradingPost` against the current client's
+      globals before assuming the section is broken — `/warband debug` reports
+      `ns.errorCount`, and `ns.safe` swallowing a missing global shows up there
+      as nothing at all, which is the trap
+
 ## The gear set — equip and save (1.6.0)
 
 **This is the first thing this addon has ever done that moves gear on your
