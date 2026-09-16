@@ -14,9 +14,19 @@
     "instances":[],
     "weeklyVault":{
       "raid":{"progress":2,"threshold":4,"unlocked":1,"slots":3,
-              "rows":[{"t":2,"p":2,"l":14,"d":"Normal"},{"t":4,"p":2,"l":0},{"t":6,"p":2,"l":0}]},
+              "rows":[{"t":2,"p":2,"l":14,"d":"Normal",
+                       "r":{"slot":5,"id":212022,"ilvl":665,"n":"Aureate Sentry's Hauberk",
+                            "cls":4,"sub":2,"set":1234,
+                            "st":{"ITEM_MOD_CRIT_RATING_SHORT":612,"ITEM_MOD_STAMINA_SHORT":2400},
+                            "s":"item:212022::::::::80:250::6:6:12053:10390:1520:1:28:2462:::"}},
+                      {"t":4,"p":2,"l":0},{"t":6,"p":2,"l":0}]},
       "mplus":{"progress":3,"threshold":4,"unlocked":1,"slots":3,"level":12,
-               "rows":[{"t":1,"p":3,"l":12},{"t":4,"p":3,"l":0},{"t":8,"p":3,"l":0}]}
+               "rows":[{"t":1,"p":3,"l":12,
+                        "r":{"slot":11,"id":215135,"ilvl":658,"n":"Seal of the Poisoned Pact",
+                             "cls":4,"sub":0,
+                             "st":{"ITEM_MOD_HASTE_RATING_SHORT":740},
+                             "s":"item:215135::::::::80:250::4:6:12053:1:28:::"}},
+                       {"t":4,"p":3,"l":0},{"t":8,"p":3,"l":0}]}
     },
     "seenAt":{"lastSeen":1724000000,"vault":1724000000}
   }]

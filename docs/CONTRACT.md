@@ -251,6 +251,21 @@ against an equipment document that only refreshes at the wearer's last logout.
 | `sub` | Item subclass id, `GetItemInfoInstant` position 7, **verbatim and uninterpreted**. For armor it is 1 Cloth … 4 Plate *on the eight slots that have an armor weight* — and **a cloak reports 1 as well**, which is not a weight and not a claim that only cloth wearers may equip it. Necks, rings and trinkets report 0. With `cls` this is what lets the website call an item unwearable by this class, and the slot is what says whether the question is answerable at all — see the note below. Added in 1.3.0; bag/bank/warbank entries only. |
 | `th` | **Two-handed.** Weapon-slot entries only (`slot` 16 or 17), and a real boolean on every one of them — never omitted-when-false, so its absence dates the bundle rather than needing a second field the way `b` does. `slot` collapses `INVTYPE_2HWEAPON` and `INVTYPE_WEAPON` to the same 16, so without this a consumer cannot tell a two-hander from a one-hander and will call a 2H an upgrade over a main hand while the off-hand beside it is silently unequipped. Only `INVTYPE_2HWEAPON` is claimed: `INVTYPE_RANGED`/`INVTYPE_RANGEDRIGHT` cover bows and guns (two-handed) but also wands (not), and no spec equipping any of the three carries an off-hand, so the distinction is unreachable and not worth a wrong claim. Added in 1.7.0; bag/bank/warbank entries only. |
 | `st` | The item's stat values: `C_Item.GetItemStats` tokens **verbatim**, a map of `ITEM_MOD_*` string → number (e.g. `{"ITEM_MOD_CRIT_RATING_SHORT":581,"ITEM_MOD_INTELLECT_SHORT":1204}`). Never compacted, never interpreted — a token this addon has not heard of still reaches the wire, and a consumer ignores what it does not know. Omitted when the client could not answer (an uncached item on a cold login); absence means "not read", never "no stats". Added in 1.6.0; bag/bank/warbank entries only. |
+| `set` | **Item set id**, `C_Item.GetItemInfo` position 16. Sent on the five tier slots only — `slot` 1, 3, 5, 7, 10 — and on bag/bank/warbank entries only. Omitted for an item in no set *and* for one this session has not cached, so **absence means "not read", never "not tier"**. Added in 1.15.0. |
+
+**`set` is asked on five slots because the call is the expensive one.** Every
+other per-item fact on this table comes from `GetItemInfoInstant`, which cannot
+miss; the set id is only in `GetItemInfo`, which is cache-dependent and returns
+nothing at all for an item this session has never seen. Asking it for every
+ring, trinket and spare cloak in a warband bank is hundreds of calls for a field
+only five slots can carry, so it is asked where the answer can be non-nil and
+nowhere else.
+
+**What it unblocks.** An item string has no field for set membership, so a
+consumer could count the tier a character is *wearing* — the Profile API states
+it on an equipped item — and could never offer to put a piece on out of the
+bags. A full-set solve that cannot see tier in the bags is not a full-set solve.
+A consumer that ignores `set` behaves exactly as it did before 1.15.0.
 
 **`sub` is a subclass, not an armor weight, and `slot` is what tells them
 apart.** Subclass 1 means Cloth on head, shoulders, chest, waist, legs, feet,
@@ -1096,6 +1111,39 @@ Two rules a consumer must not soften:
   sent on `mplus` on purpose: `GetDifficultyInfo(14)` returns "Normal" whether
   that 14 arrived as a raid difficulty or as a +14 key, and a plausible wrong
   answer is worse than none.
+
+#### `rows[].r` — the item the slot is offering, since 1.15.0
+
+```json
+"rows":[{"t":2,"p":2,"l":14,"d":"Normal",
+         "r":{"slot":5,"id":250456,"ilvl":665,"s":"item:250456::…","n":"Cuirass of…",
+              "cls":4,"sub":4,"st":{"ITEM_MOD_CRIT_RATING_SHORT":612},"set":1234}}]
+```
+
+Additive on `wb1!`, and the field that turns vault *progress* into a vault
+*decision*. Until 1.15.0 the wire said three slots were unlocked and nothing at
+all about what was in them, so the website could rank how close you were to
+earning a slot and could not rank the three items you were being asked to choose
+between — which is the only question anybody opens the vault to answer. The
+player could see them by opening the vault frame; nothing else could.
+
+`r` is **shaped like a `gear[]` entry** — same `slot` numbering, same collapse
+of both rings to 11, same `s`/`st`/`set` semantics — so a consumer decodes it
+through the path an owned item already takes rather than growing a second item
+model for one field.
+
+Three rules:
+
+- **There is no `where`.** A vault reward is not somewhere you own it yet.
+  Calling it a bag item would put it in a best-in-bags candidate pool, which is
+  the one mistake this field must not cause.
+- **Sent only for a slot that is actually paying** (`p >= t`). An activity short
+  of its threshold has no reward to example and the client answers nil for one
+  anyway.
+- **Absent whenever anything declines** — a locked slot, a client without
+  `C_WeeklyRewards.GetExampleRewardItemHyperlinks`, a link the item cache has
+  not filled in. A consumer that ignores `r` renders vault progress exactly as
+  it did before this existed.
 
 `level` on the **bucket** is a max across rows whose ordering it does not own.
 That is fine where the field is a keystone level and wrong where it is a

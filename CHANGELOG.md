@@ -45,6 +45,25 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**The export says which bag pieces are tier, and what your vault is offering.**
+Two fields, both on the strings you already copy.
+
+A bagged helm or chest now carries its set id, so the site can count tier
+pieces sitting in your bags instead of only the ones you are wearing. Before
+this it could tell you a swap would break your 4-piece and could not tell you
+the fourth piece was in the bank.
+
+And an earned Great Vault slot now carries the item it is offering — name,
+item level, stats. The site knew three slots were unlocked and had no idea what
+was in them, so it could say how close you were to earning one and not which of
+the three to take.
+
+Both are read where the client will answer and left out where it will not. A
+freshly logged-in character may send neither until things finish loading; the
+next scan picks them up.
+
 ### Fixed
 
 **A forgotten character's pasted gear set is dropped with its junk list.** Forgetting a character cleared its junk list but left its pasted gear-set record behind, so a re-scan resurrected the stale set and `/warband equip` would act on it. The same purge now covers both.
