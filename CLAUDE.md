@@ -179,11 +179,31 @@ for the commit log, and `tools/slop.mjs` fails CI on notes that read like
 marketing. Leave the `## [Unreleased]` heading in place when cutting a release;
 removing it turns `main` red.
 
-**Cutting a release is not a routine decision and is not yours to make
-unasked.** A tag ships to CurseForge and Wago and cannot be recalled;
-`.claude/settings.json` asks before `git tag` and before pushing one. What
-number a release gets is `CHANGELOG.md`'s semver rule — anchored to what the
-player has to do about it, not to payload shape.
+**Cut the release. Standing instruction from the maintainer, 2026-09-16.**
+This said the reverse until that date — *not a routine decision and not yours
+to make unasked* — and the maintainer's own words replacing it were "I always
+want you to cut the addon release always."
+
+So a session that lands a player-visible change finishes the job: write the
+`## [x.y.z]` section, merge it, and dispatch the release. **Do not stop to
+ask**, and do not report an untagged version as a question when it is now an
+instruction.
+
+What number it gets is not a judgement call either — `CHANGELOG.md`'s semver
+rule decides it, anchored to what the player has to do about it rather than to
+payload shape.
+
+**Two things this does not relax, and they are the ones that matter.** A tag
+ships to CurseForge and Wago and **cannot be recalled**, so the standing
+instruction buys the decision and not the care:
+
+- **Verify is still the gate**, and the release workflow runs the whole CI
+  suite again before it writes a tag. A red gate stops the release exactly as
+  it stops a commit.
+- **The one-way door under "Never Mix the Two Repositories" is unchanged.** The
+  cost of a mistake here is a secret on CurseForge, and being told to release
+  without asking makes reading the diff before the tag more important rather
+  than less.
 
 **But writing the section is not cutting the release, and this repo keeps
 proving it.** The tag is the version — the `.toc` carries `@project-version@`
@@ -192,8 +212,8 @@ its own. 1.3.0, 1.4.0 and 1.9.0 were each written up, dated and merged without
 a tag, and sat in `main` where no player could download them. `tools/released.mjs`
 is what closed it: it compares the changelog against the tags, fails a push to
 `main` when the newest section has no tag, and names the two commands that ship
-it. If it reports an untagged version, **say so and ask** — it is the report
-that is yours to deliver, not the tag.
+it. If it reports an untagged version, **cut the tag** — that is the standing
+instruction above, and the report is the trigger rather than the deliverable.
 
 ### The rest, stated once
 
