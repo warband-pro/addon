@@ -75,6 +75,12 @@ read_globals = {
   "GetNumSavedInstances", "GetSavedInstanceInfo", "GetSavedInstanceEncounterInfo",
   "GetNumSavedWorldBosses", "GetSavedWorldBossInfo", "RequestRaidInfo",
   "C_MythicPlus", "C_ChallengeMode", "C_WeeklyRewards", "GetDifficultyInfo",
+  -- Combat logging, on entering a raid. `GetInstanceInfo` names the instance
+  -- TYPE, which is what makes "raids only" answerable; `LoggingCombat` reads
+  -- the current state when called with no argument and sets it with one.
+  "GetInstanceInfo", "LoggingCombat",
+  -- The auction house, for the shopping list's one action.
+  "C_AuctionHouse",
 }
 
 ignore = {

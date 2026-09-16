@@ -57,6 +57,61 @@ local EQUIPLOC_SLOT = {
 -- added one warns about a swap that loses nothing.
 local TWO_HANDED = { INVTYPE_2HWEAPON = true }
 
+-- The five canonical slots this expansion's class set occupies, and the only
+-- entries `set` is read for.
+--
+-- Not an optimization for its own sake: `set` needs C_Item.GetItemInfo, which
+-- is the slow, cache-dependent call this file otherwise avoids entirely —
+-- ns.itemInfo is GetItemInfoInstant precisely because it cannot miss. Asking
+-- the slow one for every ring, trinket and spare cloak in a warband bank is
+-- hundreds of calls for a field only five slots can ever carry, so the question
+-- is asked only where the answer can be non-nil.
+--
+-- Wrong-direction: a slot missing here sends no `set` and the website counts
+-- that piece as untiered, which reads as "your bags hold no tier" — quiet, and
+-- exactly the state the website already renders for every bundle older than
+-- this field. A slot wrongly added costs one GetItemInfo per item in it and
+-- gets nil back. Neither can produce a wrong set id.
+local TIER_SLOTS = { [1] = true, [3] = true, [5] = true, [7] = true, [10] = true }
+
+--- The item set id for a hyperlink, or nil.
+---
+--- Position 16 of C_Item.GetItemInfo's return list, which is the only place the
+--- client states it — GetItemInfoInstant does not carry it, so the cached
+--- ns.itemInfo cannot answer this one. **Nil is the expected answer twice
+--- over**: for an item belonging to no set, and for an item this session has
+--- never seen, because GetItemInfo returns nothing at all until the client has
+--- the item cached. The website reads absence as "not read", never as "not
+--- tier", so a cold login under-reports and the next scan corrects it.
+function Gear.SetID(link)
+  if type(link) ~= "string" then return nil end
+  local info = C_Item and C_Item.GetItemInfo
+  if type(info) ~= "function" then return nil end
+  local setID = ns.safe(function()
+    return (select(16, info(link)))
+  end)
+  if type(setID) ~= "number" or setID <= 0 then return nil end
+  return setID
+end
+
+--- The canonical slot number an equip location collapses to, or nil for
+--- anything that is not gear this addon sends.
+---
+--- EQUIPLOC_SLOT is the table and this is the only way out of this file to it.
+--- Instances.lua reads it for a Great Vault reward, which is an item that has
+--- to be described exactly as a bag item is — same slot numbering, same
+--- collapse of both rings to 11 — or the website would be comparing it against
+--- the wrong paperdoll slot.
+function Gear.SlotFor(equipLoc)
+  if type(equipLoc) ~= "string" then return nil end
+  return EQUIPLOC_SLOT[equipLoc]
+end
+
+--- Whether `set` is worth asking about for this canonical slot. See TIER_SLOTS.
+function Gear.IsTierSlot(slot)
+  return TIER_SLOTS[slot] == true
+end
+
 -- The slots where `th` is worth sending at all. Sent as a real boolean on
 -- both, never omitted-when-false: `b` is emitted only when true and the
 -- website needs a second field to date the bundle before it can read that
@@ -168,6 +223,14 @@ function Gear.Visit(where, bagID, slot, info, out)
   }
   if info.isBound then entry.b = true end
   if WEAPON_SLOTS[canonicalSlot] then entry.th = TWO_HANDED[itemInfo.equipLoc or ""] == true end
+  --   set  the item set id, tier slots only (see TIER_SLOTS). The website's
+  --        full-set solve counts tier pieces it can identify, and an item
+  --        string has no field for set membership — so without this it can
+  --        count the tier you are WEARING (the Profile API states it) and can
+  --        never offer to put a piece on out of your bags. Omitted for an item
+  --        in no set and for one the client has not cached, which absence
+  --        means: "not read", never "not tier".
+  if TIER_SLOTS[canonicalSlot] then entry.set = Gear.SetID(info.hyperlink) end
   local stats = ns.safe(C_Item.GetItemStats, info.hyperlink)
   if type(stats) == "table" then
     -- Copy only string-token → number pairs: verbatim on the wire, but the

@@ -251,6 +251,21 @@ against an equipment document that only refreshes at the wearer's last logout.
 | `sub` | Item subclass id, `GetItemInfoInstant` position 7, **verbatim and uninterpreted**. For armor it is 1 Cloth … 4 Plate *on the eight slots that have an armor weight* — and **a cloak reports 1 as well**, which is not a weight and not a claim that only cloth wearers may equip it. Necks, rings and trinkets report 0. With `cls` this is what lets the website call an item unwearable by this class, and the slot is what says whether the question is answerable at all — see the note below. Added in 1.3.0; bag/bank/warbank entries only. |
 | `th` | **Two-handed.** Weapon-slot entries only (`slot` 16 or 17), and a real boolean on every one of them — never omitted-when-false, so its absence dates the bundle rather than needing a second field the way `b` does. `slot` collapses `INVTYPE_2HWEAPON` and `INVTYPE_WEAPON` to the same 16, so without this a consumer cannot tell a two-hander from a one-hander and will call a 2H an upgrade over a main hand while the off-hand beside it is silently unequipped. Only `INVTYPE_2HWEAPON` is claimed: `INVTYPE_RANGED`/`INVTYPE_RANGEDRIGHT` cover bows and guns (two-handed) but also wands (not), and no spec equipping any of the three carries an off-hand, so the distinction is unreachable and not worth a wrong claim. Added in 1.7.0; bag/bank/warbank entries only. |
 | `st` | The item's stat values: `C_Item.GetItemStats` tokens **verbatim**, a map of `ITEM_MOD_*` string → number (e.g. `{"ITEM_MOD_CRIT_RATING_SHORT":581,"ITEM_MOD_INTELLECT_SHORT":1204}`). Never compacted, never interpreted — a token this addon has not heard of still reaches the wire, and a consumer ignores what it does not know. Omitted when the client could not answer (an uncached item on a cold login); absence means "not read", never "no stats". Added in 1.6.0; bag/bank/warbank entries only. |
+| `set` | **Item set id**, `C_Item.GetItemInfo` position 16. Sent on the five tier slots only — `slot` 1, 3, 5, 7, 10 — and on bag/bank/warbank entries only. Omitted for an item in no set *and* for one this session has not cached, so **absence means "not read", never "not tier"**. Added in 1.15.0. |
+
+**`set` is asked on five slots because the call is the expensive one.** Every
+other per-item fact on this table comes from `GetItemInfoInstant`, which cannot
+miss; the set id is only in `GetItemInfo`, which is cache-dependent and returns
+nothing at all for an item this session has never seen. Asking it for every
+ring, trinket and spare cloak in a warband bank is hundreds of calls for a field
+only five slots can carry, so it is asked where the answer can be non-nil and
+nowhere else.
+
+**What it unblocks.** An item string has no field for set membership, so a
+consumer could count the tier a character is *wearing* — the Profile API states
+it on an equipped item — and could never offer to put a piece on out of the
+bags. A full-set solve that cannot see tier in the bags is not a full-set solve.
+A consumer that ignores `set` behaves exactly as it did before 1.15.0.
 
 **`sub` is a subclass, not an armor weight, and `slot` is what tells them
 apart.** Subclass 1 means Cloth on head, shoulders, chest, waist, legs, feet,
@@ -885,6 +900,47 @@ So a character entry may carry `sets`, one entry per spec the website solved:
 | `sets[].spec` | **Required.** The specialization id this setup was solved for, and the key it is stored under. An entry without one is dropped — it has nothing to be filed as. |
 | `sets[].set` | The proposed name for this setup's set. Proposed, not final — see below. |
 | `sets[].items` | Exactly the same shape as `items` above, validated by the same code. |
+| `sets[].c` | **The kind of night this setup is for** — `raid`, `mplus` or `delve`. Optional; added in 1.15.0. Omitted means this entry *is* the set for its spec, which is every string sent before 1.15.0. |
+
+### `sets[].c` — several setups for one spec, added in 1.15.0
+
+`sets` made one setup per spec. `c` makes several per spec, and what earns it
+is that the two are **genuinely different solves rather than two names for
+one**: the website's sim walk prices `Patchwerk` and `DungeonSlice` separately,
+so a Protection warrior's raid kit and key kit disagree about which trinket and
+which secondary, the same way the player's own two sets in the bank do.
+
+```json
+"sets":[
+  {"spec":73,"set":"Protection","c":"raid","items":[ ... ]},
+  {"spec":73,"set":"Protection","c":"mplus","items":[ ... ]}
+]
+```
+
+The three keys are the same three the `builds` assignments already use, and
+that is deliberate: a setup is a gear set *and* the talent build assigned to
+the same kind of night, so both halves key alike.
+
+Three rules a reader must not soften:
+
+- **Asking for a night you have no set for answers nothing** — never another
+  night's kit. `GearSet.Stored("delve")` is nil rather than falling back,
+  because equipping the wrong set is worse than equipping none, and the two
+  are different sentences to the player. Same rule the spec keying follows.
+- **`bySpec` still means what it meant.** `/warband equip` with no argument
+  uses the default: the entry with no `c` when the website sent one, otherwise
+  the **first** entry for that spec. Without that second clause a string
+  carrying only content sets would leave `/warband equip` reporting no set with
+  three sitting in the record.
+- **A `c` this build does not recognise is filed nowhere, and never displaces
+  a default a recognised one has claimed.** Naming a night the reader has not
+  heard of is not the same as naming none — collapsing the two let a key from
+  a newer website overwrite a good default, which is a bug this contract's own
+  test fixture now carries a case for.
+
+`/warband equip raid` is what reads it, and the macro is the point: a
+`/warband equip mplus` button on an action bar is the feature, and typing it
+is not.
 
 **`sets` is additive, and safely so.** `spec`, `set` and `items` at the
 character level still describe the **first** setup — the spec being played — so
@@ -899,6 +955,42 @@ sell a ring it should not. Neither prefix nor `v` moves.
 or nothing at all — never another spec's gear. A record with no spec anywhere
 (an older website, or a character whose spec could not be resolved) makes no
 claim and still applies to whoever is standing there.
+
+### `shop[]` — gems and enchants to go and get, added in 1.15.0
+
+The fourth section on `wbc1!`, and **the first that is a list rather than an
+instruction**. Every other section names an item the addon can find in a bag
+and act on: sell it, equip it, load it. A shopping entry names something that
+is *not* in the bags yet, so the addon can only ever display it — which is
+exactly why it is safe to send and why it needs none of the item-string
+discipline the rest of this wire runs on. There is no action a wrong match
+could take.
+
+```json
+"shop":[
+  {"id":100,"k":"gem","n":3,"d":"+300 Critical Strike","sl":["head","neck","neck"]},
+  {"id":200,"k":"enchant","n":1,"d":"Enchanted: +325 Haste","sl":["chest"]}
+]
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The gem's item id, or the enchant's enchantment id. **Required**; an entry without a positive one is dropped. |
+| `k` | `gem` or `enchant`. A third kind is dropped rather than shown unlabelled — a row has to say which it is to be worth a line. |
+| `n` | How many. Four sockets wanting one gem is **one row of four**, not four rows: the count is the trip. Defaults to 1. |
+| `d` | The website's own words for it, verbatim — `+300 Critical Strike`. What the player is choosing between, and usually more use than the item's name. |
+| `sl` | The slots that want it. This is *why* four, which is the whole difference between a shopping list and a number. |
+
+**No `seenOn`.** The website knows which of your alts already wears one, and
+deliberately does not send it: that is a fact about the warband, and the addon
+is standing on one character with its own alts' bags in front of it. Sending it
+would hand the client a staler copy of something it can read better.
+
+**The list rides the rows the gear panel already draws**, appended after the
+gear and outside the slot sort — a shopping entry has no slot to sort by and
+belongs under the set it is for. Its one action is a left click while the
+auction house is open, which browses for the item by NAME (an id means nothing
+in that box), and does nothing at all otherwise.
 
 ### The set name is proposed here and settled by the client
 
@@ -1096,6 +1188,39 @@ Two rules a consumer must not soften:
   sent on `mplus` on purpose: `GetDifficultyInfo(14)` returns "Normal" whether
   that 14 arrived as a raid difficulty or as a +14 key, and a plausible wrong
   answer is worse than none.
+
+#### `rows[].r` — the item the slot is offering, since 1.15.0
+
+```json
+"rows":[{"t":2,"p":2,"l":14,"d":"Normal",
+         "r":{"slot":5,"id":250456,"ilvl":665,"s":"item:250456::…","n":"Cuirass of…",
+              "cls":4,"sub":4,"st":{"ITEM_MOD_CRIT_RATING_SHORT":612},"set":1234}}]
+```
+
+Additive on `wb1!`, and the field that turns vault *progress* into a vault
+*decision*. Until 1.15.0 the wire said three slots were unlocked and nothing at
+all about what was in them, so the website could rank how close you were to
+earning a slot and could not rank the three items you were being asked to choose
+between — which is the only question anybody opens the vault to answer. The
+player could see them by opening the vault frame; nothing else could.
+
+`r` is **shaped like a `gear[]` entry** — same `slot` numbering, same collapse
+of both rings to 11, same `s`/`st`/`set` semantics — so a consumer decodes it
+through the path an owned item already takes rather than growing a second item
+model for one field.
+
+Three rules:
+
+- **There is no `where`.** A vault reward is not somewhere you own it yet.
+  Calling it a bag item would put it in a best-in-bags candidate pool, which is
+  the one mistake this field must not cause.
+- **Sent only for a slot that is actually paying** (`p >= t`). An activity short
+  of its threshold has no reward to example and the client answers nil for one
+  anyway.
+- **Absent whenever anything declines** — a locked slot, a client without
+  `C_WeeklyRewards.GetExampleRewardItemHyperlinks`, a link the item cache has
+  not filled in. A consumer that ignores `r` renders vault progress exactly as
+  it did before this existed.
 
 `level` on the **bucket** is a max across rows whose ordering it does not own.
 That is fine where the field is a keystone level and wrong where it is a

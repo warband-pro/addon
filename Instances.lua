@@ -131,6 +131,64 @@ local function raidDifficulty(level)
   return name
 end
 
+-- The item a vault slot is currently offering, or nil.
+--
+-- `GetExampleRewardItemHyperlinks` is the client's own answer to "what would
+-- this slot give me", and it is the whole reason the website could rank vault
+-- progress and never the vault itself: it knew three slots were unlocked and
+-- had no idea what was in them. The player sees the items by opening the vault
+-- frame; nothing else on the wire carried them.
+--
+-- Shaped like a `gear[]` entry on purpose — `slot`, `id`, `ilvl`, `s` — so the
+-- website decodes it through the same path an owned item takes rather than
+-- growing a second item model for one field. No `where`: a vault reward is not
+-- somewhere you own it yet, and calling it a bag item would put it in the
+-- solve's candidate pool, which is precisely the mistake this must not make.
+--
+-- Nil the moment anything declines: a locked slot, an API this client does not
+-- have, a link the item cache has not filled in. The website reads absence as
+-- "not read" and renders vault progress exactly as it did before this existed.
+local function vaultReward(wr, activityID)
+  if type(wr.GetExampleRewardItemHyperlinks) ~= "function" then return nil end
+  local link = ns.safe(wr.GetExampleRewardItemHyperlinks, activityID)
+  if type(link) ~= "string" or link == "" then return nil end
+
+  -- The id comes out of the item string rather than from an API that takes a
+  -- link. Gear.lua already proves the string is there and already parses ids
+  -- this way, and one fewer client call is one fewer thing that can be absent
+  -- on a client this addon has not been run against.
+  local s = link:match("|H(item[%-%d:]+)|h")
+  local id = s and tonumber(s:match("^item:(%d+)"))
+  if not id then return nil end
+
+  local itemInfo = ns.itemInfo(id)
+  local slot = itemInfo and ns.Gear.SlotFor(itemInfo.equipLoc)
+  if not slot then return nil end
+
+  local reward = {
+    slot = slot,
+    id = id,
+    ilvl = ns.safe(C_Item.GetDetailedItemLevelInfo, link),
+    s = s,
+    n = link:match("|h%[(.-)%]|h"),
+    cls = itemInfo.classID,
+    sub = itemInfo.subclassID,
+  }
+  if ns.Gear.IsTierSlot(slot) then reward.set = ns.Gear.SetID(link) end
+  local stats = ns.safe(C_Item.GetItemStats, link)
+  if type(stats) == "table" then
+    local st
+    for k, v in pairs(stats) do
+      if type(k) == "string" and type(v) == "number" then
+        st = st or {}
+        st[k] = v
+      end
+    end
+    reward.st = st
+  end
+  return reward
+end
+
 function Instances.Vault()
   local wr = C_WeeklyRewards
   if not wr then return end
@@ -167,6 +225,11 @@ function Instances.Vault()
         p = a.progress or 0,
         l = a.level,
         d = (key == "raid") and raidDifficulty(a.level) or nil,
+        -- Asked only of a slot that is actually paying: an activity still
+        -- short of its threshold has no reward to example, and the client
+        -- answers nil for one anyway. Gating here keeps a full vault to three
+        -- GetItemInfo-shaped lookups rather than one per activity row.
+        r = ((a.progress or 0) >= (a.threshold or 0)) and a.id and vaultReward(wr, a.id) or nil,
       })
 
       -- `level` is a max across rows whose ordering it does not own, which is

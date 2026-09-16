@@ -281,7 +281,10 @@ end
 --- config this character has never saved is kept rather than checked: the
 --- reader has no business deciding a build is gone when the player may simply
 --- not have logged in on that spec since making it.
-local CONTENTS = { raid = true, mplus = true, delve = true }
+-- ns.IS_CONTENT, under this file's own name. The list itself lives in
+-- Init.lua with the other constants that cross the wire, because both the
+-- build assignments and (since 1.15.0) the gear setups key on it.
+local CONTENTS = ns.IS_CONTENT
 
 local function readBuilds(raw)
   if type(raw) ~= "table" then return nil end
@@ -320,25 +323,111 @@ end
 --- `set`, `items` and `sets`, validated by the same functions — so there is
 --- one gear-set format, carried on two wires, rather than two that must be
 --- kept in step.
+--- A `sets[]` array -> `bySpec`, `byContent`, and how many survived.
+---
+--- One function rather than two near-identical loops, because there is one
+--- gear-set format carried on two wires (`wbg1!` and the `gear` section of
+--- `wbc1!`) and two copies of this validation is two things to keep in step.
+---
+--- **`c` is what lets one spec hold several sets** — since 1.15.0 the website
+--- solves a spec once per kind of night (its sim walk prices a raid and a key
+--- differently), so `raid` and `mplus` are two real answers rather than two
+--- names for one. An entry with no `c` is *the* set for its spec, which is
+--- every string sent before 1.15.0.
+---
+--- `bySpec` keeps meaning what it always meant: the set `/warband equip` uses
+--- when nobody named a night. It takes the unkeyed entry when there is one,
+--- and otherwise the FIRST content entry for that spec — the website sends
+--- them in the order it wants them tried, so first is the one it would have
+--- sent alone. Without that rule a string carrying only content sets would
+--- leave `/warband equip` answering "no set for this spec" while three sat in
+--- the record.
+---
+--- A `c` this build has not heard of is dropped rather than stored under a key
+--- nothing will ever ask for. It still reaches `bySpec` if it is first, which
+--- is the same posture the rest of this file takes: never lose the items.
+function Import.GearSetSets(raw)
+  if type(raw) ~= "table" then return nil, nil, 0 end
+  local bySpec, byContent, n = nil, nil, 0
+  for _, set in ipairs(raw) do
+    -- A setup with no spec has nothing to be filed under. On `wbg1!` the
+    -- unkeyed character-level fields carry that case; here they do too.
+    if type(set) == "table" and type(set.spec) == "number" then
+      local items = Import.GearSetItems(set.items)
+      if #items > 0 then
+        -- Naming a night this build has not heard of is NOT the same as
+        -- naming none, and collapsing the two let a `c` from a newer website
+        -- overwrite a default that a `c` this build understands had already
+        -- claimed. So an unrecognised key is filed nowhere but may still stand
+        -- in as the default — never displace one.
+        local named = type(set.c) == "string" and set.c ~= ""
+        local content = named and CONTENTS[set.c] and set.c or nil
+        local entry = { spec = set.spec, set = Import.SetName(set.set), content = content, items = items }
+        if content then
+          byContent = byContent or {}
+          byContent[set.spec] = byContent[set.spec] or {}
+          byContent[set.spec][content] = entry
+        end
+        bySpec = bySpec or {}
+        if not named then
+          -- An unkeyed entry IS the set for its spec, and always wins the
+          -- default even if a keyed one got there first.
+          bySpec[set.spec] = entry
+        elseif not bySpec[set.spec] then
+          -- The first keyed entry stands in until an unkeyed one appears.
+          bySpec[set.spec] = entry
+        end
+        n = n + 1
+      end
+    end
+  end
+  return bySpec, byContent, n
+end
+
+--- The shopping list off one character entry — gems and enchants the solved set
+--- wants and this character does not have.
+---
+--- **The one section that is a list rather than an instruction.** Everything
+--- else on this wire names an item the addon can find in a bag and act on; a
+--- shopping entry names something that is not there yet, so the addon can only
+--- ever show it. That is why it needs none of the item-string discipline the
+--- rest of this file runs on: there is no action a wrong match could take.
+---
+--- `k` is dropped when it is not one of the two kinds this build knows, rather
+--- than passed through — a row has to say "gem" or "enchant" to be worth a
+--- line, and an unknown third kind is a row that cannot be labelled.
+local function readShop(raw)
+  if type(raw) ~= "table" then return nil end
+  local out, n = nil, 0
+  for _, e in ipairs(raw) do
+    if type(e) == "table" and type(e.id) == "number" and e.id > 0
+      and (e.k == "gem" or e.k == "enchant") then
+      local slots
+      if type(e.sl) == "table" then
+        slots = {}
+        for _, sl in ipairs(e.sl) do
+          if type(sl) == "string" then slots[#slots + 1] = sl end
+        end
+      end
+      out = out or {}
+      n = n + 1
+      out[n] = {
+        id = e.id,
+        k = e.k,
+        n = type(e.n) == "number" and e.n > 0 and e.n or 1,
+        d = type(e.d) == "string" and e.d or nil,
+        sl = slots,
+      }
+    end
+  end
+  return out
+end
+
 local function readGear(raw)
   if type(raw) ~= "table" then return nil end
 
   local legacy = Import.GearSetItems(raw.items)
-  local bySpec, n = nil, 0
-  if type(raw.sets) == "table" then
-    for _, set in ipairs(raw.sets) do
-      -- A setup with no spec has nothing to be filed under. On `wbg1!` the
-      -- unkeyed character-level fields carry that case; here they do too.
-      if type(set) == "table" and type(set.spec) == "number" then
-        local items = Import.GearSetItems(set.items)
-        if #items > 0 then
-          bySpec = bySpec or {}
-          bySpec[set.spec] = { spec = set.spec, set = Import.SetName(set.set), items = items }
-          n = n + 1
-        end
-      end
-    end
-  end
+  local bySpec, byContent, n = Import.GearSetSets(raw.sets)
 
   if #legacy == 0 and n == 0 then return nil end
   return {
@@ -346,6 +435,7 @@ local function readGear(raw)
     set = Import.SetName(raw.set),
     items = legacy,
     bySpec = bySpec,
+    byContent = byContent,
   }
 end
 
@@ -378,36 +468,40 @@ function Import.DecodePlan(paste)
   if type(payload.chars) ~= "table" then return nil, "not_json" end
 
   local chars = {}
-  local nJunk, nSets, nBuilds = 0, 0, 0
+  local nJunk, nSets, nBuilds, nShop = 0, 0, 0, 0
   for _, c in ipairs(payload.chars) do
     if type(c) == "table" and type(c.guid) == "string" and c.guid ~= "" then
       local junk = Import.CleanupItems(c.items)
       local gear = readGear(c.gear)
       local builds = readBuilds(c.builds)
+      local shop = readShop(c.shop)
       -- Any one section is enough. A character with setups and nothing to
       -- sell is a normal entry, which is the case the cleanup-only reader
       -- could not express — it required `items` and dropped the rest.
-      if junk or gear or builds then
+      if junk or gear or builds or shop then
         chars[c.guid] = {
           name = type(c.name) == "string" and c.name or "?",
           junk = junk,
           gear = gear,
           builds = builds,
+          shop = shop,
         }
         if junk then nJunk = nJunk + 1 end
         if gear then nSets = nSets + 1 end
         if builds then nBuilds = nBuilds + 1 end
+        if shop then nShop = nShop + 1 end
       end
     end
   end
 
-  if nJunk + nSets + nBuilds == 0 then return nil, "no_items" end
+  if nJunk + nSets + nBuilds + nShop == 0 then return nil, "no_items" end
   return {
     generatedAt = payload.generatedAt,
     chars = chars,
     nJunk = nJunk,
     nSets = nSets,
     nBuilds = nBuilds,
+    nShop = nShop,
   }
 end
 
@@ -506,31 +600,18 @@ function Import.DecodeGearSet(paste)
         -- one reads that and behaves exactly as it always did — it simply
         -- never learns the off-spec setups exist. Nothing here depends on
         -- `sets` being present.
-        local bySpec
-        if type(c.sets) == "table" then
-          for _, set in ipairs(c.sets) do
-            -- A setup with no spec has no key to be filed under, so it is
-            -- dropped rather than guessed at — the legacy fields already
-            -- carry the unkeyed case.
-            if type(set) == "table" and type(set.spec) == "number" then
-              local setItems = Import.GearSetItems(set.items)
-              if #setItems > 0 then
-                bySpec = bySpec or {}
-                bySpec[set.spec] = {
-                  spec = set.spec,
-                  set = Import.SetName(set.set),
-                  items = setItems,
-                }
-              end
-            end
-          end
-        end
+        --
+        -- Since 1.15.0 a spec can carry several, keyed by `c` — see
+        -- Import.GearSetSets, which both wires share so the validation cannot
+        -- drift between them.
+        local bySpec, byContent = Import.GearSetSets(c.sets)
         chars[c.guid] = {
           name = type(c.name) == "string" and c.name or "?",
           spec = type(c.spec) == "number" and c.spec or nil,
           set = Import.SetName(c.set),
           items = items,
           bySpec = bySpec,
+          byContent = byContent,
         }
         count = count + 1
       end
@@ -601,7 +682,7 @@ function Import.DecodeInbound(paste)
     for guid, e in pairs(gs.chars) do
       chars[guid] = {
         name = e.name,
-        gear = { spec = e.spec, set = e.set, items = e.items, bySpec = e.bySpec },
+        gear = { spec = e.spec, set = e.set, items = e.items, bySpec = e.bySpec, byContent = e.byContent },
       }
     end
     return {

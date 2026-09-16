@@ -25,6 +25,8 @@ local EVENTS = {
   "UPDATE_INSTANCE_INFO", "BOSS_KILL", "ENCOUNTER_END",
   "WEEKLY_REWARDS_UPDATE", "CHALLENGE_MODE_COMPLETED",
   "MAIL_INBOX_UPDATE", "OWNED_AUCTIONS_UPDATED",
+  "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED",
+  "PLAYER_DIFFICULTY_CHANGED",
   "SKILL_LINES_CHANGED",
   "TRADE_SKILL_SHOW", "TRADE_SKILL_LIST_UPDATE", "NEW_RECIPE_LEARNED",
   "PLAYER_EQUIPMENT_CHANGED", "PLAYER_AVG_ITEM_LEVEL_UPDATE",
@@ -86,6 +88,10 @@ handlers.PLAYER_ENTERING_WORLD = function()
     Scan.Money()
     Instances.Request()
   end)
+  -- Zoning is the event that decides whether you are in a raid, so it is the
+  -- one that turns combat logging on and off. Throttled with everything else
+  -- that fires on a loading screen.
+  ns.throttle("combatlog", 2, ns.syncCombatLog)
 end
 
 -- A ding is the one identity fact that used to need a loading screen to be
@@ -258,6 +264,48 @@ handlers.MERCHANT_CLOSED = function()
   UI.MerchantChanged(false)
 end
 
+-- The same flag, for the other window this addon can do something useful in
+-- front of. A shopping-list row searches the auction house for what it names,
+-- and only while the auction house is open — read from the event rather than
+-- from a frame, exactly as `merchantOpen` is, so nothing has to guess.
+handlers.AUCTION_HOUSE_SHOW = function()
+  ns.GearSet.ahOpen = true
+end
+
+handlers.AUCTION_HOUSE_CLOSED = function()
+  ns.GearSet.ahOpen = false
+end
+
+-- Combat logging on when you zone into a raid, off when you leave.
+--
+-- Off by default and behind an option, because it is the only thing this addon
+-- does that writes outside the game: `WoWCombatLog.txt` grows with every pull
+-- and somebody who never asked for it should not find a file they have to
+-- delete.
+--
+-- **Raids only, and only the current expansion's**, which is the whole of what
+-- makes this safe to automate: `GetInstanceInfo` names the type, and a player
+-- who wants a log of a dungeon or an old raid turns it on themselves. Wrong in
+-- the quiet direction either way — a log that did not start costs one pull's
+-- data, and one that did not stop costs disk.
+--
+-- Both calls go through ns.safe like everything else: a client that renamed
+-- `LoggingCombat` costs this feature and nothing else.
+local function syncCombatLog()
+  local o = ns.Store.db and ns.Store.db.opts
+  if not o or not o.autoLog then return end
+  local kind = ns.safe(function() return (select(2, GetInstanceInfo())) end)
+  local want = kind == "raid"
+  local now = ns.safe(LoggingCombat)
+  if now == want then return end
+  ns.safe(LoggingCombat, want)
+  ns.print(want and "combat logging on — raid" or "combat logging off")
+end
+
+ns.syncCombatLog = syncCombatLog
+
+handlers.PLAYER_DIFFICULTY_CHANGED = syncCombatLog
+
 frame:SetScript("OnEvent", function(_, event, arg1)
   local handler = handlers[event]
   if handler then ns.safe(handler, arg1) end
@@ -389,19 +437,34 @@ SlashCmdList.WARBANDPRO = function(msg)
   -- temporary and worth retrying, no stored set means go and paste one, and a
   -- single "nothing happened" would send the second person to wait out a
   -- fight that was never the problem. Apply() returns nil for both.
-  elseif cmd == "equip" then
-    if InCombatLockdown() then
+  --
+  -- `/warband equip raid` is the same thing for one kind of night. Since
+  -- 1.15.0 the website solves a spec once per content — its sim walk prices a
+  -- raid and a key differently — so a spec can hold several sets and this is
+  -- how a macro picks one. The macro is the point: `/warband equip mplus` on
+  -- an action bar is the whole feature, and typing it is not.
+  elseif cmd == "equip" or cmd:match("^equip%s+%a+$") then
+    local content = cmd:match("^equip%s+(%a+)$")
+    if content and not ns.IS_CONTENT[content] then
+      ns.print(format("no such setup — try %s", table.concat(ns.CONTENTS, ", ")))
+    elseif InCombatLockdown() then
       ns.print("combat — press equip again after the fight")
-    elseif not ns.GearSet.Stored() then
-      -- Same two silences the panel tells apart: since 1.8.0 a paste stores a
-      -- setup per spec, so "none for this spec" is the common case after a
-      -- respec and must not read as "you never pasted one".
+    elseif not ns.GearSet.Stored(content) then
+      -- Three silences told apart rather than sharing one line, for the reason
+      -- the other two already were: a set for another night, a set for another
+      -- spec and no set at all send the player somewhere different.
+      local have = ns.GearSet.Contents()
       local stored = ns.GearSet.Summary()
-      ns.print(stored > 0
-        and format("no gear set for this spec — %d stored for your other spec%s",
-          stored, stored == 1 and "" or "s")
-        or "no gear set for this character — paste an equip string from warband.pro/gear")
-    elseif ns.GearSet.Apply() then
+      if content and #have > 0 then
+        ns.print(format("no %s set for this spec — you have %s",
+          ns.CONTENT_LABEL[content] or content, table.concat(have, ", ")))
+      elseif stored > 0 then
+        ns.print(format("no gear set for this spec — %d stored for your other spec%s",
+          stored, stored == 1 and "" or "s"))
+      else
+        ns.print("no gear set for this character — paste an equip string from warband.pro/gear")
+      end
+    elseif ns.GearSet.Apply(content) then
       if UI.JunkIsShown() then UI.RenderGearSet() end
     end
   elseif cmd == "options" then
@@ -413,7 +476,7 @@ SlashCmdList.WARBANDPRO = function(msg)
     ns.print("perf counters reset")
   else
     ns.print("/warband · /warband roster · /warband copy current · /warband copy <page> · /warband junk · "
-      .. "/warband equip · /warband options · /warband status · "
+      .. "/warband equip [raid|mplus|delve] · /warband options · /warband status · "
       .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband minimap on|off · "
       .. "/warband perf")
   end
