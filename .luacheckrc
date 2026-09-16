@@ -64,6 +64,14 @@ read_globals = {
   "C_CurrencyInfo", "GetProfessions", "GetProfessionInfo", "C_TradeSkillUI",
   "GetInboxNumItems", "GetInboxHeaderInfo", "C_AuctionHouse",
 
+  -- the trading post (Scan.TradingPost). `C_PerksProgram` populates only while
+  -- the shelf is open and `C_PerksActivities` is the Traveler's Log; both are
+  -- read through `ns.safe`, which returns nil for a name the client does not
+  -- have, so listing them here is what lets the lint pass without the code
+  -- assuming they exist. `C_DateAndTime` is here for the realm's own month,
+  -- which is the trading post's identity — see Scan.lua.
+  "C_PerksProgram", "C_PerksActivities", "C_DateAndTime",
+
   -- gear and talents
   "GetInventoryItemLink", "GetInventoryItemID", "ItemLocation",
   "C_ClassTalents", "C_Traits", "GetSpecialization", "GetSpecializationInfo",

@@ -1044,6 +1044,67 @@ tab that did not load keeps its own older stamp.
   absent-means-unknown rule everywhere else here. A web client should say "4 of
   5 tabs" rather than presenting the vault as complete.
 
+### `tradingPost` sits at the payload root too — added in 1.15.0, additive
+
+```json
+"tradingPost": {
+  "seenAt": 1724000000, "seenByName": "Vocnar",
+  "tender": 1450, "tenderSeenAt": 1724000000,
+  "month": "2026-09", "itemsSeenAt": 1724000000,
+  "items": [ {"id":3,"itemID":2002,"name":"Anvil","price":200,"purchased":true},
+             {"id":7,"itemID":2001,"name":"Zephyr","price":750} ],
+  "activitiesMonth": "2026-09", "activitiesSeenAt": 1724000000,
+  "activities": [ {"id":4,"name":"Run a delve","points":250},
+                  {"id":9,"name":"Kill 100 things","completed":true,"points":500} ]
+}
+```
+
+Account-wide, so it sits beside `warbandBank` for the same reason: the trading
+post is the account's, not a character's. Each character still carries
+`seenAt.tradingPost`, so the dots can say who last looked.
+
+**`month` is the field that makes the rest usable, and a reader that ignores it
+will be wrong once a month.** The shelf is replaced wholesale on the first, so
+a stored list is not an old reading of the same fact — it is a list of things
+that are no longer purchasable at any price. A consumer MUST compare `month`
+against its own clock and treat a mismatch as *no offerings read this month*,
+never as this month's offerings. Nothing on the addon side deletes them on the
+rollover: the addon may not be running when the month turns, and a stamp the
+consumer can check is more honest than a sweep that may never fire.
+
+**Every field here is independently optional, and the common state is a partial
+one.** The tender balance comes off `C_CurrencyInfo` (currency `2032`) and is
+readable anywhere; the shelf comes from `C_PerksProgram`, which the client
+populates only once the trading post frame has been opened. So a balance with
+no items is the *normal* reading for a player who has not visited this month,
+and a reader must not take an absent `items` as an empty shelf.
+
+| field | | |
+|---|---|---|
+| `tender` | number | Trader's Tender the account holds. Absent if never read |
+| `tenderSeenAt` | number | when that balance was read — it moves independently of the shelf |
+| `month` | string | `YYYY-MM` in the realm's reckoning, from `C_DateAndTime`. Absent when the client would not say, and then the shelf's month is unknown rather than assumed |
+| `items[]` | list | this month's shelf. Absent until the frame has been opened |
+| `items[].id` | number | the shelf entry's own id (`perksVendorItemID`) |
+| `items[].itemID` | number | the item you end up owning — **this is the id that joins to a collection** |
+| `items[].price` | number | in tender |
+| `items[].purchased` | bool | absent rather than `false`. Bought *this month*, which is a different fact from already owning the thing, and only the client knows the first |
+| `activities[]` | list | the Traveler's Log, from `C_PerksActivities`. Absent until read |
+| `activities[].completed` | bool | absent rather than `false` |
+| `activities[].points` | number | what the month's bar counts this one for. Absent when the client did not say — never `0`, which would read as an activity that earns nothing |
+
+**Days left in the month are deliberately not on this wire.** They are
+derivable from a calendar and a clock, both of which the website has, and a
+countdown computed here would be a number that goes quietly wrong in a bundle
+pasted three days later.
+
+**These API names are the least verified in this addon.** They are read off
+Blizzard's own UI rather than from anything this repo can exercise, so every
+call goes through `ns.safe` — a name the client does not have returns nil and
+costs this one section. `docs/QA.md` carries the in-game checklist that settles
+them, and until it has been run a consumer should expect this whole object to
+be absent rather than assume any part of it.
+
 ### 2. Items carry `{id, count, quality?, isBound?}` — no `link`, no `isCraftingReagent`
 
 Name, icon, quality colour and item class are all derivable from the id through

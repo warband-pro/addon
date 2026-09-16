@@ -112,6 +112,35 @@ local function warbandBank(root)
   }
 end
 
+-- The trading post, account-wide, beside the warband bank.
+--
+-- Absent entirely until something has been read, which is the same rule
+-- `warbandBank` follows one function up — an absent section and an empty one
+-- are different answers, and only the first is honest about a player who has
+-- never opened the shelf.
+--
+-- `month` travels with the items and is the field that makes the rest usable:
+-- the shelf is replaced wholesale on the first of the month, so a consumer
+-- comparing `month` against its own clock is the only way to tell this month's
+-- offerings from a stored copy of last month's. It is stated rather than
+-- implied because the addon may not have been running when the month turned.
+local function tradingPost(root)
+  if not root or not root.seenAt then return nil end
+  return {
+    seenAt = root.seenAt,
+    seenByGuid = root.seenByGuid,
+    seenByName = root.seenByName,
+    tender = root.tender,
+    tenderSeenAt = root.tenderSeenAt,
+    month = root.month,
+    itemsSeenAt = root.itemsSeenAt,
+    items = root.items,
+    activitiesMonth = root.activitiesMonth,
+    activitiesSeenAt = root.activitiesSeenAt,
+    activities = root.activities,
+  }
+end
+
 -- opts.currentOnly restricts the bundle to the character at the keyboard, which
 -- is what /warband copy current is for.
 function Bundle.Build(opts)
@@ -193,6 +222,7 @@ function Bundle.Build(opts)
       pages = pages > 1 and pages or nil,
     },
     warbandBank = warbandBank(db.warbandBank),
+    tradingPost = tradingPost(db.tradingPost),
     characters = chars,
   }
 end

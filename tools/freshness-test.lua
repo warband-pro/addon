@@ -419,6 +419,149 @@ check("a warband that fits in one bundle says nothing about pages",
   whole.bundle.page == nil and whole.bundle.pages == nil)
 check("and reports nothing left out", whole.bundle.droppedOverCap == nil)
 
+-- ── the trading post is two reads with two availabilities ───────────────────
+--
+-- The tender balance comes off the currency API and is readable anywhere; the
+-- shelf needs the trading post frame to have been opened. So the common state
+-- is a real tender number beside no items at all, and the failure this guards
+-- against is the obvious implementation of `Store.PutTradingPost` — one that
+-- writes the whole section from one read and blanks the half that was not
+-- readable that time.
+
+local PERKS_ITEMS, PERKS_ACTS, TENDER, CAL = nil, nil, nil, { year = 2026, month = 9 }
+
+_G.C_DateAndTime = {
+  GetCurrentCalendarTime = function()
+    if CAL == nil then error("no calendar on this client") end
+    return CAL
+  end,
+}
+
+_G.C_PerksProgram = {
+  GetAvailableVendorItemIDs = function()
+    if PERKS_ITEMS == nil then error("shelf not loaded") end
+    local ids = {}
+    for i = 1, #PERKS_ITEMS do ids[i] = PERKS_ITEMS[i].perksVendorItemID end
+    return ids
+  end,
+  GetVendorItemInfo = function(id)
+    for _, it in ipairs(PERKS_ITEMS or {}) do
+      if it.perksVendorItemID == id then return it end
+    end
+    return nil
+  end,
+}
+
+_G.C_PerksActivities = {
+  GetAllPerksActivitiesInfo = function()
+    if PERKS_ACTS == nil then error("log not loaded") end
+    return { activeActivities = PERKS_ACTS }
+  end,
+}
+
+-- Tender rides the ordinary currency API, so the fake lives with the others.
+local realCurrencyInfo = _G.C_CurrencyInfo
+_G.C_CurrencyInfo = setmetatable({
+  GetCurrencyInfo = function(id)
+    if id == 2032 then
+      if TENDER == nil then return nil end
+      return { quantity = TENDER, name = "Trader's Tender" }
+    end
+    return nil
+  end,
+}, { __index = realCurrencyInfo })
+
+local function shelf()
+  return {
+    { perksVendorItemID = 7, itemID = 2001, name = "Zephyr", price = 750 },
+    { perksVendorItemID = 3, itemID = 2002, name = "Anvil", price = 200, purchased = true },
+  }
+end
+
+reset()
+TENDER, PERKS_ITEMS, PERKS_ACTS = nil, nil, nil
+Scan.TradingPost()
+check("a client that answers nothing writes no trading post at all",
+  Store.db.tradingPost.seenAt == nil)
+check("and stamps no section for it", stamps().tradingPost == nil)
+
+reset()
+TENDER, PERKS_ITEMS, PERKS_ACTS = 1450, nil, nil
+Scan.TradingPost()
+check("tender alone is a real reading", Store.db.tradingPost.tender == 1450)
+check("with no shelf beside it", Store.db.tradingPost.items == nil)
+check("and no month, because the month belongs to the shelf",
+  Store.db.tradingPost.month == nil)
+check("the section is stamped once something landed", stamps().tradingPost == NOW)
+
+-- The player walks to the trading post. The shelf lands; the balance must not
+-- be disturbed, and the month arrives with the items.
+NOW = NOW + 3600
+PERKS_ITEMS = shelf()
+TENDER = nil
+Scan.TradingPost()
+local tp = Store.db.tradingPost
+check("the shelf lands", tp.items and #tp.items == 2)
+check("sorted by shelf id, so the wire is byte-stable",
+  tp.items[1].id == 3 and tp.items[2].id == 7)
+check("carrying what the client already sold you", tp.items[1].purchased == true)
+check("and leaving `purchased` absent rather than false", tp.items[2].purchased == nil)
+check("the month arrives with the shelf", tp.month == "2026-09")
+check("a tender read that failed does not blank the balance we had",
+  tp.tender == 1450)
+check("and does not move the tender stamp", tp.tenderSeenAt == NOW - 3600)
+
+-- A later pass that cannot see the shelf must not empty it.
+NOW = NOW + 3600
+PERKS_ITEMS = nil
+TENDER = 700
+Scan.TradingPost()
+tp = Store.db.tradingPost
+check("a pass with no shelf keeps the shelf we had", tp.items and #tp.items == 2)
+check("and keeps the month that came with it", tp.month == "2026-09")
+check("while the new balance lands", tp.tender == 700)
+
+-- The Traveler's Log is its own read again.
+NOW = NOW + 3600
+PERKS_ACTS = {
+  { ID = 9, activityName = "Kill 100 things", completed = true, requiredContributionAmount = 500 },
+  { ID = 4, activityName = "Run a delve", requiredContributionAmount = 250 },
+}
+Scan.TradingPost()
+tp = Store.db.tradingPost
+check("the log lands", tp.activities and #tp.activities == 2)
+check("sorted by id", tp.activities[1].id == 4 and tp.activities[2].id == 9)
+check("carrying completion", tp.activities[2].completed == true)
+check("and leaving it absent rather than false", tp.activities[1].completed == nil)
+check("the shelf is untouched by a log read", tp.items and #tp.items == 2)
+
+-- A client with no calendar still reads a shelf; it just cannot say which
+-- month, and the consumer is told that by the absence rather than by a guess.
+reset()
+CAL = nil
+TENDER, PERKS_ITEMS, PERKS_ACTS = 10, shelf(), nil
+Scan.TradingPost()
+check("no calendar means no month, never a guessed one",
+  Store.db.tradingPost.month == nil)
+check("and the shelf still lands", #Store.db.tradingPost.items == 2)
+CAL = { year = 2026, month = 9 }
+
+-- ── and the trading post has to survive the trip to the wire ────────────────
+
+reset()
+TENDER, PERKS_ITEMS, PERKS_ACTS = nil, nil, nil
+check("a payload from an account that never looked omits it entirely",
+  Bundle.Build().tradingPost == nil)
+
+TENDER, PERKS_ITEMS = 1450, shelf()
+Scan.TradingPost()
+local tpWire = Bundle.Build().tradingPost
+check("once read it reaches the payload root", tpWire ~= nil)
+check("with the balance", tpWire.tender == 1450)
+check("the month", tpWire.month == "2026-09")
+check("and the shelf", tpWire.items and #tpWire.items == 2)
+check("json-encodes without error", type(Bundle.JSON(Bundle.Build())) == "string")
+
 -- ── every stamped section is one the store knows about ──────────────────────
 
 reset()

@@ -345,6 +345,114 @@ function Scan.Currencies()
   Store.Put("currency", "currencies", out)
 end
 
+-- Trader's Tender. 2032 since the trading post shipped in 10.0.7.
+--
+-- A constant rather than a search through the currency list, because the list
+-- is localized and the id is not — and because `Scan.Currencies` above only
+-- sees a currency the player has *discovered*, which tender is not until they
+-- first earn some. The id answers either way.
+local TENDER_CURRENCY = 2032
+
+-- `YYYY-MM` in the realm's own reckoning, or nil when the client will not say.
+--
+-- The month is the trading post's identity: the shelf is replaced wholesale on
+-- the first, so a list without the month it was read in cannot be told apart
+-- from last month's. Calendar time rather than `date()` because the rollover
+-- that matters is the realm's, and a player east of their realm can be a day
+-- ahead of it locally — which for one day a month would file this month's
+-- offerings under next month's key and hide them.
+local function currentMonth()
+  local t = ns.safe(C_DateAndTime and C_DateAndTime.GetCurrentCalendarTime)
+  local y, m = t and tonumber(t.year), t and tonumber(t.month)
+  if not y or not m then return nil end
+  return string.format("%04d-%02d", y, m)
+end
+
+-- This month's trading post: what is on the shelf, what it costs, what the
+-- account has to spend, and how far the Traveler's Log has got.
+--
+-- **Two reads with different availability, deliberately kept separate.** The
+-- tender balance is a currency and readable anywhere. The offerings come from
+-- `C_PerksProgram`, which the client populates when the trading post frame is
+-- opened — so until the player visits it once in a month, there is a balance
+-- and no shelf. `Store.PutTradingPost` takes each independently for exactly
+-- that reason; this function returning with only a tender number is the normal
+-- case, not a failure.
+--
+-- Everything goes through `ns.safe`, which matters more here than usual: these
+-- API names are the least verified in this addon. They are read off Blizzard's
+-- own UI code rather than from anything this repo can exercise, and
+-- docs/QA.md carries the in-game checklist that settles them. A wrong name
+-- costs this one section — `ns.safe` returns nil for a non-function — and the
+-- website already treats every field here as optional.
+function Scan.TradingPost()
+  local perks = C_PerksProgram
+  local read = { month = currentMonth() }
+
+  local ci = C_CurrencyInfo
+  local tender = ci and ns.safe(ci.GetCurrencyInfo, TENDER_CURRENCY)
+  if tender and type(tender.quantity) == "number" then read.tender = tender.quantity end
+
+  if perks then
+    local ids = ns.safe(perks.GetAvailableVendorItemIDs)
+    if type(ids) == "table" then
+      local items = {}
+      for i = 1, #ids do
+        local info = ns.safe(perks.GetVendorItemInfo, ids[i])
+        -- `perksVendorItemID` is the shelf entry; `itemID` is the thing you end
+        -- up owning, and it is the one that joins to a collection. An entry
+        -- with neither is not worth a row.
+        local vendorID = info and tonumber(info.perksVendorItemID or ids[i])
+        local itemID = info and tonumber(info.itemID)
+        if info and (vendorID or itemID) then
+          items[#items + 1] = {
+            id = vendorID,
+            itemID = itemID,
+            name = info.name,
+            price = tonumber(info.price),
+            -- What the player has already bought this month. The point of the
+            -- whole section: `purchased` and "already in the collection" are
+            -- different facts, and only the client knows the first.
+            purchased = info.purchased or nil,
+          }
+        end
+      end
+      -- Sorted by shelf id so the wire is byte-stable across reads — same rule
+      -- as the warband bank's tabs, and for the same reason: a bundle whose
+      -- bytes move without its meaning moving is one a diff cannot be read
+      -- against.
+      table.sort(items, function(a, b) return (a.id or a.itemID or 0) < (b.id or b.itemID or 0) end)
+      read.items = items
+    end
+  end
+
+  local acts = C_PerksActivities
+  local all = acts and ns.safe(acts.GetAllPerksActivitiesInfo)
+  local list = type(all) == "table" and (all.activeActivities or all) or nil
+  if type(list) == "table" then
+    local out = {}
+    for i = 1, #list do
+      local a = list[i]
+      local id = a and tonumber(a.ID or a.perksActivityID)
+      if id then
+        out[#out + 1] = {
+          id = id,
+          name = a.activityName or a.name,
+          completed = a.completed or nil,
+          -- How much of the month's bar this one is worth, when the client
+          -- says. Absent rather than zero: a nil is "not stated", and zero
+          -- would read as an activity that earns nothing.
+          points = tonumber(a.requiredContributionAmount) or nil,
+        }
+      end
+    end
+    table.sort(out, function(a, b) return a.id < b.id end)
+    read.activities = out
+  end
+
+  Store.PutTradingPost(read)
+end
+
 -- Skill level and cap only. Recipe counts need the profession window open and a
 -- full C_TradeSkillUI walk, which is the most expensive thing this addon could
 -- do; the contract already treats knownRecipes as optional.
@@ -412,6 +520,10 @@ function Scan.All()
   Scan.Bags()
   Scan.Currencies()
   Scan.Professions()
+  -- Cheap on the common path: without the trading post frame open this is one
+  -- currency read and two calls that return nil, and it is the read that gets
+  -- the tender balance onto the wire for a player who never opens the shelf.
+  Scan.TradingPost()
   ns.Gear.All()
   ns.Gear.Talents()
 end

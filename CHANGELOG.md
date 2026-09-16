@@ -45,6 +45,20 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**The trading post goes out with the bundle.** What is on this month's shelf,
+what each thing costs, how much Trader's Tender you have, and how far the
+Traveler's Log has got. warband.pro reads it against the collection it already
+knows about, so it can tell you which of this month's items you do not own yet
+and whether you have the tender to finish.
+
+The balance travels whether or not you visit the shelf — it is a currency, and
+the addon can read it anywhere. The offerings need you to open the trading post
+once in a month, because that is when the game loads them; until you do, the
+string carries your tender and says plainly that the shelf has not been read
+rather than reporting it as empty.
+
 ### Fixed
 
 **A forgotten character's pasted gear set is dropped with its junk list.** Forgetting a character cleared its junk list but left its pasted gear-set record behind, so a re-scan resurrected the stale set and `/warband equip` would act on it. The same purge now covers both.
