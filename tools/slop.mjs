@@ -120,11 +120,28 @@ if (prose === '') {
   process.exit(1);
 }
 
+/**
+ * A line with its inline code spans blanked out.
+ *
+ * Every rule above is about PROSE VOICE — how a person writes a sentence — and
+ * a slash command is not a sentence. `/warband equip delve` has to be spelled
+ * the way the client accepts it, lowercase and all, and the `delv` rule is
+ * case-sensitive precisely because the capitalised WoW content type is
+ * legitimate. Without this the changelog could name a command it cannot name.
+ *
+ * Only the span CONTENTS go; the backticks are kept so column positions in the
+ * report still line up with the file. Code fences are left alone — a fenced
+ * block in this file is a command to run, and no rule here has ever matched
+ * one.
+ */
+const withoutCode = (line) => line.replace(/`[^`]*`/g, (m) => '`' + ' '.repeat(m.length - 2) + '`');
+
 const findings = [];
 body.forEach((line, i) => {
   const lineNo = start + 2 + i; // 1-based, offset past the heading
+  const text = withoutCode(line);
   for (const [re, why] of RULES) {
-    const m = line.match(re);
+    const m = text.match(re);
     if (m) findings.push({ lineNo, hit: m[0].trim(), why });
   }
 });

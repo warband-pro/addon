@@ -235,6 +235,52 @@ check("that character carries no junk section at all",
 local buildsOnly = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G",' .. BUILDS .. '}]}')
 check("builds alone are enough to keep a character", buildsOnly ~= nil and buildsOnly.nBuilds == 1)
 
+-- ── `c`: several setups for one spec, since 1.15.0 ─────────────────────────
+
+local CONTENT_GEAR = '"gear":{"spec":103,"set":"Feral",' ..
+  '"items":[{"slot":1,"s":"item:9","id":9}],' ..
+  '"sets":[{"spec":103,"set":"Feral","c":"raid","items":[{"slot":1,"s":"item:9"}]},' ..
+  '{"spec":103,"set":"Feral","c":"mplus","items":[{"slot":1,"s":"item:8"}]},' ..
+  '{"spec":103,"set":"Feral","c":"nonsense","items":[{"slot":1,"s":"item:7"}]}]}'
+
+local byNight = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N",' .. CONTENT_GEAR .. '}]}')
+if byNight then
+  local g = byNight.chars["G"].gear
+  check("one spec carries a set per kind of night", g.byContent and g.byContent[103] ~= nil)
+  check("the raid set is the raid set",
+    g.byContent and g.byContent[103].raid and g.byContent[103].raid.items[1].s == "item:9")
+  check("the mythic+ set is a different one",
+    g.byContent and g.byContent[103].mplus and g.byContent[103].mplus.items[1].s == "item:8")
+  check("a content key this build does not know is not filed under one",
+    g.byContent and g.byContent[103].nonsense == nil)
+  -- Without this rule a string of content-only sets leaves `/warband equip`
+  -- saying "no set for this spec" with three sitting in the record.
+  check("the first content set stands in as the default",
+    g.bySpec and g.bySpec[103] and g.bySpec[103].items[1].s == "item:9")
+  check("and it remembers which night it came from",
+    g.bySpec and g.bySpec[103].content == "raid")
+end
+
+local UNKEYED_WINS = '"gear":{"spec":103,"set":"Feral","items":[{"slot":1,"s":"item:9","id":9}],' ..
+  '"sets":[{"spec":103,"set":"Feral","c":"raid","items":[{"slot":1,"s":"item:9"}]},' ..
+  '{"spec":103,"set":"Feral","items":[{"slot":1,"s":"item:1"}]}]}'
+local unkeyed = plan('{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N",' .. UNKEYED_WINS .. '}]}')
+if unkeyed then
+  local g = unkeyed.chars["G"].gear
+  check("an unkeyed set wins the default even arriving second",
+    g.bySpec and g.bySpec[103].items[1].s == "item:1")
+  check("and carries no content", g.bySpec and g.bySpec[103].content == nil)
+  check("while the raid set stays reachable by name",
+    g.byContent and g.byContent[103].raid.items[1].s == "item:9")
+end
+
+-- A string from before 1.15.0 must decode exactly as it always did.
+if all then
+  local g = all.chars["G"].gear
+  check("a string with no `c` anywhere files nothing by content", g.byContent == nil)
+  check("and still keys by spec", g.bySpec and g.bySpec[105] ~= nil)
+end
+
 check("a string empty of all three is still no_items", (function()
   inflated = '{"v":1,"generatedAt":9,"chars":[{"guid":"G","name":"N"}]}'
   local _, c = Import.DecodePlan("wbc1!AAAA")

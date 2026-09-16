@@ -446,6 +446,51 @@ SPEC = 102
 check("an unkeyed record applies to any spec", GearSet.Stored() ~= nil)
 SPEC = 103
 
+-- ── a setup per KIND OF NIGHT (1.15.0) ─────────────────────────────────────
+-- The website solves a spec once per content now — its sim walk prices a raid
+-- and a key differently — so one spec can hold several sets and `/warband
+-- equip raid` is how a macro picks one.
+
+inflated = '{"v":1,"generatedAt":1,"chars":[{"guid":"Player-1-TEST","name":"Vocnar",' ..
+  '"spec":103,"set":"Feral","items":[{"slot":1,"s":"item:9"}],' ..
+  '"sets":[{"spec":103,"set":"Feral","c":"raid","items":[{"slot":1,"s":"item:9"}]},' ..
+  '{"spec":103,"set":"Feral","c":"mplus","items":[{"slot":5,"s":"item:8"}]}]}]}'
+GearSet.Save(Import.DecodeInbound("wbg1!AAAA"))
+SPEC = 103
+
+local raidSet = GearSet.Stored("raid")
+local keySet = GearSet.Stored("mplus")
+check("a night names its own set", raidSet ~= nil and raidSet.items[1].s == "item:9")
+check("and another night names a different one", keySet ~= nil and keySet.items[1].s == "item:8")
+check("a set knows which night it is for", raidSet and raidSet.content == "raid")
+
+-- Handing over another night's kit would be worse than handing over none: the
+-- same rule the spec keying already follows.
+check("a night with no set answers nothing, not another night's gear", GearSet.Stored("delve") == nil)
+
+check("the nights available are listed in the website's own order",
+  table.concat(GearSet.Contents(), ",") == "raid,mplus", table.concat(GearSet.Contents(), ","))
+
+-- Without an argument nothing changes for anyone: the default is what
+-- `/warband equip` has always used.
+local defaultSet = GearSet.Stored()
+check("no argument still gets a set", defaultSet ~= nil)
+check("and it is the first the website sent", defaultSet and defaultSet.items[1].s == "item:9")
+
+SPEC = 105
+check("nights are per spec too", GearSet.Stored("raid") == nil)
+check("and another spec lists none of them", #GearSet.Contents() == 0)
+SPEC = 103
+
+-- Apply takes the same argument, which is the whole point of the macro.
+BAGS = { [0] = { [1] = { itemID = 221151, hyperlink = link("item:8", "Chest") } } }
+SETS, ORDER, printed = {}, {}, {}
+local keyApply = GearSet.Apply("mplus")
+check("apply acts on the night it was given", keyApply ~= nil and #keyApply.ready == 1)
+check("and equips that night's item into that night's slot",
+  ORDER[2] == "equip:5", tostring(ORDER[2]))
+GearSet.pending = nil
+
 -- ── the set name is discovered, never assumed ───────────────────────────────
 -- C_EquipmentSet enforces a length this addon cannot read, so the full name is
 -- tried and shorter ones after it. Here the stub refuses anything over 16.

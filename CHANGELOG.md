@@ -64,6 +64,18 @@ Both are read where the client will answer and left out where it will not. A
 freshly logged-in character may send neither until things finish loading; the
 next scan picks them up.
 
+**A set per kind of night, and `/warband equip raid` to wear it.** The site
+solves each spec once for raid, once for keys and once for Delves — and those
+are different answers, not the same answer three times, because it prices a
+raid boss and a dungeon pull separately. Paste as usual and all three arrive.
+
+`/warband equip` on its own is unchanged and still equips what it always did.
+`/warband equip raid`, `/warband equip mplus` and `/warband equip delve` each
+pick one, which is what you want on an action bar.
+
+Asking for a night you have no set for says so and equips nothing, rather than
+putting on a different night's gear.
+
 ### Fixed
 
 **A forgotten character's pasted gear set is dropped with its junk list.** Forgetting a character cleared its junk list but left its pasted gear-set record behind, so a re-scan resurrected the stale set and `/warband equip` would act on it. The same purge now covers both.

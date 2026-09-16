@@ -107,17 +107,42 @@ end
 --- it makes no claim, so it applies to whoever is standing there. That is
 --- also the downgrade path — the legacy fields are still written, so a player
 --- who reverts this addon finds exactly the record the old code expects.
-function GearSet.Stored()
+--- `content` is optional and is what `/warband equip raid` passes: since 1.15.0
+--- the website solves a spec once per kind of night, so a spec can hold a raid
+--- set and a key set at the same time.
+---
+--- **Asking for a night you have no set for answers nothing, rather than
+--- quietly handing over another night's kit.** That is the same rule the spec
+--- keying already follows and for the same reason: equipping the wrong set is
+--- worse than equipping none, and the panel can say which of the two happened.
+--- Asking for no night at all gets the default — the unkeyed set when the
+--- website sent one, otherwise the first it sent.
+function GearSet.Stored(content)
   local rec = storedRecord()
   if not rec then return nil end
+  local spec = activeSpecID()
+
+  if content then
+    local forSpec = spec and type(rec.byContent) == "table" and rec.byContent[spec]
+    local mine = forSpec and forSpec[content]
+    if not mine then return nil end
+    return {
+      generatedAt = rec.generatedAt,
+      spec = mine.spec,
+      set = mine.set,
+      content = mine.content,
+      items = mine.items,
+    }
+  end
+
   if rec.bySpec then
-    local spec = activeSpecID()
     local mine = spec and rec.bySpec[spec]
     if mine then
       return {
         generatedAt = rec.generatedAt,
         spec = mine.spec,
         set = mine.set,
+        content = mine.content,
         items = mine.items,
       }
     end
@@ -127,6 +152,22 @@ function GearSet.Stored()
   -- No `bySpec` at all: an unkeyed record, which applies to anyone.
   if rec.spec and activeSpecID() and rec.spec ~= activeSpecID() then return nil end
   return rec
+end
+
+--- Which kinds of night this character has a set for, in the website's own
+--- order, for the spec being played. Read by the panel and by `/warband equip`
+--- so an unknown argument can be answered with the list rather than a shrug.
+function GearSet.Contents()
+  local rec = storedRecord()
+  local spec = activeSpecID()
+  local out = {}
+  if not rec or not spec or type(rec.byContent) ~= "table" then return out end
+  local forSpec = rec.byContent[spec]
+  if type(forSpec) ~= "table" then return out end
+  for _, key in ipairs(ns.CONTENTS) do
+    if forSpec[key] then out[#out + 1] = key end
+  end
+  return out
 end
 
 --- How many stored setups this character has, and whether any is for the spec
@@ -167,6 +208,11 @@ function GearSet.Save(decoded)
         set = gear.set,
         items = gear.items,
         bySpec = gear.bySpec,
+        -- Per spec AND per kind of night, since 1.15.0. Stored beside `bySpec`
+        -- rather than replacing it: `bySpec` is still what `/warband equip`
+        -- with no argument uses, and is still the whole record for a string
+        -- from a website that does not send `c`.
+        byContent = gear.byContent,
         -- Carried on the same record rather than a fourth top-level table:
         -- a build assignment is about which setup to wear on which night, so
         -- it belongs beside the setups, and one record means one write.
@@ -280,8 +326,10 @@ end
 --- Returns `already` (target slot holds the exact item), `ready` (found in a
 --- carried bag, with live coordinates), `missing` (nowhere reachable, with
 --- the wire's `w` for the "in your bank" line), plus `set` and `generatedAt`.
-function GearSet.Resolve()
-  local stored = GearSet.Stored()
+--- `content` is passed straight through to `Stored` — `/warband equip raid`
+--- resolves the raid set and nothing else.
+function GearSet.Resolve(content)
+  local stored = GearSet.Stored(content)
   if not stored then return nil end
   local byString = scanCarried()
   local already, ready, missing = {}, {}, {}
@@ -537,9 +585,9 @@ end
 
 --- Equip every ready item and arm the verify-then-save. Returns the resolve
 --- it acted on, or nil when there was nothing to act on at all.
-function GearSet.Apply()
+function GearSet.Apply(content)
   if InCombatLockdown() then return nil end
-  local r = GearSet.Resolve()
+  local r = GearSet.Resolve(content)
   if not r then return nil end
 
   local bankCount = 0

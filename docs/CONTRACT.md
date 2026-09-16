@@ -900,6 +900,47 @@ So a character entry may carry `sets`, one entry per spec the website solved:
 | `sets[].spec` | **Required.** The specialization id this setup was solved for, and the key it is stored under. An entry without one is dropped — it has nothing to be filed as. |
 | `sets[].set` | The proposed name for this setup's set. Proposed, not final — see below. |
 | `sets[].items` | Exactly the same shape as `items` above, validated by the same code. |
+| `sets[].c` | **The kind of night this setup is for** — `raid`, `mplus` or `delve`. Optional; added in 1.15.0. Omitted means this entry *is* the set for its spec, which is every string sent before 1.15.0. |
+
+### `sets[].c` — several setups for one spec, added in 1.15.0
+
+`sets` made one setup per spec. `c` makes several per spec, and what earns it
+is that the two are **genuinely different solves rather than two names for
+one**: the website's sim walk prices `Patchwerk` and `DungeonSlice` separately,
+so a Protection warrior's raid kit and key kit disagree about which trinket and
+which secondary, the same way the player's own two sets in the bank do.
+
+```json
+"sets":[
+  {"spec":73,"set":"Protection","c":"raid","items":[ ... ]},
+  {"spec":73,"set":"Protection","c":"mplus","items":[ ... ]}
+]
+```
+
+The three keys are the same three the `builds` assignments already use, and
+that is deliberate: a setup is a gear set *and* the talent build assigned to
+the same kind of night, so both halves key alike.
+
+Three rules a reader must not soften:
+
+- **Asking for a night you have no set for answers nothing** — never another
+  night's kit. `GearSet.Stored("delve")` is nil rather than falling back,
+  because equipping the wrong set is worse than equipping none, and the two
+  are different sentences to the player. Same rule the spec keying follows.
+- **`bySpec` still means what it meant.** `/warband equip` with no argument
+  uses the default: the entry with no `c` when the website sent one, otherwise
+  the **first** entry for that spec. Without that second clause a string
+  carrying only content sets would leave `/warband equip` reporting no set with
+  three sitting in the record.
+- **A `c` this build does not recognise is filed nowhere, and never displaces
+  a default a recognised one has claimed.** Naming a night the reader has not
+  heard of is not the same as naming none — collapsing the two let a key from
+  a newer website overwrite a good default, which is a bug this contract's own
+  test fixture now carries a case for.
+
+`/warband equip raid` is what reads it, and the macro is the point: a
+`/warband equip mplus` button on an action bar is the feature, and typing it
+is not.
 
 **`sets` is additive, and safely so.** `spec`, `set` and `items` at the
 character level still describe the **first** setup — the spec being played — so

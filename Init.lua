@@ -19,6 +19,23 @@ ns.SOFT_BYTES = 20480       -- past this the panel warns instead of pretending
 -- Eight is comfortably past the three warband.pro assigns a meaning to.
 ns.MAX_LOADOUTS = 8
 
+-- The kinds of night warband.pro solves for, in the order it sends them.
+--
+-- A wire constant twice over: it keys the build assignments (`builds[spec][key]`)
+-- and, since 1.15.0, the gear setups (`sets[].c`), so both sides have to spell
+-- these three the same way. An ordered list rather than a set because the panel
+-- and `/warband equip` both list them, and a pairs() order would shuffle
+-- between sessions.
+ns.CONTENTS = { "raid", "mplus", "delve" }
+
+-- The same three as a lookup, built from the list above so the two cannot drift.
+ns.IS_CONTENT = {}
+for _, key in ipairs(ns.CONTENTS) do ns.IS_CONTENT[key] = true end
+
+-- What a player calls each of them. `/warband equip mplus` is what you type;
+-- `mythic+` is what the panel prints.
+ns.CONTENT_LABEL = { raid = "raid", mplus = "mythic+", delve = "delves" }
+
 -- The addon's face, in one place. It is the window's portrait and the minimap
 -- button, and `WarbandPro.toc` names the same texture again for the addon
 -- compartment because a .toc cannot read a Lua value. Two copies, and the .toc

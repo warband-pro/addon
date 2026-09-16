@@ -389,19 +389,34 @@ SlashCmdList.WARBANDPRO = function(msg)
   -- temporary and worth retrying, no stored set means go and paste one, and a
   -- single "nothing happened" would send the second person to wait out a
   -- fight that was never the problem. Apply() returns nil for both.
-  elseif cmd == "equip" then
-    if InCombatLockdown() then
+  --
+  -- `/warband equip raid` is the same thing for one kind of night. Since
+  -- 1.15.0 the website solves a spec once per content — its sim walk prices a
+  -- raid and a key differently — so a spec can hold several sets and this is
+  -- how a macro picks one. The macro is the point: `/warband equip mplus` on
+  -- an action bar is the whole feature, and typing it is not.
+  elseif cmd == "equip" or cmd:match("^equip%s+%a+$") then
+    local content = cmd:match("^equip%s+(%a+)$")
+    if content and not ns.IS_CONTENT[content] then
+      ns.print(format("no such setup — try %s", table.concat(ns.CONTENTS, ", ")))
+    elseif InCombatLockdown() then
       ns.print("combat — press equip again after the fight")
-    elseif not ns.GearSet.Stored() then
-      -- Same two silences the panel tells apart: since 1.8.0 a paste stores a
-      -- setup per spec, so "none for this spec" is the common case after a
-      -- respec and must not read as "you never pasted one".
+    elseif not ns.GearSet.Stored(content) then
+      -- Three silences told apart rather than sharing one line, for the reason
+      -- the other two already were: a set for another night, a set for another
+      -- spec and no set at all send the player somewhere different.
+      local have = ns.GearSet.Contents()
       local stored = ns.GearSet.Summary()
-      ns.print(stored > 0
-        and format("no gear set for this spec — %d stored for your other spec%s",
-          stored, stored == 1 and "" or "s")
-        or "no gear set for this character — paste an equip string from warband.pro/gear")
-    elseif ns.GearSet.Apply() then
+      if content and #have > 0 then
+        ns.print(format("no %s set for this spec — you have %s",
+          ns.CONTENT_LABEL[content] or content, table.concat(have, ", ")))
+      elseif stored > 0 then
+        ns.print(format("no gear set for this spec — %d stored for your other spec%s",
+          stored, stored == 1 and "" or "s"))
+      else
+        ns.print("no gear set for this character — paste an equip string from warband.pro/gear")
+      end
+    elseif ns.GearSet.Apply(content) then
       if UI.JunkIsShown() then UI.RenderGearSet() end
     end
   elseif cmd == "options" then
@@ -413,7 +428,7 @@ SlashCmdList.WARBANDPRO = function(msg)
     ns.print("perf counters reset")
   else
     ns.print("/warband · /warband roster · /warband copy current · /warband copy <page> · /warband junk · "
-      .. "/warband equip · /warband options · /warband status · "
+      .. "/warband equip [raid|mplus|delve] · /warband options · /warband status · "
       .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband minimap on|off · "
       .. "/warband perf")
   end
