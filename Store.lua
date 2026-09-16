@@ -71,6 +71,11 @@ function Store.Init()
   -- how many it left out. Roster.lua carries the rule and why it is a rule
   -- rather than SavedInstances' per-currency checklist.
   if db.opts.allCurrencies == nil then db.opts.allCurrencies = false end
+  -- Off. Combat logging writes a file that grows with every pull, and turning
+  -- it on for somebody who never asked is a disk cost they did not agree to —
+  -- the opposite lean from every other default here, and the right one for the
+  -- only option that writes outside the game.
+  if db.opts.autoLog == nil then db.opts.autoLog = false end
 
   _G.WarbandProDB = db
   Store.db = db

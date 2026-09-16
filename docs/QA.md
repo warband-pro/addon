@@ -118,6 +118,23 @@ numbers.
 - [ ] Hover a lockout cell — the tooltip names every boss dead and alive and
       says how long until it resets, and its title names the character
 - [ ] Hover a vault cell — each slot's threshold, and which are earned
+- [ ] With a Great Vault slot earned: export, paste, and the site's vault panel
+      names the item that slot is offering (`rows[].r`; needs the vault frame
+      opened at least once this session so the client has the links)
+- [ ] `/warband equip raid` with a raid setup pasted — the gear equips AND the
+      talent build assigned to raid loads, and the receipt names it
+- [ ] `/warband equip delve` with no delve setup — says so, equips nothing, and
+      does NOT put on the raid set
+- [ ] `/warband equip nonsense` — lists the nights that exist
+- [ ] A shopping list on the From warband.pro tab: one row per gem/enchant,
+      under the gear, saying how many and which slots
+- [ ] Open the auction house and left-click a shopping row — it searches for
+      that item by name. Click one with the auction house shut — nothing
+      happens, and no error
+- [ ] Options → combat logging on, then zone into a raid: logging starts and
+      says so. Leave: it stops. Zone into a DUNGEON with it on: nothing happens
+- [ ] Turn it on while already standing in a raid — it starts immediately
+      rather than waiting for the next loading screen
 - [ ] Hover a currency with a weekly cap — "this week 320/1,500"
 - [ ] Hover a column header — realm, guild, level, item level, gold, last zone,
       when it was scanned

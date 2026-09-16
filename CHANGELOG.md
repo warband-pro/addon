@@ -47,6 +47,53 @@ MAJOR has to be a wire break.**
 
 ### Added
 
+**The export says which bag pieces are tier, and what your vault is offering.**
+Two fields, both on the strings you already copy.
+
+A bagged helm or chest now carries its set id, so the site can count tier
+pieces sitting in your bags instead of only the ones you are wearing. Before
+this it could tell you a swap would break your 4-piece and could not tell you
+the fourth piece was in the bank.
+
+And an earned Great Vault slot now carries the item it is offering — name,
+item level, stats. The site knew three slots were unlocked and had no idea what
+was in them, so it could say how close you were to earning one and not which of
+the three to take.
+
+Both are read where the client will answer and left out where it will not. A
+freshly logged-in character may send neither until things finish loading; the
+next scan picks them up.
+
+**A set per kind of night, and `/warband equip raid` to wear it.** The site
+solves each spec once for raid, once for keys and once for Delves — and those
+are different answers, not the same answer three times, because it prices a
+raid boss and a dungeon pull separately. Paste as usual and all three arrive.
+
+`/warband equip` on its own is unchanged and still equips what it always did.
+`/warband equip raid`, `/warband equip mplus` and `/warband equip delve` each
+pick one, which is what you want on an action bar.
+
+Asking for a night you have no set for says so and equips nothing, rather than
+putting on a different night's gear.
+
+**Equipping a setup loads its talent build too.** If you have told warband.pro
+which of your saved builds is your raid build, `/warband equip raid` loads it
+and equips the gear in one press. It does not change your specialization —
+a setup applies to the spec you are standing in, and asking for another spec's
+set still says so and does nothing.
+
+**Combat logging can turn itself on in raids.** Off by default, in Options:
+with it on, `/combatlog` starts when you zone into a raid and stops when you
+leave, so a Warcraft Logs upload has the pulls in it. Raids only. It stays off
+unless you ask because it writes a file that grows with every pull, and that is
+not a cost to hand somebody who never wanted it.
+
+**The paste now carries a shopping list.** Gems and enchants the solved set
+wants and you do not have show under the set on the From warband.pro tab —
+one row per thing to buy, with how many and which slots want them, so four
+sockets wanting one gem is one stack of four rather than four lines. With the
+auction house open, clicking a row searches for it.
+
 **The trading post goes out with the bundle.** What is on this month's shelf,
 what each thing costs, how much Trader's Tender you have, and how far the
 Traveler's Log has got. warband.pro reads it against the collection it already

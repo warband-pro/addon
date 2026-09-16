@@ -34,6 +34,11 @@ local ITEMS = {
   -- equip location on each, so a drifted read reports the handedness
   -- backwards rather than merely dropping it.
   [108] = { "Weapon", "One-Handed Swords", "INVTYPE_WEAPON", "INVTYPE_2HWEAPON", 2, 7 },
+  -- A tier slot (hands, 10) whose item belongs to no set — the client answers 0.
+  [109] = { "Armor", "Plate", "INVTYPE_HAND", "INVTYPE_HEAD", 4, 4 },
+  -- A tier slot (legs, 7) the fake GetItemInfo has never heard of — nil, the
+  -- cold-login case.
+  [110] = { "Armor", "Mail", "INVTYPE_LEGS", "INVTYPE_HEAD", 4, 3 },
   -- not gear: a consumable (no equip location)
   [201] = { "Consumable", "Potion", "", "INVTYPE_HEAD", 0, 1 },
   -- gear-shaped but with a nil equipLoc, as a broken client might answer
@@ -53,6 +58,14 @@ local STATS = {
   [105] = { ITEM_MOD_STAMINA_SHORT = 1800, [7] = 99, ITEM_MOD_BROKEN = "yes" },
 }
 
+-- id → itemSetID, as GetItemInfo position 16 answers it. 101 (a head) and 102
+-- (a chest) are tier slots and in a set; 109 is a tier slot in NO set, which
+-- the client reports as 0 and which must not reach the wire as a set id; 103
+-- (a ring) is in a set the client would happily name and is never asked,
+-- because a ring is not a tier slot. Any id absent here answers nil — the
+-- uncached-item case.
+local SETS = { [101] = 1234, [102] = 1234, [103] = 5678, [109] = 0 }
+
 _G.C_Item = {
   GetItemInfoInstant = function(id)
     local t = ITEMS[id]
@@ -66,6 +79,18 @@ _G.C_Item = {
   GetItemStats = function(link)
     local id = tonumber(type(link) == "string" and link:match("item:(%d+)"))
     return id and STATS[id] or nil
+  end,
+  -- The slow, cache-dependent lookup. Only position 16 (setID) is ever read,
+  -- so every earlier value is a filler that would break a drifted destructure
+  -- loudly: an off-by-one lands on a string or on `false`, never on a plausible
+  -- set id. `nil` for an id not in SETS is the uncached-item case, which is the
+  -- reason `set` may be absent without meaning "not tier".
+  GetItemInfo = function(link)
+    local id = tonumber(type(link) == "string" and link:match("item:(%d+)"))
+    local setID = id and SETS[id]
+    if setID == nil then return nil end
+    return "name", link, 4, 639, 80, "Armor", "Cloth", 1, "INVTYPE_HEAD",
+      "icon", 100, 4, 1, 1, 11, setID, false
   end,
 }
 _G.ItemLocation = {
@@ -173,6 +198,29 @@ eq(boundFalse.b, nil, "isBound false emits nothing, matching AddonItem.isBound")
 local banked = visit(103, { where = "bank", bagID = -1 })
 eq(banked.where, "bank", "bank entries carry their scope")
 eq(banked.ilvl, 619, "bank ilvl reads the bank container slot")
+
+-- ── set: the tier id a full-set solve cannot work without ───────────────────
+
+eq(visit(101).set, 1234, "a head in a set carries its item set id")
+eq(visit(102).set, 1234, "a chest in the same set carries the same id")
+eq(visit(109).set, nil, "a tier-slot item in NO set sends nothing — 0 is not a set id")
+eq(visit(110).set, nil, "an uncached tier-slot item sends nothing — absence means not read")
+eq(visit(103).set, nil, "a ring is not a tier slot and is never asked, set or not")
+eq(visit(104).set, nil, "nor is a trinket")
+eq(visit(106).set, nil, "nor is a weapon")
+eq(visit(107).set, nil, "nor is a cloak")
+
+eq(ns.Gear.SetID("|Hitem:101::|h[x]|h"), 1234, "SetID reads position 16 off a link")
+eq(ns.Gear.SetID("|Hitem:109::|h[x]|h"), nil, "SetID declines a zero set id")
+eq(ns.Gear.SetID(nil), nil, "SetID declines a non-string")
+
+eq(ns.Gear.SlotFor("INVTYPE_HEAD"), 1, "SlotFor is the way into EQUIPLOC_SLOT from outside this file")
+eq(ns.Gear.SlotFor("INVTYPE_FINGER"), 11, "SlotFor collapses both rings the same way Visit does")
+eq(ns.Gear.SlotFor("INVTYPE_BAG"), nil, "SlotFor declines what is not gear")
+eq(ns.Gear.SlotFor(nil), nil, "SlotFor declines a non-string")
+eq(ns.Gear.IsTierSlot(1), true, "head is a tier slot")
+eq(ns.Gear.IsTierSlot(10), true, "hands is a tier slot")
+eq(ns.Gear.IsTierSlot(11), false, "a ring is not")
 
 local weird = visit(106, { name = "Grim-Veiled \"Edge\"" })
 eq(weird.n, "Grim-Veiled \"Edge\"", "a name with punctuation survives the bracket match")

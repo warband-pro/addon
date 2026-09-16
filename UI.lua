@@ -442,14 +442,34 @@ local function buildGearRow(parent, i)
   row.label:SetWordWrap(false)
 
   row:SetScript("OnEnter", function(self)
-    if not self.s then return end
+    if not self.s and not self.buyID then return end
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    -- The client's own item tooltip for the wire's item string. A string the
-    -- client cannot resolve leaves the tooltip empty rather than raising.
-    ns.safe(GameTooltip.SetHyperlink, GameTooltip, self.s)
+    if self.s then
+      -- The client's own item tooltip for the wire's item string. A string the
+      -- client cannot resolve leaves the tooltip empty rather than raising.
+      ns.safe(GameTooltip.SetHyperlink, GameTooltip, self.s)
+    else
+      -- A shopping row names something that is not in a bag, so there is no
+      -- item string to hang a tooltip on — only an id.
+      ns.safe(GameTooltip.SetItemByID, GameTooltip, self.buyID)
+      if ns.GearSet.ahOpen then
+        GameTooltip:AddLine("Click to search the auction house", 0.6, 0.6, 0.6)
+      end
+    end
     GameTooltip:Show()
   end)
   row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  -- The one thing a shopping row can do. Every other row in this list is inert
+  -- by design — the gear set is applied by its button, never by clicking a
+  -- line — and this stays inert too unless the auction house is open, which
+  -- `SearchAuction` checks for itself rather than trusting the caller.
+  -- `OnMouseUp`, not `OnClick`: this row is a Frame with EnableMouse, and a
+  -- Frame has no OnClick at all — the handler would simply never fire, which
+  -- is the quiet kind of wrong.
+  row:SetScript("OnMouseUp", function(self, button)
+    if not self.buyID or button ~= "LeftButton" then return end
+    ns.GearSet.SearchAuction({ state = "buy", id = self.buyID })
+  end)
   return row
 end
 
@@ -486,15 +506,25 @@ local function renderGearRows(r)
       local name, quality, icon, ilvl = itemLook(d)
       local hex = QUALITY_HEX[quality or 1] or "ffffff"
       w.s = d.s
+      -- Only a shopping row carries this, and it is what makes the row's
+      -- tooltip and its click possible at all — there is no item string for
+      -- something that is not in a bag yet.
+      w.buyID = d.state == "buy" and d.id or nil
       w.icon:SetTexture(icon or ns.ICON)
       w.slot:SetText(d.name)
       -- Name, then the client's item level, then — when the site sent one —
       -- its estimated gain, in the good tone because a row here is a swap
       -- the site is proposing and the figure is why.
       local gain = ns.GearSet.GainText(d)
+      -- A shopping row's best label is what the site called it — `+300
+      -- Critical Strike` — because that is what the player is choosing
+      -- between, and the item's own name ("Elusive Blasphemite") says less.
+      -- The client's name wins when it has one, since that is what the auction
+      -- house is going to show.
+      local label = name or d.d or (d.id and ("item " .. d.id)) or "?"
       w.label:SetText(format("|cff%s%s|r%s%s",
         name and hex or MUTED,
-        name or (d.id and ("item " .. d.id) or "?"),
+        label,
         ilvl and format("  |cff%s%d|r", MUTED, ilvl) or "",
         gain ~= "" and format("  |cff%s%s|r", GOOD, gain) or ""))
       local text, tone = ns.GearSet.StateText(d)
@@ -566,10 +596,11 @@ local function buildImport()
     local keptJunk = ns.Junk.Save(plan)
     local keptSets = ns.GearSet.Save(plan)
     local keptBuilds = ns.GearSet.SaveBuilds(plan)
+    local keptShop = ns.GearSet.SaveShop(plan)
     self:SetText("")
     self:ClearFocus()
 
-    if keptJunk + keptSets + keptBuilds == 0 then
+    if keptJunk + keptSets + keptBuilds + keptShop == 0 then
       junkHeader:SetText("|cff" .. WARN .. "that string is for characters this account has not scanned yet|r")
       return
     end
@@ -596,6 +627,7 @@ local function buildImport()
     part(keptJunk, "a clear-out list for %d")
     part(keptSets, "gear for %d")
     part(keptBuilds, "talent builds for %d")
+    part(keptShop, "a shopping list for %d")
     -- The unit rides the FIRST clause and the rest inherit it, which is how
     -- the sentence is said out loud: "gear for 2" after "a list for 3
     -- characters" is unambiguous, and repeating the noun three times is not
@@ -1375,6 +1407,23 @@ local function buildOptions()
       o.allCurrencies = v
       ns.Store.Touch()
       UI.RenderRoster()
+    end)
+
+  makeOption(p, -330,
+    "Turn combat logging on in raids",
+    "Starts /combatlog when you zone into a raid and stops it when you leave, so an upload to "
+      .. "Warcraft Logs has the pulls in it. Raids only, and off by default — it writes a file "
+      .. "that grows with every pull, which is not a cost to hand somebody who did not ask.",
+    function() local o = opts() return o and o.autoLog end,
+    function(v)
+      local o = opts()
+      if not o then return end
+      o.autoLog = v
+      ns.Store.Touch()
+      -- Applied now rather than at the next loading screen: turning it on
+      -- while already standing in the raid is exactly when somebody turns it
+      -- on, and waiting would look broken.
+      ns.syncCombatLog()
     end)
 
   local version = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
