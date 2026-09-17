@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.16.0] — 2026-09-17 — your housing decor travels, and the shelf reaches the string again
+
 ### Added
 
 **Your housing decor goes out with the bundle, and nothing else could send it.**
