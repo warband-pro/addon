@@ -138,7 +138,8 @@ Top-right sink `[ ↻ sync / ↥ import ▼ ]` lives every route, mirrors ghost 
 
 - `WarbandPro.toc`, `Init.lua`, `Core.lua`, `Store.lua`, `Scan.lua`, `Instances.lua`, `Bundle.lua`, `Export.lua`, `UI.lua`, `Vendor/LibDeflate.lua`
 - `tools/validate.mjs`, `tools/vector.mjs`, `tools/sample.mjs`, `tools/slop.mjs`, `tools/notes.mjs` (+ the `tools/changelog.mjs` parser they share), `CHANGELOG.md`, `.pkgmeta`, `.github/workflows/ci.yml` + `release.yml`
-- `docs/` — coding reference, trimmed before CurseForge zip via `.pkgmeta` ignore. See `docs/README.md` read order: FLOW → RESEARCH-REFERENCE → CONTRACT → UI → TESTING → QA → CI → PROMPT → EXECUTION-READY.
+- `docs/` — coding reference, trimmed before CurseForge zip via `.pkgmeta` ignore. See `docs/README.md` read order: CURRENT-STATE → FLOW → RESEARCH-REFERENCE → CONTRACT → UI → TESTING → QA → CI → PROMPT → EXECUTION-READY.
+- **Contributing?** [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md) is the map: what this addon captures today and which of warband.pro's four pillars each capture serves, what a paste does, what acts without a click, and the open gaps. The product's intent lives in the (private) app repo and is referenced from there.
 
 When shipping light, flat root, no badges clutter, per your rule Problem→Install→Use→What it catches→Inside 4-6 files (this README already does it).
 
