@@ -220,25 +220,46 @@ rather than the mechanics. Types in use: `feat`, `fix`, `docs`, `ci`, `chore`,
 and `release: N.N.N — summary` for a cut. `fix(bindings): Bindings.xml is
 loaded by name, so listing it in the .toc loads it twice` is the register.
 
-**A `CHANGELOG.md` note under `## [Unreleased]` moves with the commit** when a
-player would notice the change — and only then. It is written for players, not
-for the commit log, and `tools/slop.mjs` fails CI on notes that read like
-marketing. Leave the `## [Unreleased]` heading in place when cutting a release;
-removing it turns `main` red.
+**A `CHANGELOG.md` note under `## [Unreleased]` moves with the commit.** It is
+written for players, not for the commit log, and `tools/slop.mjs` fails CI on
+notes that read like marketing. Leave the `## [Unreleased]` heading in place
+when cutting a release; removing it turns `main` red.
 
 **Cut the release. Standing instruction from the maintainer, 2026-09-17.**
 This said the reverse until that date — *not a routine decision and not yours
 to make unasked* — and the maintainer's own words replacing it were "I always
 want you to cut the addon release always."
 
-So a session that lands a player-visible change finishes the job: write the
-`## [x.y.z]` section, merge it, and dispatch the release. **Do not stop to
-ask**, and do not report an untagged version as a question when it is now an
-instruction.
+So a session that merges **anything** finishes the job: write the `## [x.y.z]`
+section, merge it, and dispatch the release. **Do not stop to ask**, and do not
+report an untagged version as a question when it is now an instruction.
+
+**Every merge to `main` gets a version, however small.** Strengthened
+2026-09-17, on the maintainer's instruction — *always increment the addon
+version to trigger a new build, even if minor* — and the sentence it replaced
+is the reason it had to be: a note used to move with the commit "when a player
+would notice the change — and only then", which reads as permission to skip.
+A session took it the same day, merged a docs-only change and reported *"no
+release: `.pkgmeta` strips `docs/`, so nothing ships"* — correct about the zip
+and wrong about the job. **A change that ships no Lua still ships.** The zip is
+byte-identical and the version still moves, because the build is what the
+maintainer asked for and "too small to matter" is not a judgement this repo
+wants any session making on its own.
+
+`PATCH` is the floor. There is no fourth option under it.
 
 What number it gets is not a judgement call either — `CHANGELOG.md`'s semver
 rule decides it, anchored to what the player has to do about it rather than to
 payload shape.
+
+**Prose alone does not hold here and this repo has the record twice over.**
+The rule that a written-up version must be tagged was prose until 1.3.0, 1.4.0
+and 1.9.0 had each been merged untagged; `tools/released.mjs` closed it. The
+rule you are reading was prose for exactly one day before it was skipped. So it
+is a check too, in the same file: **`released.mjs` fails a push to `main` that
+sits past the newest tag with no section describing it**, and it names the
+number and the dispatch. Green on `main` now means every commit has shipped,
+not merely that what was written down did.
 
 **Two things this does not relax, and they are the ones that matter.** A tag
 ships to CurseForge and Wago and **cannot be recalled**, so the standing
