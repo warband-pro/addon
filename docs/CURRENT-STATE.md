@@ -108,7 +108,12 @@ vault).
 
 `tradingPost` at the payload root, added in 1.15.0 — `tender`, `month`,
 `items[]` (this month's shelf with `purchased`), `activities[]` (the traveler's
-log). **This is the only Progress capture that exists.** See §5.
+log). **This is the only Progress capture that exists**, and it is load-bearing:
+Blizzard publishes *nothing* about the trading post — seven paths, all 404 — so
+this is the one feature on the site whose data can only come from the client.
+The app reads it, joins the shelf to what the account already owns, and ranks
+what is leaving this month as a deadline. See §5 for the caveat on how fresh it
+actually is.
 
 ### Captured, and the app reads it but never ranks it
 
@@ -208,7 +213,7 @@ Each of these is a GitHub issue labelled `agent` in the repo it belongs to.
 | # | Finding | Evidence | Proposed resolution |
 |---|---------|----------|---------------------|
 | [A1](https://github.com/warband-pro/addon/issues/46) | **The trading post's five event handlers are defined and never registered.** `handlers.PERKS_PROGRAM_OPEN`, `PERKS_PROGRAM_DATA_REFRESH`, `PERKS_PROGRAM_CURRENCY_REFRESH`, `PERKS_ACTIVITIES_UPDATED` and `PERKS_ACTIVITY_COMPLETED` exist in `Core.lua`; none of those names is in the `EVENTS` table. So `Scan.TradingPost` runs **only** from `Scan.All()` at `PLAYER_LOGIN` — opening the trading post never refreshes the shelf, and buying something never marks it purchased until the next login. | grep: `PERKS` occurs nowhere else in the addon | Add the five names to `EVENTS`. `/warband status`'s "N of M events registered" counts only the registered list, so it could not surface this — a `freshness-test.lua` case that asserts every defined handler is registered would. |
-| [A2](https://github.com/warband-pro/app/issues/130) | **Nothing on the app side reads `tradingPost`.** The addon has shipped it since 1.15.0; the app's parser does not declare the field. | app repo: zero references | App-side work. Filed there. |
+| ~~A2~~ | ~~Nothing on the app side reads `tradingPost`.~~ **Closed 2026-09-17**, hours after it was written down: the app decodes the section, stores it, joins this month's shelf to what the account already owns and ranks what is leaving as a deadline. | [`app#130`](https://github.com/warband-pro/app/issues/130) | Nothing to do here — but it makes **A1 sharper, not moot**: the app now renders a shelf that this addon only reads at `PLAYER_LOGIN`. |
 | [A3](https://github.com/warband-pro/addon/issues/47) | **`consumables.healthPotion` and `tempPotion` are specified and never emitted** — `POTION_IDS` is empty. | `Scan.lua` | Either fill the table or delete the two branches and the contract lines, so the wire stops describing a field it never sends. |
 | [A4](https://github.com/warband-pro/addon/issues/48) | **Housing decor ownership has no capture**, and the app's milestone names this addon as the only possible source. | app milestone Phase 4 | A decor scan is a new subject; decide whether it belongs here before the app's Phase 4 starts. |
 | [A5](https://github.com/warband-pro/app/issues/137) | **The Great Vault `pvp` bucket is captured and ranks nowhere.** | `Instances.lua` sends it; the app has no `pvp` activity kind | App-side decision: rank it, or state that PvP is out of scope. |
