@@ -6,6 +6,53 @@ wire format, the UI, the CI and the distribution policy. This file is only a
 pointer, plus the path every session takes and the rules that are not written
 down anywhere else.
 
+## Read First — what this product is
+
+Two documents, before the read order and before any Lua:
+
+- **Vision** — `warband-pro/app` at `.wiki/wiki/topics/vision.md`. The pillars,
+  the product principles, the Opportunity Test. That repo is **private**; the
+  vision is referenced here and never copied, the same one-way door as
+  **Never Mix the Two Repositories** below.
+- [**Current State**](docs/CURRENT-STATE.md) — what *this* repo captures today,
+  by pillar, with the event map, the paste audit and the gaps.
+
+warband.pro reads a Battle.net account once and answers one question: **what's
+the highest-impact thing to do tonight, and on which character?** Four pillars:
+
+- **Camp** — the small subset of the warband the player actually plays. Camp is
+  the default scope for everything on the site.
+- **Tonight** — one ranked list of next-best activities across the camp. Every
+  other pillar pays off here.
+- **Gear** — replaces AskMrRobot: Best in Bags, upgrade planning, the Great
+  Vault choice, gems and enchants, the clear-out list, and the round trip back
+  into the game through `wbc1!`.
+- **Progress** — replaces completionism.com: collections, trading post,
+  achievements, reputations, events, decor.
+
+**This addon's pillar is all four, from underneath.** The Battle.net API covers
+who a character is and what they wear; **this addon covers everything the API
+cannot see.** The boundary: the addon renders facts and the app renders
+judgements — `wbc1!` is the deliberate exception, and it carries a decision the
+addon *acts on* under a click rather than draws as a readout.
+
+**The Opportunity Test.** Before building or proposing anything, answer:
+
+1. Which pillar does it serve?
+2. Does it default to camp scope?
+3. How does it rank in Tonight, and with what impact, urgency and effort?
+4. Does it replace something the operator currently opens another site or addon
+   for?
+5. Does it respect every principle above?
+
+> **When you ship a change that alters a captured field, the wire, stored data
+> or what a paste does, update [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md)
+> in the same PR.**
+
+A field this addon captures that no page on the site uses is an unfinished
+crossing — log it as a GitHub issue labelled `agent`, citing the question it
+answers.
+
 ## The Path
 
 Four steps, this order, every session. **None of them is a branch decision** —
