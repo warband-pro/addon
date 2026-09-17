@@ -302,6 +302,47 @@ shelf only exists once the trading post has been opened in the current one.
       `ns.errorCount`, and `ns.safe` swallowing a missing global shows up there
       as nothing at all, which is the trap
 
+## Housing decor (unreleased)
+
+**The same job as the section above, and it matters more here.** `C_HousingCatalog`
+and its searcher object were read off Blizzard's UI, not off anything this repo
+can run, and this section is the only one on the wire with **no Battle.net
+fallback at all**: if these names are wrong, warband.pro cannot show decor
+completion by any other route. `tools/freshness-test.lua` covers the bookkeeping
+against a fake client — that an empty read is refused, that two variants of one
+item count once, that an unnamed entry is counted rather than dropped, that both
+the synchronous and the callback path write. What it cannot check is whether the
+client answers at all.
+
+- [ ] Log in without opening the housing catalog. `/warband` → the string has
+      **no** `"decor"` key. An absent section is the correct reading here, not a
+      failure — the addon refuses to write an empty read
+- [ ] Open the housing catalog, wait for it to finish loading, then `/warband`
+      again. `decor.owned` is present and is a list of numbers
+- [ ] `#decor.owned` is in the right neighbourhood of what the catalog's own
+      "collected" filter shows. It will not match exactly — variants collapse to
+      one item and `unmatched` holds the rest — but an order of magnitude out
+      means the searcher's filters are not doing what this reads them as
+- [ ] `decor.owned` holds **item ids, not catalog entry ids.** Spot-check one
+      against the decor's item on Wowhead. This is the id warband.pro joins to
+      its catalog, so a wrong one reports decor you own as missing — the same
+      trap as `items[].itemID` above, and the reason both are checked by hand
+- [ ] The list is ascending and has no duplicates
+- [ ] If `unmatched` is present, it is a plausible small number rather than the
+      whole collection. `unmatched` equal to the catalog size means
+      `GetCatalogEntryInfo` is not resolving the ids the searcher returns, and
+      the variant fallback is not covering it either
+- [ ] Redeem or destroy a decor, reopen the catalog, `/warband` again — the list
+      has moved by one. This is what proves the read is live rather than a
+      cached list from the first open
+- [ ] Copy a bundle on one character, log to another, `/warband` — `decor` is
+      still there with the same list. It is account-wide and must not follow the
+      character who looked
+- [ ] **If the whole section is missing after opening the catalog**, the API
+      names are wrong rather than the logic. `/warband debug` reports
+      `ns.errorCount`; a missing global shows up there as nothing at all, which
+      is the trap. Check `Scan.Decor` against the current client's globals
+
 ## The gear set — equip and save (1.6.0)
 
 **This is the first thing this addon has ever done that moves gear on your

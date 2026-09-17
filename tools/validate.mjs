@@ -202,6 +202,41 @@ for (const file of luaFiles) {
   }
 }
 
+// --- every handler is an event the frame actually asked for ---------------
+//
+// The same class of failure as everything else in this file: silent. Core.lua
+// registers a fixed list of events and then hangs handlers off a table keyed by
+// event name, and nothing connects the two — a `handlers.X` for an event that
+// is not in `EVENTS` is a function the game will never call, with no error, no
+// warning and no symptom beyond a section that quietly stops updating.
+//
+// **It has happened.** 1.15.0 shipped five `PERKS_*` handlers that were never
+// registered, so the trading post shelf was only ever read by `Scan.All` at
+// login — which is exactly the moment the frame is closed and the client has
+// nothing to give. The bundle then carried a tender balance and no items, which
+// is *also* the correct reading for a player who has not visited the shelf, so
+// the bug looked like the feature working.
+//
+// Registration is deliberately pcall'd in Core.lua so a name this client does
+// not have is skipped rather than thrown — that is what makes listing an event
+// safe, and it is why this check runs in the other direction: a handler with no
+// registration is always a mistake, a registration with no handler is not.
+{
+  const core = read('Core.lua');
+  const block = core.match(/local EVENTS = \{([\s\S]*?)\n\}/);
+  if (!block) {
+    fail('Core.lua — could not find the `local EVENTS = {` list to check handlers against');
+  } else {
+    const registered = new Set([...block[1].matchAll(/"([A-Z0-9_]+)"/g)].map((m) => m[1]));
+    const handled = new Set([...core.matchAll(/^handlers\.([A-Z0-9_]+)\s*=/gm)].map((m) => m[1]));
+    for (const event of handled) {
+      if (!registered.has(event)) {
+        fail(`Core.lua — handlers.${event} is never registered, so the game will never call it. Add "${event}" to EVENTS.`);
+      }
+    }
+  }
+}
+
 // --- packaging hygiene ---------------------------------------------------
 for (const required of ['LICENSE', 'README.md', 'CHANGELOG.md', 'Vendor/LibDeflate.lua']) {
   if (!here(required)) fail(`${required} is missing`);

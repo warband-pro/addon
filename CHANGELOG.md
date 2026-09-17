@@ -51,6 +51,35 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+**Your housing decor goes out with the bundle, and nothing else could send it.**
+Every other collection warband.pro shows — mounts, pets, toys, heirlooms — it
+reads from Battle.net on its own. Decor is the one Blizzard publishes a
+catalogue for and no ownership for, so the site has been able to list all 2131
+pieces and never say which of them are yours. Now the string carries them.
+
+Open the housing catalogue once and let it finish loading; the list travels
+account-wide, so it does not matter which character you were on. Until you open
+it the string leaves decor out entirely rather than reporting a collection of
+nothing.
+
+A few pieces the game will not name come across as a count instead of an id.
+They are left out of both halves of your completion rather than counted as
+missing, and the site says how many.
+
+### Fixed
+
+**This month's trading post shelf reaches the string again.** 1.15.0 added the
+capture and wired it to the wrong side of the game's event system, so the only
+time it ever ran was at login — the one moment the trading post is shut and the
+game has nothing to hand over. Your tender balance travelled, the shelf did not,
+and that reads exactly like a player who has not been to the post yet, which is
+why nobody could see it was broken.
+
+Open the trading post once and it lands now. A check was added that fails the
+build for the same mistake rather than shipping it again.
+
 ## [1.15.1] — 2026-09-17 — the same addon, released on purpose
 
 Nothing in the addon changed. No new capture, nothing new on the wire, nothing

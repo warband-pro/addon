@@ -29,7 +29,7 @@ ns.Store = Store
 -- window in front of it.
 local SECTIONS = {
   "bag", "bank", "reagentBank", "warbank", "currency", "instance", "vault", "mail", "auctions",
-  "profession", "professionCooldown", "gear", "talents", "tradingPost",
+  "profession", "professionCooldown", "gear", "talents", "tradingPost", "decor",
 }
 
 function Store.Init()
@@ -54,6 +54,9 @@ function Store.Init()
   -- the trading post is the account's, not a character's. Every field inside
   -- stays nil until something reads it — see Store.PutTradingPost.
   db.tradingPost = db.tradingPost or {}
+  -- Account-wide like the two above, and empty until the housing catalog has
+  -- been open once — see Store.PutDecor.
+  db.decor = db.decor or {}
   db.lastExport = db.lastExport or 0
   -- Whether this install has ever told the player it is here. One line, once,
   -- on the first login after install — see Core.lua's PLAYER_LOGIN.
@@ -267,6 +270,43 @@ function Store.PutTradingPost(read)
   tp.seenByName = UnitName("player")
   local c = Store.Char()
   if c then c.seenAt.tradingPost = tp.seenAt end
+  Store.Touch()
+end
+
+-- Housing decor the account owns, at the root beside the trading post.
+--
+-- Account-wide, and **replaced wholesale rather than merged**, which is the
+-- opposite of the profession-cooldown rule below and deliberate: the searcher
+-- answers for the whole catalog at once, so a read is a complete statement of
+-- what the account owns rather than a window onto part of it. Merging would
+-- make a decor the player destroyed immortal.
+--
+-- An empty read is refused, and that is the same judgement `Store.PutTradingPost`
+-- makes about its items: the catalog is populated when the housing UI has been
+-- open, so "the searcher returned nothing" is overwhelmingly "nobody has looked
+-- yet" rather than "this account owns no decor". Writing the empty one would
+-- stamp that guess fresh and blank what an earlier look actually saw.
+--
+-- `unmatched` rides along because it is the honest half of the count — owned
+-- entries the client named no item for, which the website has to exclude from
+-- both the owned list and the total rather than quietly lose.
+function Store.PutDecor(read)
+  if not Store.Ready() or type(read) ~= "table" then return end
+  if type(read.owned) ~= "table" or #read.owned == 0 then return end
+
+  local d = Store.db.decor
+  if type(d) ~= "table" then
+    d = {}
+    Store.db.decor = d
+  end
+
+  d.owned = read.owned
+  d.unmatched = read.unmatched
+  d.seenAt = ns.now()
+  d.seenByGuid = UnitGUID("player")
+  d.seenByName = UnitName("player")
+  local c = Store.Char()
+  if c then c.seenAt.decor = d.seenAt end
   Store.Touch()
 end
 

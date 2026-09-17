@@ -106,14 +106,24 @@ vault).
 
 ### Serves Progress
 
+**Two captures, and both exist because Blizzard publishes nothing.** That is
+what they have in common and it is the whole shape of this pillar's half of the
+addon: everything else here supplements an API, and these two replace one.
+
 `tradingPost` at the payload root, added in 1.15.0 — `tender`, `month`,
 `items[]` (this month's shelf with `purchased`), `activities[]` (the traveler's
-log). **This is the only Progress capture that exists**, and it is load-bearing:
-Blizzard publishes *nothing* about the trading post — seven paths, all 404 — so
-this is the one feature on the site whose data can only come from the client.
-The app reads it, joins the shelf to what the account already owns, and ranks
-what is leaving this month as a deadline. See §5 for the caveat on how fresh it
-actually is.
+log). Blizzard publishes *nothing* about the trading post — seven paths, all
+404. The app reads it, joins the shelf to what the account already owns, and
+ranks what is leaving this month as a deadline.
+
+`decor` at the payload root, added in 1.16.0 — `owned[]` (item ids, ascending
+and deduped) and `unmatched` (owned entries the client would not name). Read
+from `C_HousingCatalog`'s searcher when the housing catalogue is opened, and
+**not** from `Scan.All`: it is the whole catalogue plus an info read per entry,
+which is the bank's weight rather than the shelf's. Blizzard publishes the decor
+*catalogue* and no ownership for it — `/profile/user/wow/collections/decor` is
+the one collection path that 404s rather than refusing a wrong credential — so
+this is the only section on the wire with no Battle.net fallback at all.
 
 ### Captured, and the app reads it but never ranks it
 
@@ -124,10 +134,11 @@ actually is.
 ### Not captured at all — deliberately
 
 - **Reputations.** No `C_Reputation` call anywhere.
-- **Collections** — mounts, pets, toys, transmog, achievements, housing decor.
-  The app gets the first four from Battle.net; **decor ownership has no API at
-  all** (`/profile/user/wow/collections/decor` 404s), so the app's milestone
-  names an addon capture as its only fallback and it does not exist yet.
+- **Collections** — mounts, pets, toys, transmog, achievements. All five come
+  from Battle.net directly, so capturing them here would be a second answer to a
+  question that already has one. Housing decor moved off this list in 1.16.0 and
+  is under *Serves Progress* above, because it is the one the API cannot
+  answer.
 - **Playtime.** `RequestTimePlayed()` prints into the player's chat frame, so it
   stays unbuilt on purpose (`docs/CONTRACT.md`).
 - No combat log parsing, no aura reads, no other characters' data.
@@ -159,7 +170,7 @@ question:
 
 **Freshness is per section, and absent is never zero.** Fourteen stamps live in
 `seenAt` — `bag, bank, reagentBank, warbank, currency, instance, vault, mail,
-auctions, profession, professionCooldown, gear, talents, tradingPost` — plus
+auctions, profession, professionCooldown, gear, talents, tradingPost, decor` — plus
 `lastSeen`. A stamp moves only if that section was actually read this pass, and
 a section that could not be read goes **missing rather than throwing**. Every
 WoW API call goes through `ns.safe`, 75 call sites across ten files, because
@@ -212,10 +223,10 @@ Each of these is a GitHub issue labelled `agent` in the repo it belongs to.
 
 | # | Finding | Evidence | Proposed resolution |
 |---|---------|----------|---------------------|
-| [A1](https://github.com/warband-pro/addon/issues/46) | **The trading post's five event handlers are defined and never registered.** `handlers.PERKS_PROGRAM_OPEN`, `PERKS_PROGRAM_DATA_REFRESH`, `PERKS_PROGRAM_CURRENCY_REFRESH`, `PERKS_ACTIVITIES_UPDATED` and `PERKS_ACTIVITY_COMPLETED` exist in `Core.lua`; none of those names is in the `EVENTS` table. So `Scan.TradingPost` runs **only** from `Scan.All()` at `PLAYER_LOGIN` — opening the trading post never refreshes the shelf, and buying something never marks it purchased until the next login. | grep: `PERKS` occurs nowhere else in the addon | Add the five names to `EVENTS`. `/warband status`'s "N of M events registered" counts only the registered list, so it could not surface this — a `freshness-test.lua` case that asserts every defined handler is registered would. |
+| ~~A1~~ | ~~The trading post's five event handlers are defined and never registered.~~ **Closed 2026-09-17.** All five `PERKS_*` names are in `EVENTS`, so opening the shelf refreshes it and buying something marks it purchased without waiting for the next login. | [`#46`](https://github.com/warband-pro/addon/issues/46) | Done, plus the check this row asked for: `tools/validate.mjs` now fails the build when any `handlers.X` names an event `EVENTS` does not register. It was put in `validate.mjs` rather than `freshness-test.lua` because it is a static property of `Core.lua` — no fake client needed, and it runs in the packaging job every push. |
 | ~~A2~~ | ~~Nothing on the app side reads `tradingPost`.~~ **Closed 2026-09-17**, hours after it was written down: the app decodes the section, stores it, joins this month's shelf to what the account already owns and ranks what is leaving as a deadline. | [`app#130`](https://github.com/warband-pro/app/issues/130) | Nothing to do here — but it makes **A1 sharper, not moot**: the app now renders a shelf that this addon only reads at `PLAYER_LOGIN`. |
 | [A3](https://github.com/warband-pro/addon/issues/47) | **`consumables.healthPotion` and `tempPotion` are specified and never emitted** — `POTION_IDS` is empty. | `Scan.lua` | Either fill the table or delete the two branches and the contract lines, so the wire stops describing a field it never sends. |
-| [A4](https://github.com/warband-pro/addon/issues/48) | **Housing decor ownership has no capture**, and the app's milestone names this addon as the only possible source. | app milestone Phase 4 | A decor scan is a new subject; decide whether it belongs here before the app's Phase 4 starts. |
+| ~~A4~~ | ~~Housing decor ownership has no capture.~~ **Closed 2026-09-17.** `Scan.Decor` reads `C_HousingCatalog`'s searcher and `decor` rides at the payload root. Issue #48's first question — *is there an API to call* — resolved yes, which is what unblocked it. | [`#48`](https://github.com/warband-pro/addon/issues/48) | Done. The remaining risk is not the design but the names: `C_HousingCatalog` is as unexercised here as `C_PerksProgram` was, so `docs/QA.md`'s new section is what settles it in game. |
 | [A5](https://github.com/warband-pro/app/issues/137) | **The Great Vault `pvp` bucket is captured and ranks nowhere.** | `Instances.lua` sends it; the app has no `pvp` activity kind | App-side decision: rank it, or state that PvP is out of scope. |
 
 **Principle check.** No network calls — grepped every `.lua`, `.toc` and `.xml`
@@ -233,6 +244,13 @@ payment path. **Clean.**
 
 **2026-09-17**, at `41bfbbc` (`release: 1.15.0`). Every file named here exists
 at that commit.
+
+**Amended the same day** for the housing decor capture and the event-registration
+fix that came out of building it: §2 gained `decor` and lost it from the
+deliberately-uncaptured list, §3's section list gained it, and §5's A1 and A4
+both closed. A1 closed by accident — the merge that brought this article onto the
+decor branch is what surfaced the missing registrations, before the issue filing
+it had been read.
 
 ## See also
 

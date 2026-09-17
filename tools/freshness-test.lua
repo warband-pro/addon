@@ -459,6 +459,42 @@ _G.C_PerksActivities = {
   end,
 }
 
+-- The housing catalog. `DECOR_ENTRIES` is what the searcher returns and
+-- `DECOR_INFO` maps an entry to what `GetCatalogEntryInfo` says about it — kept
+-- separate so a test can hand back an entry the client will not name, which is
+-- the `unmatched` case and the only interesting one.
+--
+-- `DECOR_SYNC` drives the half of `Scan.Decor` that exists because a searcher
+-- may answer from a warm cache and never fire its callback: true means the
+-- search reports itself finished immediately, false means only the callback
+-- lands. Both have to write, and a test that only exercised one would let the
+-- other rot.
+local DECOR_ENTRIES, DECOR_INFO, DECOR_SYNC = nil, nil, true
+
+_G.C_HousingCatalog = {
+  CreateCatalogSearcher = function()
+    if DECOR_ENTRIES == nil then error("catalog not loaded") end
+    local cb
+    return {
+      SetBaseVariantOnly = function() end,
+      SetCollected = function() end,
+      SetUncollected = function() end,
+      SetResultsUpdatedCallback = function(_, fn) cb = fn end,
+      RunSearch = function()
+        if not DECOR_SYNC and cb then cb() end
+      end,
+      IsSearchInProgress = function() return not DECOR_SYNC end,
+      GetCatalogSearchResults = function() return DECOR_ENTRIES end,
+    }
+  end,
+  GetCatalogEntryInfo = function(entry)
+    local info = DECOR_INFO and DECOR_INFO[entry]
+    if info == nil then error("no such entry") end
+    return info
+  end,
+  GetCatalogEntryVariantInfo = function() return nil end,
+}
+
 -- Tender rides the ordinary currency API, so the fake lives with the others.
 local realCurrencyInfo = _G.C_CurrencyInfo
 _G.C_CurrencyInfo = setmetatable({
@@ -561,6 +597,95 @@ check("with the balance", tpWire.tender == 1450)
 check("the month", tpWire.month == "2026-09")
 check("and the shelf", tpWire.items and #tpWire.items == 2)
 check("json-encodes without error", type(Bundle.JSON(Bundle.Build())) == "string")
+
+-- ── housing decor ──────────────────────────────────────────────────────────
+--
+-- The section with no Battle.net counterpart at all, so the rules it keeps are
+-- the ones nothing else can check afterwards.
+
+local function entries()
+  DECOR_INFO = {
+    [10] = { itemID = 234502 },
+    [11] = { itemID = 234501 },
+    [12] = { itemID = 234501 }, -- a second variant of the same item
+    [13] = {},                  -- owned, and the client will not name it
+  }
+  return { 10, 11, 12, 13 }
+end
+
+reset()
+DECOR_ENTRIES, DECOR_INFO = nil, nil
+Scan.Decor()
+check("a client with no housing catalog writes no decor at all",
+  Store.db.decor.seenAt == nil)
+check("and stamps no section for it", stamps().decor == nil)
+
+reset()
+DECOR_ENTRIES, DECOR_SYNC = {}, true
+Scan.Decor()
+check("an empty catalog read is refused rather than stored as a score of zero",
+  Store.db.decor.seenAt == nil)
+
+reset()
+DECOR_ENTRIES, DECOR_SYNC = entries(), true
+Scan.Decor()
+local dec = Store.db.decor
+check("the owned set lands", dec.owned and #dec.owned == 2)
+check("ascending, so the wire is byte-stable",
+  dec.owned[1] == 234501 and dec.owned[2] == 234502)
+check("two variants of one item count once", #dec.owned == 2)
+check("an entry the client will not name is counted, not dropped", dec.unmatched == 1)
+check("the section is stamped", stamps().decor == NOW)
+
+-- Nothing the client cannot read may blank what an earlier look saw.
+NOW = NOW + 3600
+DECOR_ENTRIES = nil
+Scan.Decor()
+check("a pass with no catalog keeps the set we had", #Store.db.decor.owned == 2)
+check("and does not move the stamp", Store.db.decor.seenAt == NOW - 3600)
+
+-- A read that finds nothing unmatched leaves the field off rather than zero,
+-- the rule every optional count on this wire follows.
+reset()
+DECOR_INFO = { [10] = { itemID = 234502 } }
+DECOR_ENTRIES, DECOR_SYNC = { 10 }, true
+Scan.Decor()
+check("nothing unmatched means the field is absent, never 0",
+  Store.db.decor.unmatched == nil)
+
+-- The callback path, which is the real one in game: a searcher that reports
+-- itself still running must still write, from the callback it was given.
+reset()
+DECOR_ENTRIES, DECOR_SYNC = entries(), false
+Scan.Decor()
+check("an asynchronous search writes from its callback", #Store.db.decor.owned == 2)
+
+-- Replaced wholesale, not merged — the opposite of the profession cooldowns,
+-- because the searcher answers for the whole catalog at once.
+NOW = NOW + 3600
+DECOR_INFO = { [10] = { itemID = 999 } }
+DECOR_ENTRIES, DECOR_SYNC = { 10 }, true
+Scan.Decor()
+check("a later read replaces the set rather than merging into it",
+  #Store.db.decor.owned == 1 and Store.db.decor.owned[1] == 999)
+check("and clears a stale unmatched count", Store.db.decor.unmatched == nil)
+
+-- ── and decor has to survive the trip to the wire ───────────────────────────
+
+reset()
+DECOR_ENTRIES, DECOR_INFO = nil, nil
+check("a payload from an account that never looked omits it entirely",
+  Bundle.Build().decor == nil)
+
+DECOR_ENTRIES, DECOR_SYNC = entries(), true
+Scan.Decor()
+local decWire = Bundle.Build().decor
+check("once read it reaches the payload root", decWire ~= nil)
+check("with the owned item ids", decWire.owned and #decWire.owned == 2)
+check("and the unmatched count", decWire.unmatched == 1)
+check("json-encodes without error", type(Bundle.JSON(Bundle.Build())) == "string")
+
+DECOR_ENTRIES, DECOR_INFO = nil, nil
 
 -- ── every stamped section is one the store knows about ──────────────────────
 

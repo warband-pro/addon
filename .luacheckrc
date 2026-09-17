@@ -72,6 +72,14 @@ read_globals = {
   -- which is the trading post's identity — see Scan.lua.
   "C_PerksProgram", "C_PerksActivities", "C_DateAndTime",
 
+  -- housing decor (Scan.Decor). `C_HousingCatalog` is the only source in the
+  -- world for what decor an account owns — Blizzard publishes the catalog and
+  -- not the ownership, and this is the namespace the client answers it from.
+  -- Listed for the same reason as the three above: the code reads every one of
+  -- its functions through `ns.safe` rather than assuming the name exists, and
+  -- the lint needs the namespace declared to let that read compile.
+  "C_HousingCatalog",
+
   -- gear and talents
   "GetInventoryItemLink", "GetInventoryItemID", "ItemLocation",
   "C_ClassTalents", "C_Traits", "GetSpecialization", "GetSpecializationInfo",
