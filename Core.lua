@@ -160,6 +160,21 @@ handlers.PERKS_PROGRAM_CURRENCY_REFRESH = tradingPost
 handlers.PERKS_ACTIVITIES_UPDATED = tradingPost
 handlers.PERKS_ACTIVITY_COMPLETED = tradingPost
 
+-- The housing catalog fills when the player opens it, exactly like the trading
+-- post above, and the storage events are what say the owned set has moved —
+-- redeeming a decor, destroying one, or the catalog finishing its load.
+--
+-- Four seconds rather than the shelf's two. This walk is the whole catalog
+-- rather than one month's shelf, and these events arrive in bursts while the
+-- storage list populates; a longer trailing edge is what keeps one open of the
+-- housing UI to one walk.
+local function decor()
+  ns.throttle("decor", 4, Scan.Decor)
+end
+handlers.HOUSING_STORAGE_UPDATED = decor
+handlers.HOUSING_STORAGE_ENTRY_UPDATED = decor
+handlers.HOUSING_CATALOG_CATEGORY_UPDATED = decor
+
 -- Bank contents are readable only while the frame is open, and the warband
 -- tabs populate a beat after it opens — walked together, same as before.
 ns.onDirty("bank", function()

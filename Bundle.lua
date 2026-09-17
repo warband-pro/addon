@@ -141,6 +141,29 @@ local function tradingPost(root)
   }
 end
 
+-- Housing decor, account-wide, beside the trading post.
+--
+-- Absent until something has been read, the rule both sections above follow.
+-- What it carries is a list of **item ids**, not catalog entry ids: the website
+-- keys its decor catalog on Blizzard's Game Data decor rows, which name a
+-- backing item, and that item id is the one number both sides hold. See
+-- docs/CONTRACT.md § decor.
+--
+-- `unmatched` is a count, not a list, because there is nothing useful to say
+-- about an entry the client would not name — only how many of them there were,
+-- so a completion percentage can leave them out of both halves rather than
+-- counting them as unowned.
+local function decor(root)
+  if not root or not root.seenAt then return nil end
+  return {
+    seenAt = root.seenAt,
+    seenByGuid = root.seenByGuid,
+    seenByName = root.seenByName,
+    owned = root.owned,
+    unmatched = root.unmatched,
+  }
+end
+
 -- opts.currentOnly restricts the bundle to the character at the keyboard, which
 -- is what /warband copy current is for.
 function Bundle.Build(opts)
@@ -223,6 +246,7 @@ function Bundle.Build(opts)
     },
     warbandBank = warbandBank(db.warbandBank),
     tradingPost = tradingPost(db.tradingPost),
+    decor = decor(db.decor),
     characters = chars,
   }
 end

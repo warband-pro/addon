@@ -100,11 +100,18 @@ Traveler's Log has got. warband.pro reads it against the collection it already
 knows about, so it can tell you which of this month's items you do not own yet
 and whether you have the tender to finish.
 
-The balance travels whether or not you visit the shelf — it is a currency, and
-the addon can read it anywhere. The offerings need you to open the trading post
-once in a month, because that is when the game loads them; until you do, the
-string carries your tender and says plainly that the shelf has not been read
-rather than reporting it as empty.
+The balance travels whether or not you visit the shelf. The offerings need you
+to open the trading post once in a month, because that is when the game loads
+them; until you do, the string carries your tender and says the shelf has not
+been read rather than reporting it as empty.
+
+**Your housing decor goes out too, and nothing else could send it.** Blizzard
+publishes a decor catalogue and no ownership for it, so warband.pro could list
+all 2131 pieces and never say which are yours.
+
+Open the housing catalogue once and let it load. The list is account-wide, so
+the character does not matter, and until you open it decor is left out rather
+than reported as a collection of nothing.
 
 ### Fixed
 

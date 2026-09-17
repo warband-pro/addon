@@ -453,6 +453,92 @@ function Scan.TradingPost()
   Store.PutTradingPost(read)
 end
 
+-- Housing decor the account owns.
+--
+-- **This section exists because Blizzard publishes nowhere else.** Every other
+-- collection — mounts, pets, toys, heirlooms — has a Profile API endpoint the
+-- website reads directly, and decor is the one that does not: the catalog is
+-- published (`/data/wow/decor/index`, 2131 items) and ownership is not. The
+-- path that would carry it is the only collection path that 404s rather than
+-- refusing a wrong credential, which is the tell that it does not exist at all.
+-- So this addon is the only thing in the world that can answer "do I own that
+-- chair", and that is the whole justification for the read below.
+--
+-- **The item id is the join, not the catalog entry id.** The website's decor
+-- rows are keyed on Blizzard's Game Data decor id and carry a backing
+-- `item.id`; the client's catalog entry carries an `itemID` for the same thing.
+-- Those two item ids are the same number in both directions, and the entry ids
+-- are not known to agree. So the wire carries item ids and the website joins on
+-- them — the same shape the trading post's offerings use, arrived at from the
+-- same constraint.
+--
+-- **What cannot be matched is counted, never dropped.** An owned entry the
+-- client gives no item id for goes into `unmatched` as a number rather than
+-- being silently left out, because a short owned list reads on a completion
+-- percentage as a player further behind than they are — which is the same
+-- failure the website's `?` state exists to prevent on the trading post.
+--
+-- Like the trading post, these API names are read off Blizzard's own UI rather
+-- than from anything this repo can exercise, so every one goes through
+-- `ns.safe` and docs/QA.md carries the in-game checklist that settles them. A
+-- name that is wrong costs this one section and nothing else.
+local function decorFromSearcher(searcher)
+  local ids = ns.safe(searcher.GetCatalogSearchResults, searcher)
+  if type(ids) ~= "table" then return nil end
+
+  local cat = C_HousingCatalog
+  local seen, owned, unmatched = {}, {}, 0
+  for i = 1, #ids do
+    local entry = ids[i]
+    -- The searcher answers in entry *variant* ids. `GetCatalogEntryInfo` is
+    -- documented against an entry id, so the variant read is tried second
+    -- rather than assumed away: whichever resolves carries the item id, and an
+    -- id that resolves through neither is still an owned thing and is counted.
+    local info = ns.safe(cat.GetCatalogEntryInfo, entry)
+      or ns.safe(cat.GetCatalogEntryVariantInfo, entry)
+    local itemID = info and tonumber(info.itemID)
+    if itemID and not seen[itemID] then
+      seen[itemID] = true
+      owned[#owned + 1] = itemID
+    elseif not itemID then
+      unmatched = unmatched + 1
+    end
+  end
+
+  -- Ascending, so two reads of one collection produce the same bytes — the rule
+  -- every list on this wire follows, and the reason a diff of two bundles is
+  -- readable at all.
+  table.sort(owned)
+  return { owned = owned, unmatched = unmatched > 0 and unmatched or nil }
+end
+
+function Scan.Decor()
+  local cat = C_HousingCatalog
+  if not cat then return end
+  local searcher = ns.safe(cat.CreateCatalogSearcher)
+  if type(searcher) ~= "table" then return end
+
+  -- One row per decor rather than per colour variant. The website counts
+  -- catalog items, and counting a green chair and a red chair as two would put
+  -- the denominator and the numerator in different units.
+  ns.safe(searcher.SetBaseVariantOnly, searcher, true)
+  ns.safe(searcher.SetCollected, searcher, true)
+  ns.safe(searcher.SetUncollected, searcher, false)
+
+  local finish = function()
+    local read = decorFromSearcher(searcher)
+    if read then Store.PutDecor(read) end
+  end
+
+  -- The search is asynchronous, so the callback is the real path. It is also
+  -- read once directly below, because a searcher that answers from a warm cache
+  -- may never fire one — and a section that only lands on a callback that did
+  -- not fire is a section that silently never lands.
+  ns.safe(searcher.SetResultsUpdatedCallback, searcher, finish)
+  ns.safe(searcher.RunSearch, searcher)
+  if ns.safe(searcher.IsSearchInProgress, searcher) ~= true then finish() end
+end
+
 -- Skill level and cap only. Recipe counts need the profession window open and a
 -- full C_TradeSkillUI walk, which is the most expensive thing this addon could
 -- do; the contract already treats knownRecipes as optional.
@@ -524,6 +610,12 @@ function Scan.All()
   -- currency read and two calls that return nil, and it is the read that gets
   -- the tender balance onto the wire for a player who never opens the shelf.
   Scan.TradingPost()
+  -- `Scan.Decor` is deliberately NOT here. It is the housing catalog's whole
+  -- contents and an info read per owned entry, which is the bank's weight
+  -- rather than the shelf's — so it is event-driven only, like the bank, and
+  -- runs when the player opens the catalog. Putting it on every login would
+  -- spend that walk on the overwhelming majority of logins that never go near
+  -- a house.
   ns.Gear.All()
   ns.Gear.Talents()
 end

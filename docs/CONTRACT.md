@@ -1197,6 +1197,60 @@ costs this one section. `docs/QA.md` carries the in-game checklist that settles
 them, and until it has been run a consumer should expect this whole object to
 be absent rather than assume any part of it.
 
+### `decor` sits at the payload root too — added in 1.16.0, additive
+
+```json
+"decor": {
+  "seenAt": 1724000000, "seenByName": "Vocnar",
+  "owned": [ 234501, 234502, 234877, 235010 ],
+  "unmatched": 3
+}
+```
+
+Account-wide, beside `warbandBank` and `tradingPost`, and for a stronger reason
+than either: **this is the only section on this wire that no Battle.net endpoint
+could ever replace.** Blizzard publishes the decor *catalog*
+(`/data/wow/decor/index`, 2131 items) and publishes no ownership for it —
+`/profile/user/wow/collections/decor` is the one collection path that answers
+404 rather than refusing a wrong credential, which is the tell that it does not
+exist. Every other collection the website shows is read from the API directly.
+This one cannot be, so the client is the only source there is.
+
+**`owned` is a list of item ids, not catalog entry ids.** Blizzard's decor rows
+name a backing item, and the client's catalog entry carries an `itemID` for the
+same thing; the entry ids are not known to agree between the two. So the join is
+on the item id, exactly as `tradingPost.items[].itemID` is, and for the same
+reason.
+
+**`unmatched` is a count and it belongs in neither half of a percentage.** It is
+how many owned entries the client named no item for — real things the account
+owns that cannot be joined to a catalog row. A consumer MUST NOT count them as
+unowned, because a short owned list reads as a player further behind than they
+are; the honest reading is `owned` out of `catalog − unmatched`, with the gap
+stated. This is the same `?` posture the trading post's unmatchable offerings
+take.
+
+| field | | |
+|---|---|---|
+| `owned[]` | list | item ids the account owns, ascending and deduped. Absent until the housing catalog has been open once |
+| `unmatched` | number | owned entries the client gave no item id for. Absent rather than `0` |
+
+**An absent `decor` is not an empty collection.** The catalog populates when the
+housing UI has been opened, so "nothing read" is the state for every player who
+has not opened it — the addon refuses to write an empty read for exactly that
+reason, and a consumer must say the collection has not been read rather than
+report a score of zero.
+
+**No per-house placement, and no counts.** What is placed in which house is a
+different question from what the account owns, changes constantly, and answers
+nothing the website asks; `totalNumStored` is likewise left off, because "do I
+own that chair" is the question and "I own four of them" is not.
+
+**These API names are as unverified as the trading post's above** —
+`C_HousingCatalog` and its searcher object are read off Blizzard's own UI, every
+call goes through `ns.safe`, and `docs/QA.md` carries the in-game checklist that
+settles them.
+
 ### 2. Items carry `{id, count, quality?, isBound?}` — no `link`, no `isCraftingReagent`
 
 Name, icon, quality colour and item class are all derivable from the id through
