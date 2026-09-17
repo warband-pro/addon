@@ -93,6 +93,12 @@ function compare(a, b) {
 }
 const highest = (list) => [...list].sort(compare).at(-1);
 
+const bump = (v, kind) => {
+  const [major, minor, patch] = v.split('-')[0].split('.').map(Number);
+  if (kind === 'minor') return `${major}.${minor + 1}.0`;
+  return `${major}.${minor}.${patch + 1}`;
+};
+
 const newest = written[0];
 const highestWritten = highest(written);
 const highestTag = highest(tags);
@@ -140,16 +146,61 @@ if (!tagged.has(newest)) {
   else note(message);
 }
 
+// --- work on main that no version describes ------------------------------
+// The check above asks whether the newest WRITTEN version shipped. This one
+// asks the question that outranks it: is there work on main that no version
+// describes at all?
+//
+// Nothing asked it until 2026-09-17, and it is the gap a session falls through
+// rather than argues with. A change that ships no Lua — docs, tools, CI — leaves
+// the packaged zip byte-identical, so "nothing a player would notice" reads as
+// "nothing to release": the commit merges with no section, every check on the
+// page stays green, and main quietly sits a commit past the newest tag. abff4c0
+// is how it looks in the log. The old rule invited it in as many words, saying a
+// note moves with the commit "when a player would notice the change — and only
+// then", which hands the decision to whoever is holding it.
+//
+// The standing instruction is that every merge to main gets a version, however
+// small, so this is a failure rather than a judgement call. PATCH is the floor
+// and there is no "too small to ship" — see CHANGELOG.md's semver block.
+//
+// Only when the newest section IS tagged: an untagged newest section is the
+// check above, already failing with a better sentence, and a release run calls
+// this file before it creates its own tag.
+function commitsSince(tag) {
+  try {
+    return Number(
+      execFileSync('git', ['rev-list', '--count', `${tag}..HEAD`], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).trim(),
+    );
+  } catch {
+    return null;
+  }
+}
+
+if (tagged.has(newest)) {
+  const since = commitsSince(`v${newest}`);
+  if (since === null) {
+    // A shallow checkout has the tag name from `git tag` and not the object, so
+    // say which half is missing rather than passing as though main were clean.
+    note(`could not count commits since v${newest} — the tag is listed but not reachable, so this checkout cannot tell whether main has moved`);
+  } else if (since > 0) {
+    const next = bump(newest, 'patch');
+    const message =
+      `main is ${since} commit${since === 1 ? '' : 's'} past v${newest} and no section describes ${since === 1 ? 'it' : 'them'}. ` +
+      `Every merge gets a version, however small — a docs or tooling change ships a zip nobody can tell apart, and it still ships. ` +
+      `Write '## [${next}]' and cut it:\n       Actions → Release → Run workflow → ${next}`;
+    if (shipped) fail(message);
+    else note(message);
+  }
+}
+
 // --- what is waiting for a number ----------------------------------------
 // Notes accumulate under ## [Unreleased] on purpose, so this is never a
 // failure. It is the nudge: here is what is queued, and here is the number it
 // would go out under.
-const bump = (v, kind) => {
-  const [major, minor, patch] = v.split('-')[0].split('.').map(Number);
-  if (kind === 'minor') return `${major}.${minor + 1}.0`;
-  return `${major}.${minor}.${patch + 1}`;
-};
-
 const pending = section('--unreleased');
 if (!pending.found) {
   fail(`${CHANGELOG} has no '## [Unreleased]' heading — cutting a release adds a section, it does not rename that one`);
