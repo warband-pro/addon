@@ -10,7 +10,7 @@ one button, and everything between that and the download page is automatic.
 | Job | What it proves |
 | --- | --- |
 | `luacheck` | Zero warnings under `.luacheckrc`. That file lists every global the addon may touch, so a new warning is usually a leaked global rather than a style nit. |
-| `packaging + contract` | `tools/validate.mjs` — the `.toc` and `.pkgmeta` are internally consistent. `tools/vector.mjs` — a `wb1!` payload survives encode → decode unchanged, and the committed `.wb1` fixtures still match. `tools/slop.mjs --unreleased` — the notes accumulating under `## [Unreleased]` read like a person wrote them. `tools/released.mjs` — the newest version in `CHANGELOG.md` has a tag, so it actually reached a download page. |
+| `packaging + contract` | `tools/validate.mjs` — the `.toc` and `.pkgmeta` are internally consistent. `tools/vector.mjs` — a `wb1!` payload survives encode → decode unchanged, and the committed `.wb1` fixtures still match. `tools/slop.mjs --unreleased` — the notes accumulating under `## [Unreleased]` read like a person wrote them. `tools/released.mjs` — the newest version in `CHANGELOG.md` has a tag, so it actually reached a download page, and no commit sits on `main` without a version describing it. |
 | `package (dry run)` | The real packager builds the real zip with uploads switched off, and attaches it as a workflow artifact. |
 
 That artifact matters: **every push to `main` produces a downloadable, correctly
@@ -156,6 +156,29 @@ version turns the branch red and the failure prints the two commands that fix
 it. On a pull request and on a release run it reports without failing — the
 section is written before the tag by design on the first, and the release
 workflow calls CI *before* it creates the tag on the second.
+
+**Since 2026-09-17 it asks a second question, which outranks the first:** is
+there work on `main` that no version describes *at all*? Every merge gets a
+version, however small, so commits sitting past the newest tag with no section
+naming them fail the same way.
+
+That gap was the one a session falls through rather than argues with. A change
+touching only `docs/`, `tools/` or `.github/` packages a zip nobody can tell from
+the last one, so "nothing a player would notice" reads as "nothing to release" —
+the commit merges with no section and every check on the page stays green while
+`main` drifts past the tag. It happened the day the always-release rule was
+written, which is why it is a check and not a paragraph.
+
+```
+FAIL main is 1 commit past v1.15.0 and no section describes it. Every merge gets
+     a version, however small — a docs or tooling change ships a zip nobody can
+     tell apart, and it still ships. Write '## [1.15.1]' and cut it:
+       Actions → Release → Run workflow → 1.15.1
+```
+
+It only runs when the newest section **is** tagged: an untagged one is the check
+above, already failing with a better sentence, and a release run calls this file
+before creating its own tag.
 
 It also answers the question the nudge exists for: what is queued under
 `## [Unreleased]`, and what number that would go out under.

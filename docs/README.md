@@ -2,7 +2,20 @@
 
 Instruction manual for coder AI that never sees game output. Each file answers one question, no overlap.
 
+**Read first — what this product is.** The addon is one half of warband.pro, and
+the intent lives in the app repo: `warband-pro/app` at
+`.wiki/wiki/topics/vision.md` — the four pillars (**Camp**, **Tonight**,
+**Gear**, **Progress**), the product principles and the Opportunity Test every
+proposal answers. That repo is private, so it is referenced and never copied
+here. What *this* repo delivers against it — what is captured, which events
+drive it, what a paste does, and what is missing — is
+[CURRENT-STATE.md](CURRENT-STATE.md). This addon's job in one line: **the
+Battle.net API covers who a character is and what they wear; this addon covers
+everything the API cannot see, and it never phones home.**
+
 **Read this order:**
+
+0. CURRENT-STATE.md — what this addon captures today, by pillar, with the gaps and the drift log. Start here when you are deciding whether a change is worth making; the twelve documents below are how.
 
 1. FLOW.md — Goal + user behavior. Why API has 0 paths for gold/bank/bags/curr/vault/mail, who Voc (6 Voc- tanks 3H/3A second-monitor back-and-forth 4-10 exports/night Sat push), success, when data matters for Tonight Plan, omnipresent sink why. **And the return trip**: the loop is a round trip since 1.4.0 — the site hands an answer back as `wbc1!` and the Import tab acts on it under a click; the two clocks (the addon's ~30 events, automatic, versus the player's milestone), and why neither side may assume the other's crossing happened.
 2. RESEARCH-REFERENCE.md — Midnight 12.1 best practices, Interface 120100, no Ace3/libstub, load order libs→core→data→ui, account-wide WarbandProDB guid-keyed, event-driven throttle .5s, C_Container new, C_Bank 5 tabs only at banker, CLEU dead + Secret Values taint, LibDeflate wb1! -_ std, Compartment Func, Settings modern, packager.

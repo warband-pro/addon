@@ -6,6 +6,53 @@ wire format, the UI, the CI and the distribution policy. This file is only a
 pointer, plus the path every session takes and the rules that are not written
 down anywhere else.
 
+## Read First — what this product is
+
+Two documents, before the read order and before any Lua:
+
+- **Vision** — `warband-pro/app` at `.wiki/wiki/topics/vision.md`. The pillars,
+  the product principles, the Opportunity Test. That repo is **private**; the
+  vision is referenced here and never copied, the same one-way door as
+  **Never Mix the Two Repositories** below.
+- [**Current State**](docs/CURRENT-STATE.md) — what *this* repo captures today,
+  by pillar, with the event map, the paste audit and the gaps.
+
+warband.pro reads a Battle.net account once and answers one question: **what's
+the highest-impact thing to do tonight, and on which character?** Four pillars:
+
+- **Camp** — the small subset of the warband the player actually plays. Camp is
+  the default scope for everything on the site.
+- **Tonight** — one ranked list of next-best activities across the camp. Every
+  other pillar pays off here.
+- **Gear** — replaces AskMrRobot: Best in Bags, upgrade planning, the Great
+  Vault choice, gems and enchants, the clear-out list, and the round trip back
+  into the game through `wbc1!`.
+- **Progress** — replaces completionism.com: collections, trading post,
+  achievements, reputations, events, decor.
+
+**This addon's pillar is all four, from underneath.** The Battle.net API covers
+who a character is and what they wear; **this addon covers everything the API
+cannot see.** The boundary: the addon renders facts and the app renders
+judgements — `wbc1!` is the deliberate exception, and it carries a decision the
+addon *acts on* under a click rather than draws as a readout.
+
+**The Opportunity Test.** Before building or proposing anything, answer:
+
+1. Which pillar does it serve?
+2. Does it default to camp scope?
+3. How does it rank in Tonight, and with what impact, urgency and effort?
+4. Does it replace something the operator currently opens another site or addon
+   for?
+5. Does it respect every principle above?
+
+> **When you ship a change that alters a captured field, the wire, stored data
+> or what a paste does, update [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md)
+> in the same PR.**
+
+A field this addon captures that no page on the site uses is an unfinished
+crossing — log it as a GitHub issue labelled `agent`, citing the question it
+answers.
+
 ## The Path
 
 Four steps, this order, every session. **None of them is a branch decision** —
@@ -173,17 +220,58 @@ rather than the mechanics. Types in use: `feat`, `fix`, `docs`, `ci`, `chore`,
 and `release: N.N.N — summary` for a cut. `fix(bindings): Bindings.xml is
 loaded by name, so listing it in the .toc loads it twice` is the register.
 
-**A `CHANGELOG.md` note under `## [Unreleased]` moves with the commit** when a
-player would notice the change — and only then. It is written for players, not
-for the commit log, and `tools/slop.mjs` fails CI on notes that read like
-marketing. Leave the `## [Unreleased]` heading in place when cutting a release;
-removing it turns `main` red.
+**A `CHANGELOG.md` note under `## [Unreleased]` moves with the commit.** It is
+written for players, not for the commit log, and `tools/slop.mjs` fails CI on
+notes that read like marketing. Leave the `## [Unreleased]` heading in place
+when cutting a release; removing it turns `main` red.
 
-**Cutting a release is not a routine decision and is not yours to make
-unasked.** A tag ships to CurseForge and Wago and cannot be recalled;
-`.claude/settings.json` asks before `git tag` and before pushing one. What
-number a release gets is `CHANGELOG.md`'s semver rule — anchored to what the
-player has to do about it, not to payload shape.
+**Cut the release. Standing instruction from the maintainer, 2026-09-17.**
+This said the reverse until that date — *not a routine decision and not yours
+to make unasked* — and the maintainer's own words replacing it were "I always
+want you to cut the addon release always."
+
+So a session that merges **anything** finishes the job: write the `## [x.y.z]`
+section, merge it, and dispatch the release. **Do not stop to ask**, and do not
+report an untagged version as a question when it is now an instruction.
+
+**Every merge to `main` gets a version, however small.** Strengthened
+2026-09-17, on the maintainer's instruction — *always increment the addon
+version to trigger a new build, even if minor* — and the sentence it replaced
+is the reason it had to be: a note used to move with the commit "when a player
+would notice the change — and only then", which reads as permission to skip.
+A session took it the same day, merged a docs-only change and reported *"no
+release: `.pkgmeta` strips `docs/`, so nothing ships"* — correct about the zip
+and wrong about the job. **A change that ships no Lua still ships.** The zip is
+byte-identical and the version still moves, because the build is what the
+maintainer asked for and "too small to matter" is not a judgement this repo
+wants any session making on its own.
+
+`PATCH` is the floor. There is no fourth option under it.
+
+What number it gets is not a judgement call either — `CHANGELOG.md`'s semver
+rule decides it, anchored to what the player has to do about it rather than to
+payload shape.
+
+**Prose alone does not hold here and this repo has the record twice over.**
+The rule that a written-up version must be tagged was prose until 1.3.0, 1.4.0
+and 1.9.0 had each been merged untagged; `tools/released.mjs` closed it. The
+rule you are reading was prose for exactly one day before it was skipped. So it
+is a check too, in the same file: **`released.mjs` fails a push to `main` that
+sits past the newest tag with no section describing it**, and it names the
+number and the dispatch. Green on `main` now means every commit has shipped,
+not merely that what was written down did.
+
+**Two things this does not relax, and they are the ones that matter.** A tag
+ships to CurseForge and Wago and **cannot be recalled**, so the standing
+instruction buys the decision and not the care:
+
+- **Verify is still the gate**, and the release workflow runs the whole CI
+  suite again before it writes a tag. A red gate stops the release exactly as
+  it stops a commit.
+- **The one-way door under "Never Mix the Two Repositories" is unchanged.** The
+  cost of a mistake here is a secret on CurseForge, and being told to release
+  without asking makes reading the diff before the tag more important rather
+  than less.
 
 **But writing the section is not cutting the release, and this repo keeps
 proving it.** The tag is the version — the `.toc` carries `@project-version@`
@@ -192,8 +280,8 @@ its own. 1.3.0, 1.4.0 and 1.9.0 were each written up, dated and merged without
 a tag, and sat in `main` where no player could download them. `tools/released.mjs`
 is what closed it: it compares the changelog against the tags, fails a push to
 `main` when the newest section has no tag, and names the two commands that ship
-it. If it reports an untagged version, **say so and ask** — it is the report
-that is yours to deliver, not the tag.
+it. If it reports an untagged version, **cut the tag** — that is the standing
+instruction above, and the report is the trigger rather than the deliverable.
 
 ### The rest, stated once
 

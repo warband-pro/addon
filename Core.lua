@@ -32,6 +32,20 @@ local EVENTS = {
   "PLAYER_EQUIPMENT_CHANGED", "PLAYER_AVG_ITEM_LEVEL_UPDATE",
   "TRAIT_CONFIG_UPDATED", "ACTIVE_COMBAT_CONFIG_CHANGED", "PLAYER_SPECIALIZATION_CHANGED",
   "GET_ITEM_INFO_RECEIVED",
+  -- The trading post and the housing catalog. **This list is the registration
+  -- and the handler table below is not** — a `handlers.X` for an event nobody
+  -- asked the frame for is a function the game will never call, which is how
+  -- 1.15.0 shipped five trading-post handlers that could not fire. The shelf
+  -- was then only ever read by `Scan.All` at login, which is precisely the
+  -- moment the frame is shut and the client has nothing to give.
+  --
+  -- Nothing about that failure is visible: no error, no warning, and a bundle
+  -- that carries a tender balance and no items — which is also the honest
+  -- reading for a player who has not visited, so it looked correct.
+  "PERKS_PROGRAM_OPEN", "PERKS_PROGRAM_DATA_REFRESH", "PERKS_PROGRAM_CURRENCY_REFRESH",
+  "PERKS_ACTIVITIES_UPDATED", "PERKS_ACTIVITY_COMPLETED",
+  "HOUSING_STORAGE_UPDATED", "HOUSING_STORAGE_ENTRY_UPDATED",
+  "HOUSING_CATALOG_CATEGORY_UPDATED",
 }
 
 local registered = {}

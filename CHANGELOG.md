@@ -27,7 +27,13 @@ Versions follow [semver](https://semver.org/), anchored to **what the player has
 
 - **MAJOR** — they have to update, or it stops working. `wb1!` → `wb2!`: the website rejects strings from an older addon with "update your addon".
 - **MINOR** — something new. A new capture, a new field on the wire, or a new thing the in-game UI does. Nothing they already do breaks, and the website still reads older bundles.
-- **PATCH** — a fix. No new capture, no new field, no new control.
+- **PATCH** — a fix. No new capture, no new field, no new control. **And the floor:** every merge to `main` gets a version, so a change with nothing in it for a player is a PATCH rather than nothing at all.
+
+**There is no fourth option, and that is the 2026-09-17 correction.** A change touching only `docs/`, `tools/` or `.github/` packages a zip nobody can tell from the last one — `.pkgmeta` strips all three — and it still gets a number and still goes out. The maintainer's instruction is to always increment so a build is triggered, and the version moving is the point rather than a side effect of the payload changing.
+
+This was worth writing down because the previous wording invited the opposite. It said a note moves with the commit "when a player would notice the change — and only then", and a session read that as permission, merged a docs change and reported *no release, nothing ships*. True of the zip, false of the job. `tools/released.mjs` now fails a push to `main` that sits past the newest tag with nothing describing it, so the rule does not depend on the reading.
+
+**What such a release says to a player** is the honest thing and not an invented feature: that nothing in the addon changed, and what did. A release note is allowed to be one line.
 
 **This used to say the wire format was the thing being versioned**, and it stopped
 being true one release before it was corrected. 1.5.0 added a minimap button, a
@@ -44,6 +50,57 @@ they are in [docs/CONTRACT.md](docs/CONTRACT.md), which is law for this repo and
 MAJOR has to be a wire break.**
 
 ## [Unreleased]
+
+### Added
+
+**Your housing decor goes out with the bundle, and nothing else could send it.**
+Every other collection warband.pro shows — mounts, pets, toys, heirlooms — it
+reads from Battle.net on its own. Decor is the one Blizzard publishes a
+catalogue for and no ownership for, so the site has been able to list all 2131
+pieces and never say which of them are yours. Now the string carries them.
+
+Open the housing catalogue once and let it finish loading; the list travels
+account-wide, so it does not matter which character you were on. Until you open
+it the string leaves decor out entirely rather than reporting a collection of
+nothing.
+
+A few pieces the game will not name come across as a count instead of an id.
+They are left out of both halves of your completion rather than counted as
+missing, and the site says how many.
+
+### Fixed
+
+**This month's trading post shelf reaches the string again.** 1.15.0 added the
+capture and wired it to the wrong side of the game's event system, so the only
+time it ever ran was at login — the one moment the trading post is shut and the
+game has nothing to hand over. Your tender balance travelled, the shelf did not,
+and that reads exactly like a player who has not been to the post yet, which is
+why nobody could see it was broken.
+
+Open the trading post once and it lands now. A check was added that fails the
+build for the same mistake rather than shipping it again.
+
+## [1.15.1] — 2026-09-17 — the same addon, released on purpose
+
+Nothing in the addon changed. No new capture, nothing new on the wire, nothing
+new in the window — if you are on 1.15.0 this is that code with a different
+number on it, and the string you copy is byte for byte the one you copied
+yesterday.
+
+It goes out anyway, and that is the whole of this release. A version is cut on
+every merge now rather than only when there is something to show for it, so the
+build you can download and the state of the addon stay the same thing. Work that
+shows a player nothing — documentation, the checks that run before a release —
+used to land with no version at all and sit where nobody could get it.
+
+### Changed
+
+- The rule about what earns a release, and a check that fails the build when a
+  merge lands with no version describing it. Both are read by nobody but the
+  people working on the addon; the effect you might notice is that releases get
+  smaller and more frequent.
+
+## [1.15.0] — 2026-09-17 — a set for each kind of night, and one press to wear it
 
 ### Added
 
@@ -100,18 +157,11 @@ Traveler's Log has got. warband.pro reads it against the collection it already
 knows about, so it can tell you which of this month's items you do not own yet
 and whether you have the tender to finish.
 
-The balance travels whether or not you visit the shelf. The offerings need you
-to open the trading post once in a month, because that is when the game loads
-them; until you do, the string carries your tender and says the shelf has not
-been read rather than reporting it as empty.
-
-**Your housing decor goes out too, and nothing else could send it.** Blizzard
-publishes a decor catalogue and no ownership for it, so warband.pro could list
-all 2131 pieces and never say which are yours.
-
-Open the housing catalogue once and let it load. The list is account-wide, so
-the character does not matter, and until you open it decor is left out rather
-than reported as a collection of nothing.
+The balance travels whether or not you visit the shelf — it is a currency, and
+the addon can read it anywhere. The offerings need you to open the trading post
+once in a month, because that is when the game loads them; until you do, the
+string carries your tender and says plainly that the shelf has not been read
+rather than reporting it as empty.
 
 ### Fixed
 
