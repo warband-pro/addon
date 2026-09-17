@@ -45,7 +45,7 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
-## [1.15.0] — 2026-09-16 — a set for each kind of night, and one press to wear it
+## [1.15.0] — 2026-09-17 — a set for each kind of night, and one press to wear it
 
 ### Added
 

@@ -179,7 +179,7 @@ for the commit log, and `tools/slop.mjs` fails CI on notes that read like
 marketing. Leave the `## [Unreleased]` heading in place when cutting a release;
 removing it turns `main` red.
 
-**Cut the release. Standing instruction from the maintainer, 2026-09-16.**
+**Cut the release. Standing instruction from the maintainer, 2026-09-17.**
 This said the reverse until that date — *not a routine decision and not yours
 to make unasked* — and the maintainer's own words replacing it were "I always
 want you to cut the addon release always."
