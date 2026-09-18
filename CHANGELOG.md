@@ -51,6 +51,10 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+- Numbers in the roster grid line up against the right of their column instead of floating in the middle of it, so a column of golds or lockout counts reads straight down. Character names and row labels are where they were.
+
 ## [1.16.1] — 2026-09-18 — an empty consumable stack is a shopping list, not an error
 
 ### Fixed

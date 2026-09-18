@@ -1036,7 +1036,12 @@ local function growLine(w, n)
     hit:EnableMouse(true)
     local fs = hit:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     fs:SetAllPoints(hit)
-    fs:SetJustifyH("CENTER")
+    -- RIGHT, not CENTER: a centred value drifts left and right with its own
+    -- width, so `0/2` and `43,418g` start in different places and a column of
+    -- numbers has no edge to read down. Flushing them to the cell's right edge
+    -- gives one. The name headers above stay centred — they are labels, not a
+    -- series. This is what SavedInstances does with its compact values.
+    fs:SetJustifyH("RIGHT")
     fs:SetWordWrap(false)
     hit:SetScript("OnEnter", function(self)
       if w.hi then w.hi:Show() end
