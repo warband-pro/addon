@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.16.3] — 2026-09-18 — a section header looks like a section header
+
 ### Changed
 
 - Roster group headers (`this week`, `currencies`, `professions`, `pockets`) are
