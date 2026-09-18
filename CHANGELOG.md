@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.16.1] — 2026-09-18 — an empty consumable stack is a shopping list, not an error
+
 ### Fixed
 
 **A consumable count of 0 in the Roster grid is no longer red.** Red in that
