@@ -588,7 +588,11 @@ local function pockets(groups, cols)
     addRow(g, cols, con.label, function(c)
       local n = c.consumables and num(c.consumables[con.key])
       if not n then return nil end
-      return cell(tostring(n), n == 0 and "bad" or "plain")
+      -- A zero phial count is a reading, not a failure: red is this grid's
+      -- "something is wrong or expired" and nothing is wrong about an empty
+      -- stack you have not shopped for yet. The currencies keep red because
+      -- at the cap is a loss happening now.
+      return cell(tostring(n), "plain")
     end)
   end
 
