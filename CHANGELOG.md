@@ -51,6 +51,13 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+- The wire-format document that both this addon and the website are written
+  against showed keystone, Mythic+ run and raid lockout examples with fields
+  the addon has never sent, and left out three it sends every scan. Nothing in
+  the addon itself changed — the document now says what it actually writes.
+
 ## [1.17.0] — 2026-09-18 — a currency row carries its own icon
 
 ### Added

@@ -107,13 +107,14 @@ Top-level:
   ],
 
   "instances": [
-    {"name":"Nerub-ar Palace","instanceID":1273,"lfgID":0,"difficulty":3,"locked":true,"resetTime":1724200000,"extended":false,
+    {"name":"Nerub-ar Palace","instanceID":1273,"lfgID":0,"difficulty":3,"difficultyName":"Heroic","isRaid":true,
+     "locked":true,"resetTime":1724200000,"extended":false,
      "bosses":[{"name":"Ulgrax","killed":true},{"name":"Bloodbound Horror","killed":true}]}
   ],
   "worldBosses": [{"name":"Kordac","killed":true,"resetTime":1724200000}],
 
-  "keystone": {"level":12,"dungeonID":503,"dungeonName":"City of Threads","where":"bag","itemID":180653},
-  "mythicPlusRuns": [{"mapID":503,"level":12,"timed":true,"chestCount":2,"completedAt":1723989000}],
+  "keystone": {"level":12,"dungeonID":503,"dungeonName":"City of Threads"},
+  "mythicPlusRuns": [{"mapID":503,"level":12,"timed":true,"thisWeek":true}],
   "mythicPlusScore": 2345,
 
   "weeklyVault": {
@@ -186,6 +187,26 @@ Top-level:
   trusting it for a cap warning, the same way it gates the vault.
 - `consumables` is derived cache to make Tonight Plan fast: count by regex on known consumable itemIDs, not name match.
 - `instances.bosses` bool order matches in-game encounter order, but name included for human search.
+- `instances[].difficultyName` is the client's own **localized** difficulty
+  label — `GetSavedInstanceInfo`'s tenth return, "Heroic" on an English client
+  and something else on every other one. It is there so a list can be read
+  without a lookup table; join on `difficulty`, the numeric id, and never on
+  this string.
+- `instances[].isRaid` says whether the save is a raid rather than a dungeon,
+  which is the one split a consumer always wants and cannot derive from
+  `instanceID` without a table of its own.
+- **`keystone` is absent when the character holds no key**, and that absence is
+  a fact rather than a gap: the client was asked and the answer was no key.
+  `GetOwnedKeystoneLevel` and `GetOwnedKeystoneChallengeMapID` are the whole
+  source, so the addon answers the **owned** keystone and never where it sits —
+  the example here carried a `where` and an `itemID` until 2026-09-18 and
+  neither has ever crossed the wire.
+- `mythicPlusRuns[].thisWeek` marks the runs `GetRunHistory` counts in the
+  current weekly reset, which is the set the vault is being filled from; rows
+  without it are this season but an earlier week. `timed` is the client's own
+  `completed` flag for the run, not a comparison against the dungeon timer.
+  The same example promised a `chestCount` and a `completedAt`; the client
+  returns neither, so a decoder waiting on them waits forever.
 - Mail goldPending in copper.
 - Any field unknown on old version must be treated as optional by web. New fields additive, bumps minor patch but safe.
 
