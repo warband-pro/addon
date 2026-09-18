@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.16.2] — 2026-09-18 — a column of numbers reads down its right edge
+
 ### Fixed
 
 - Numbers in the roster grid line up against the right of their column instead of floating in the middle of it, so a column of golds or lockout counts reads straight down. Character names and row labels are where they were.
