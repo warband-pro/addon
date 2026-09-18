@@ -1226,10 +1226,14 @@ function UI.RenderRoster()
       -- stripe under it is what stops `currencies` reading as one more row of
       -- the block above it.
       --
+      -- Gold, not grey. The stripe alone was carrying the separation and grey
+      -- reads as disabled, so the header sat at the same weight as the data
+      -- under it. Gold is what SavedInstances marks structure with.
+      --
       -- The `+`/`-` in front of it is the whole of the affordance. A shut group
       -- names the count it is holding, because `pockets` with a rule under it
       -- and nothing else looks like a group that had nothing to say.
-      w.label:SetText(format("|cff%s%s %s%s|r", MUTED, line.closed and "+" or "-", line.head,
+      w.label:SetText(format("|cff%s%s %s%s|r", WARN, line.closed and "+" or "-", line.head,
         line.closed and format("  (%d)", line.hidden) or ""))
       w.stripe:SetColorTexture(1, 1, 1, 0.05)
       w.stripe:Show()
