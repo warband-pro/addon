@@ -180,6 +180,11 @@ a cell that is a child of the scroll frame do not otherwise line up.
 a 14px row across twelve columns is exactly where an eye loses its place, and
 these are the two things SavedInstances gets from LibQTip that we owed it.
 
+The header text and its `+`/`-` are gold (`WARN`, `ffd100`), not grey. Grey put
+a header at the same weight as the data under it — worse, it read as disabled —
+which left the stripe doing the separation on its own. Gold is what
+SavedInstances marks structure with, and the data rows stay uncoloured.
+
 **Row groups, in order:** `this week` (the three vault buckets, keystone, m+
 score), `lockouts` (one row per instance-and-difficulty anybody is saved to,
 raids first, plus a world-boss count), `currencies` (one row per currency the

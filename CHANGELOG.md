@@ -51,6 +51,13 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Changed
+
+- Roster group headers (`this week`, `currencies`, `professions`, `pockets`) are
+  gold instead of grey, so they read as structure rather than as one more row of
+  data — or as something switched off. The fold arrow, the hidden-row count and
+  the click-to-fold behaviour are the same.
+
 ## [1.16.2] — 2026-09-18 — a column of numbers reads down its right edge
 
 ### Fixed
