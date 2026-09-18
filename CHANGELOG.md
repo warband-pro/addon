@@ -51,6 +51,15 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+**A consumable count of 0 in the Roster grid is no longer red.** Red in that
+grid means something is wrong or already lost — a currency sitting at its cap,
+a plan gone stale. An empty phial stack is neither; it is a shopping list.
+Every character short on one showed a red 0, so a normal Tuesday read as a
+column of failures. Zeros now draw like every other count, and red stays on
+the rows where something is actually going wrong.
+
 ## [1.16.0] — 2026-09-17 — your housing decor travels, and the shelf reaches the string again
 
 ### Added

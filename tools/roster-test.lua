@@ -154,12 +154,14 @@ do
 end
 
 do
-  -- Zero IS a reading here, and the one worth colouring: the tonight plan
-  -- blocks on an empty phial count, so the grid should show it in the tone
-  -- that says go and buy some.
+  -- Zero IS a reading here and it is still drawn, but it is not a fault:
+  -- red in this grid means wrong or expired, and a stack you have not shopped
+  -- for yet is neither. A column of red 0s read as a column of failures.
   local model = Roster.Build(db({ a = char({ consumables = { phial = 0, foodFeast = 200 } }) }), nil)
   check("a consumable that was counted at zero is drawn as 0", textAt(model, "phials", 1) == "0")
-  check("and it is drawn as a problem", row(model, "phials").cells[1].tone == "bad")
+  check("and it carries no opinion about it", row(model, "phials").cells[1].tone == "plain")
+  check("a counted consumable reads the same either way",
+    row(model, "food").cells[1].tone == "plain")
   check("a consumable key the scan never wrote has no row",
     row(model, "health potions") == nil)
 end
