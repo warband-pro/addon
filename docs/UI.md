@@ -189,6 +189,13 @@ mail when something is waiting). The warband bank is account-wide and so has no
 column to live in; it is the footer line, with how many of its tabs were
 actually read.
 
+**Values are right-justified in their cell, labels are not.** A centred value
+moves with its own width, so `0/2` and `43,418g` begin in different places and a
+column of numbers offers the eye no edge to run down. Flushing them to the right
+of the 56px cell gives one, which is what SavedInstances' compact values do. The
+row labels stay left-justified and the column headers stay centred — a name is a
+label, not a member of a series.
+
 **Hover is where the parity actually lands.** A cell is two or three characters
 because that is what makes a row readable *across*; everything it summarises
 lives in the cell's own tooltip, which is the feature people name when they say
