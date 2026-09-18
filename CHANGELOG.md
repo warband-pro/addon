@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.17.1] — 2026-09-18 — the contract says what the addon actually sends
+
 ### Fixed
 
 - The wire-format document that both this addon and the website are written
