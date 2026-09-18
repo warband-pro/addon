@@ -245,6 +245,15 @@ player does on the addon's behalf every time an expansion retires a currency and
 mints four more. The signal is already on the wire here, so this is decided
 rather than configured — the same move as the expired lockout above.
 
+**Each row draws the currency's own icon before its name.** SavedInstances does
+this and it is most of why its currency list reads faster than ours did: the
+icon arrives before the word, so you find Valorstones by shape rather than by
+reading down a column of names that all begin with a capital letter. The icon
+is the row's rather than a cell's — a currency is the same currency across every
+character — and it comes off the stored `icon` file id, so an alt offline since
+last week still shows one. A row nobody has an icon for keeps the whole label
+column and looks exactly as it did. Instance and profession rows stay text.
+
 The group header **says how many it left out** — `currencies · 4 hidden` — for
 the reason the minimap glance prints `+2` rather than simply stopping at three: a
 header that silently drops rows is a bug report waiting to be filed, and one

@@ -331,6 +331,11 @@ function Scan.Currencies()
         out[#out + 1] = {
           id = id,
           name = info.name,
+          -- The icon the currency frame draws beside this row. Stored rather
+          -- than looked up at draw time: the grid renders from the DB alone,
+          -- so an alt's currency icon has to survive the logout that took its
+          -- client-side list with it.
+          icon = info.iconFileID,
           quantity = info.quantity or 0,
           maxQuantity = info.maxQuantity or 0,
           weeklyMax = info.maxWeeklyQuantity or 0,

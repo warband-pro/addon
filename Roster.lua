@@ -159,7 +159,10 @@ local function group(label)
   return { label = label, rows = {}, _n = 0 }
 end
 
-local function addRow(g, cols, label, fn)
+--- `icon` is optional and is the row's, not a cell's: a currency is the same
+--- currency down the whole line, so the texture belongs beside the label rather
+--- than repeated in every column. A row without one draws exactly as before.
+local function addRow(g, cols, label, fn, icon)
   local cells, any = {}, false
   for i = 1, #cols do
     local c = fn(cols[i].char, cols[i])
@@ -168,7 +171,7 @@ local function addRow(g, cols, label, fn)
   end
   if not any then return end
   g._n = g._n + 1
-  g.rows[g._n] = { label = label, cells = cells }
+  g.rows[g._n] = { label = label, cells = cells, icon = icon }
 end
 
 local function push(groups, g)
@@ -375,6 +378,10 @@ local function currencies(groups, cols, showAll)
           seen[cur.id] = k
           keys[#keys + 1] = k
         end
+        -- First character to have read an icon for this currency answers for
+        -- the row. An alt scanned by an older version carries none, and that
+        -- must not blank a row another alt can illustrate.
+        if k.icon == nil then k.icon = cur.icon end
         if liveCurrency(cur) then k.live = true end
       end
     end
@@ -440,7 +447,7 @@ local function currencies(groups, cols, showAll)
           end
         end
         return nil
-      end)
+      end, k.icon)
     end
   end
 
@@ -801,7 +808,7 @@ function Roster.Lines(groups, first, nCols, shut)
         head.hidden = head.hidden + 1
         if not closed then
           n = n + 1
-          out[n] = { label = r.label, cells = cells }
+          out[n] = { label = r.label, cells = cells, icon = r.icon }
         end
       end
     end

@@ -65,6 +65,10 @@ local GS_ROWS, GS_LINE = 16, 16
 -- measured) scrolled off the bottom of its own grid into blank space. Both
 -- pools now grow to whatever the model and the window between them ask for.
 local LABEL_W, CELL_W, LINE_H = 152, 56, 14
+-- The icon a row may carry, and the room the label gives up for it. Sized off
+-- the line so the two stay in step if the grid ever changes row height.
+local ROW_ICON = LINE_H - 2
+local ROW_ICON_GAP = 3
 
 -- The gutter left of the first cell. The well is already anchored 20px clear of
 -- UIPanelScrollFrameTemplate's bar, so the bar is NOT subtracted again here —
@@ -973,6 +977,20 @@ local function makeRosterLine(i)
   stripe:SetHeight(LINE_H)
   stripe:Hide()
 
+  -- One icon per line, pooled with the line and hidden when the row it lands on
+  -- has none. SavedInstances draws a currency's own icon before its name, and
+  -- that is what makes a column of sixteen currencies scannable — the icon
+  -- arrives before the word does. Created here rather than per render: a
+  -- texture made while drawing is a texture leaked on every draw.
+  local icon = rosterChild:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(ROW_ICON, ROW_ICON)
+  icon:SetPoint("TOPLEFT", 0, y - (LINE_H - ROW_ICON) / 2)
+  -- The stock icon border is baked into the texture's outer 6%, the same crop
+  -- buildGearRow takes and for the same reason: at 12px the border is most of
+  -- what you would see.
+  icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  icon:Hide()
+
   local label = rosterChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   label:SetPoint("TOPLEFT", 0, y)
   label:SetWidth(LABEL_W)
@@ -1015,7 +1033,7 @@ local function makeRosterLine(i)
   rowHit.hi = hi
 
   rosterLines[i] = {
-    label = label, stripe = stripe, hi = hi, rowHit = rowHit,
+    label = label, icon = icon, stripe = stripe, hi = hi, rowHit = rowHit,
     cells = {}, hits = {}, y = y,
   }
   return rosterLines[i]
@@ -1198,6 +1216,24 @@ function UI.RenderRoster()
     end
   end
 
+  -- The label column, with or without its icon. A row that has one gives up
+  -- the icon's width from the left of the label rather than drawing over it,
+  -- so a long currency name still stops short of the first value column.
+  local function setLabel(w, text, icon)
+    w.label:ClearAllPoints()
+    if icon then
+      w.icon:SetTexture(icon)
+      w.icon:Show()
+      w.label:SetPoint("TOPLEFT", ROW_ICON + ROW_ICON_GAP, w.y)
+      w.label:SetWidth(LABEL_W - ROW_ICON - ROW_ICON_GAP)
+    else
+      w.icon:Hide()
+      w.label:SetPoint("TOPLEFT", 0, w.y)
+      w.label:SetWidth(LABEL_W)
+    end
+    w.label:SetText(text)
+  end
+
   local function blank(w)
     for j = 1, #w.cells do
       w.cells[j]:SetText("")
@@ -1216,7 +1252,7 @@ function UI.RenderRoster()
     w.rowHit:SetWidth(gridW)
     w.hi:Hide()
     if not line then
-      w.label:SetText("")
+      setLabel(w, "", nil)
       w.stripe:Hide()
       w.rowHit:EnableMouse(false)
       w.rowHit.group, w.rowHit.hint = nil, nil
@@ -1233,8 +1269,8 @@ function UI.RenderRoster()
       -- The `+`/`-` in front of it is the whole of the affordance. A shut group
       -- names the count it is holding, because `pockets` with a rule under it
       -- and nothing else looks like a group that had nothing to say.
-      w.label:SetText(format("|cff%s%s %s%s|r", WARN, line.closed and "+" or "-", line.head,
-        line.closed and format("  (%d)", line.hidden) or ""))
+      setLabel(w, format("|cff%s%s %s%s|r", WARN, line.closed and "+" or "-", line.head,
+        line.closed and format("  (%d)", line.hidden) or ""), nil)
       w.stripe:SetColorTexture(1, 1, 1, 0.05)
       w.stripe:Show()
       w.rowHit:EnableMouse(true)
@@ -1242,7 +1278,7 @@ function UI.RenderRoster()
       w.rowHit.hint = line.closed and "click to open" or "click to close"
       blank(w)
     else
-      w.label:SetText(line.label)
+      setLabel(w, line.label, line.icon)
       w.stripe:Hide()
       w.rowHit:EnableMouse(true)
       w.rowHit.group, w.rowHit.hint = nil, nil
