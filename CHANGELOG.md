@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.17.0] — 2026-09-18 — a currency row carries its own icon
+
 ### Added
 
 - Currency rows in the Roster grid now show the currency's own icon before its
