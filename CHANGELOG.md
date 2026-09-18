@@ -51,6 +51,13 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+- Currency rows in the Roster grid now show the currency's own icon before its
+  name, the way the in-game currency frame does. An alt scanned by an older
+  version has no icon stored yet and its row looks exactly as it did until the
+  next time you log in on it.
+
 ## [1.16.3] — 2026-09-18 — a section header looks like a section header
 
 ### Changed

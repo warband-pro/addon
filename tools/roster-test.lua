@@ -342,6 +342,61 @@ do
 end
 
 do
+  -- The icon. It rides the row rather than a cell, because a currency is the
+  -- same currency down the whole line — and it is threaded from the DB rather
+  -- than read at draw time so an alt offline since last week still shows one.
+  --
+  -- Two characters, one of them scanned by a version that never captured an
+  -- icon: the row still finds the icon the other one has. Absent is not zero
+  -- here either, and the absence to protect against is a blank row where one
+  -- character's stale entry happened to sort first.
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 2815, name = "Resonance Crystals", quantity = 10, maxQuantity = 2000 },
+      { id = 3008, name = "Valorstones", quantity = 10, maxQuantity = 2000, icon = 4622270 },
+    } }),
+    b = char({ currencies = {
+      { id = 2815, name = "Resonance Crystals", quantity = 20, maxQuantity = 2000,
+        icon = 5088829 },
+    } }),
+  }), nil)
+
+  check("a currency row carries its icon", row(model, "Valorstones").icon == 4622270,
+    tostring(row(model, "Valorstones").icon))
+  check("an alt with no icon does not blank the row",
+    row(model, "Resonance Crystals").icon == 5088829,
+    tostring(row(model, "Resonance Crystals").icon))
+
+  -- And it survives the flattening, which is the half the grid actually reads.
+  local lines = Roster.Lines(model.groups, 0, 2, nil)
+  local drawn
+  for _, ln in ipairs(lines) do
+    if ln.label == "Valorstones" then drawn = ln end
+  end
+  check("and the line the grid draws still has it", drawn and drawn.icon == 4622270,
+    drawn and tostring(drawn.icon))
+end
+
+do
+  -- A row with no icon anywhere carries none, so the widget stays hidden and
+  -- the label keeps the whole label column. A nil here is the difference
+  -- between "no icon" and a broken texture.
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 1, name = "Plain", quantity = 10, maxQuantity = 2000 },
+    } }),
+  }), nil)
+  check("a currency nobody has an icon for carries none", row(model, "Plain").icon == nil)
+
+  -- Every other group builds rows through the same addRow, and none of them
+  -- passes an icon: a lockout row must not inherit one from a pooled widget.
+  local other = Roster.Build(db({
+    a = char({ weeklyVault = { raid = { progress = 1, threshold = 3, unlocked = false } } }),
+  }), nil)
+  check("a row from another group has no icon", row(other, "vault · raid").icon == nil)
+end
+
+do
   -- A warband holding nothing but legacy currencies has a group with no rows,
   -- and rule 2 drops it — the same as every other empty group. The switch is
   -- still on the Options tab, which is where the player who wants them looks.

@@ -131,6 +131,12 @@ this is the only section on the wire with no Battle.net fallback at all.
 `goldPending`, `soonestExpiryHours`), `currencies[]`, `auctions.countActive`,
 `professions`, `mythicPlusScore`, `instances` detail.
 
+`currencies[].icon` (1.17.0) is the one field here the app does not read at all
+and is not meant to: it is the client's `iconFileID`, captured so the in-game
+grid can draw a currency's icon beside its name for an alt whose currency list
+logged out with them. A file id resolves on the WoW client and nowhere else, so
+this is a stored-for-the-addon field rather than an unfinished crossing.
+
 ### Not captured at all — deliberately
 
 - **Reputations.** No `C_Reputation` call anywhere.

@@ -95,7 +95,7 @@ Top-level:
   "auctions": {"countActive":3,"goldHeld":500000,"seenAt":1723998000},
 
   "currencies": [
-    {"id":2815,"name":"Resonance Crystals","quantity":4500,"maxQuantity":20000,"weeklyMax":0,"earnedThisWeek":320,"isAccountWide":false,"discovered":true}
+    {"id":2815,"name":"Resonance Crystals","icon":4622270,"quantity":4500,"maxQuantity":20000,"weeklyMax":0,"earnedThisWeek":320,"isAccountWide":false,"discovered":true}
   ],
 
   "professions": [
@@ -175,6 +175,11 @@ Top-level:
   `seenAt` has never been read; a section whose stamp did not move was looked
   for and not found, and its stored value is exactly as old as the stamp says.
 - Warband bank `seenByGuid` lets web show "Warband Bank updated 1h ago (by Vocnar)" valid across alts.
+- `currencies.icon` is the client's own `iconFileID` for the currency, stored
+  so the in-game grid can draw it for an alt whose currency list logged out
+  with them. It is a **file id, not a path**, and it means nothing off the WoW
+  client — web has no use for it and ignores it. Additive in 1.17.0; absent
+  from every entry an older version wrote.
 - `currencies.maxQuantity` 0 = no cap, `weeklyMax` 0 = not weekly-capped.
   `earnedThisWeek` is how much of `weeklyMax` this reset period has earned so
   far; web gates it on its own weekly-reset clock (`lastResetMs`) before
