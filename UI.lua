@@ -41,6 +41,11 @@ local DOT = {
   never  = "|cff808080*|r",
 }
 local MUTED, WARN, BAD, GOOD = "808080", "ffd100", "ff2020", "00ff00"
+-- Section headings inside a tooltip, and the one colour this window did not
+-- already have. SavedInstances marks a sub-header — an LFR wing, a group of
+-- rows — in orange, one step off the gold it marks a title with, so structure
+-- inside a panel reads as structure without competing with the panel's name.
+local ORANGE = "ff8000"
 
 local TAB_ROSTER, TAB_EXPORT, TAB_IMPORT, TAB_OPTIONS = 1, 2, 3, 4
 local MAX_ROWS = 8
@@ -892,15 +897,46 @@ local function classText(class, text)
   return text
 end
 
+--- Everything about a character that does not fit in a column header.
+---
+--- A header is 56px and a name plus a realm plus a level plus an item level
+--- plus a last-seen is not, so the header identifies and the hover carries the
+--- rest. Extracted from the header widget when the minimap hover grew columns
+--- of its own: two grids asking the same question of a column have to get the
+--- same answer, and the second copy is how they stop doing.
+local function columnTip(c)
+  local tip = {}
+  if c.realm then tip[#tip + 1] = { "realm", c.realm } end
+  if c.guild then tip[#tip + 1] = { "guild", c.guild } end
+  if c.level then tip[#tip + 1] = { "level", tostring(c.level) } end
+  if c.ilvl then tip[#tip + 1] = { "item level", tostring(c.ilvl) } end
+  if c.gold then tip[#tip + 1] = { "gold", c.gold } end
+  if c.zone then tip[#tip + 1] = { "last seen in", c.zone } end
+  tip[#tip + 1] = { "scanned", c.ago }
+  return tip
+end
+
 --- Paint one of Roster.lua's tips into GameTooltip and show it.
 ---
 --- The model hands back plain strings and `{left, right}` pairs and no colour
 --- at all, so the palette decision lives here with the rest of it. Two columns
 --- for a pair is what makes `Ulgrax   dead` scan as a table rather than as
 --- prose — the same reason the grid itself has columns.
-local function showTip(owner, title, tip)
+--- `beside` is a frame the tooltip should sit alongside rather than an anchor
+--- on the widget that was hovered. The grid in a window can hang its detail off
+--- the cell, because there is room to the right of the window; the grid in the
+--- minimap hover cannot — a tooltip anchored to a cell would open on top of the
+--- rows either side of it. Passing the panel puts the second tooltip beside the
+--- first, which is where SavedInstances puts it.
+local function showTip(owner, title, tip, beside)
   if not tip or #tip == 0 then return end
-  GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  if beside then
+    GameTooltip:SetOwner(beside, "ANCHOR_NONE")
+    GameTooltip:ClearAllPoints()
+    GameTooltip:SetPoint("TOPRIGHT", beside, "TOPLEFT", -4, 0)
+  else
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  end
   if title then GameTooltip:AddLine(title) end
   for _, line in ipairs(tip) do
     if type(line) == "table" then
@@ -943,16 +979,7 @@ local function makeRosterCol(i)
   meta:SetWordWrap(false)
   hit:SetScript("OnEnter", function(self)
     if not self.col then return end
-    local c = self.col
-    local tip = {}
-    if c.realm then tip[#tip + 1] = { "realm", c.realm } end
-    if c.guild then tip[#tip + 1] = { "guild", c.guild } end
-    if c.level then tip[#tip + 1] = { "level", tostring(c.level) } end
-    if c.ilvl then tip[#tip + 1] = { "item level", tostring(c.ilvl) } end
-    if c.gold then tip[#tip + 1] = { "gold", c.gold } end
-    if c.zone then tip[#tip + 1] = { "last seen in", c.zone } end
-    tip[#tip + 1] = { "scanned", c.ago }
-    showTip(self, c.name, tip)
+    showTip(self, self.col.name, columnTip(self.col))
   end)
   hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
   rosterCols[i] = { hit = hit, name = name, meta = meta }
@@ -1915,6 +1942,400 @@ local function minimapTooltip(self)
   GameTooltip:Show()
 end
 
+-- ── the minimap hover grid ──────────────────────────────────────────────────
+
+-- **The hover IS the interface.** That is the SavedInstances habit this is
+-- built for: a player parks on the minimap icon between queues and the whole
+-- warband picture is right there — which alt is saved to which raid and how
+-- far, who has done their weeklies, how much of each currency each of them
+-- holds — with no window to open. The glance above answered four questions
+-- across the warband and then sent you to a tab for the fifth, which is a
+-- summary where a decade of muscle memory expects a grid.
+--
+-- So the grid moved into the hover, and the tab stays as the surface you ACT
+-- on: it scrolls, it shuts groups, it pages, and it is next to the export and
+-- import boxes that are the reason the window exists at all. The hover reads.
+--
+-- Three things this is not allowed to be, and each decided a line of it:
+--
+-- 1. **Not a second source of truth.** `Roster.Hover` is `Roster.Build` and
+--    `Roster.Lines` — the two calls `UI.RenderRoster` makes — so what the hover
+--    says is what the tab shows and what the paste will carry. Nothing here
+--    encodes or deflates: a hover is not worth a bundle build.
+-- 2. **Not a skin.** `TooltipBackdropTemplate` is the client's own tooltip
+--    chrome, the same nine-slice GameTooltip wears, so this panel inherits the
+--    player's tooltip settings and scale rather than imitating them. If the
+--    template is not there to build on, `makeHoverGrid` returns nil and the
+--    button falls back to the four-line glance — a missing frame costs the
+--    grid, never the session.
+-- 3. **Not a window.** It has no scrollbar and no click, because a tooltip you
+--    have to operate is a window that forgot to have a title bar. What does not
+--    fit is trimmed by the model and counted out loud in the footer, and the
+--    footer names the tab that has the rest.
+--
+-- GameTooltip itself cannot be the panel: it is two columns (`AddDoubleLine`)
+-- and a warband is twenty. So the panel is ours and the SECOND tooltip — the
+-- per-cell detail, which is the half of SavedInstances people actually name —
+-- is the real GameTooltip, hung off the panel's left edge.
+
+local HOVER_LABEL_W, HOVER_CELL_W, HOVER_LINE_H = 150, 52, 12
+local HOVER_ICON = HOVER_LINE_H - 1
+local HOVER_ICON_GAP = 3
+local HOVER_PAD, HOVER_GAP, HOVER_TEXT_H = 12, 5, 13
+-- The lines of chrome the grid does not get: title, freshness, the glance band,
+-- the column header and the footer. Subtracted from the screen before the rows
+-- are counted, because a tooltip is measured against the monitor and not
+-- against the warband.
+local HOVER_CHROME = 14
+-- Narrow enough for a one-character account, wide enough for the two footer
+-- lines: below this the hints wrap out of the panel they are inside.
+local HOVER_MIN_W = 360
+
+local hoverFrame, hoverTitle, hoverMeta, hoverNote, hoverHint, hoverHint2
+local hoverGlance, hoverHeads, hoverRows = {}, {}, {}
+
+--- Is the mouse still somewhere that wants this panel open?
+---
+--- The button and the panel are two frames with a shared border, so leaving one
+--- for the other fires an OnLeave that means nothing. Asking where the cursor
+--- actually is — rather than trusting the event — is what lets the panel be
+--- hovered at all, and it is why the rows can carry a tooltip of their own.
+local function hoverWanted()
+  if minimapButton and minimapButton:IsShown() and minimapButton:IsMouseOver() then return true end
+  if hoverFrame and hoverFrame:IsShown() and hoverFrame:IsMouseOver() then return true end
+  return false
+end
+
+local function hoverDismiss()
+  if hoverWanted() then return end
+  if hoverFrame then hoverFrame:Hide() end
+  GameTooltip:Hide()
+end
+
+--- A leave is a question, asked once the cursor has had time to land.
+---
+--- One `C_Timer.After` and not an OnUpdate: the addon's only OnUpdate is the
+--- drag handler, which exists between a press and a release, and a panel that
+--- polled the cursor every frame while it was open would be the thing
+--- `Init.lua` says this addon does not do.
+local function hoverLeave()
+  C_Timer.After(0.1, hoverDismiss)
+end
+
+--- Hide the panel now, whatever the cursor is doing. The click that opens the
+--- window and the drag that moves the button both take the hover with them.
+function UI.HideHover()
+  if hoverFrame then hoverFrame:Hide() end
+end
+
+--- How much of the grid this screen can hold, in columns and in lines.
+---
+--- Decided here and passed to the model, which has no idea how wide UIParent
+--- is. Both numbers are floors on purpose: a partial column would be a name cut
+--- in half, and a partial row would be a lockout you could not read.
+local function hoverFit()
+  local w = ns.safe(function() return UIParent:GetWidth() end) or 1024
+  local h = ns.safe(function() return UIParent:GetHeight() end) or 768
+  -- Just over half the screen's width, because the panel hangs off a minimap
+  -- that is itself in a corner: a grid wider than this reaches the far edge and
+  -- gets clamped back over the button it belongs to.
+  local cols = math.floor((w * 0.55 - HOVER_PAD * 2 - HOVER_LABEL_W) / HOVER_CELL_W)
+  local lines = math.floor((h * 0.8 - HOVER_CHROME * HOVER_LINE_H) / HOVER_LINE_H)
+  return math.max(cols, 1), math.max(lines, 6)
+end
+
+local function hoverText(parent, font, justify)
+  local fs = parent:CreateFontString(nil, "OVERLAY", font)
+  fs:SetJustifyH(justify or "LEFT")
+  fs:SetWordWrap(false)
+  return fs
+end
+
+--- One column header: the freshness dot, the name in its class colour, and
+--- everything that did not fit on the hover.
+local function makeHoverHead(i)
+  local hit = CreateFrame("Frame", nil, hoverFrame)
+  hit:SetSize(HOVER_CELL_W, HOVER_TEXT_H)
+  hit:EnableMouse(true)
+  hit:SetFrameLevel(hoverFrame:GetFrameLevel() + 2)
+  local name = hoverText(hit, "GameFontHighlightSmall", "CENTER")
+  name:SetAllPoints(hit)
+  hit:SetScript("OnEnter", function(self)
+    if not self.col then return end
+    showTip(self, self.col.name, columnTip(self.col), hoverFrame)
+  end)
+  hit:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+    hoverLeave()
+  end)
+  hoverHeads[i] = { hit = hit, name = name }
+  return hoverHeads[i]
+end
+
+--- One grid line: a label, the icon it may carry, and its cells.
+---
+--- Every part of a line is anchored inside a container frame, so a render that
+--- puts the rows two lines further down — because the glance band grew a line —
+--- moves one frame per row rather than four widgets.
+local function makeHoverRow(i)
+  local row = CreateFrame("Frame", nil, hoverFrame)
+  row:SetHeight(HOVER_LINE_H)
+  row:EnableMouse(true)
+
+  local hi = row:CreateTexture(nil, "BACKGROUND")
+  hi:SetAllPoints(row)
+  hi:SetColorTexture(1, 1, 1, 0.06)
+  hi:Hide()
+
+  local icon = row:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(HOVER_ICON, HOVER_ICON)
+  icon:SetPoint("LEFT")
+  -- The stock icon border is baked into the texture's outer 6%, and at 11px it
+  -- would be most of what you saw. Same crop as the grid's rows.
+  icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  icon:Hide()
+
+  local label = hoverText(row, "GameFontHighlightSmall", "LEFT")
+  label:SetPoint("LEFT")
+
+  row:SetScript("OnEnter", function(self) self.hi:Show() end)
+  row:SetScript("OnLeave", function(self)
+    self.hi:Hide()
+    hoverLeave()
+  end)
+
+  -- On the FRAME as well as in the pool entry: the handlers above are given the
+  -- frame, not the table, and a highlight the row cannot reach is a nil call in
+  -- the middle of a hover.
+  row.hi = hi
+
+  hoverRows[i] = { row = row, hi = hi, icon = icon, label = label, cells = {}, hits = {} }
+  return hoverRows[i]
+end
+
+--- Give a line cells up to `n`. A cell is a frame around its FontString because
+--- a FontString takes no mouse input, and the detail under the mouse is the
+--- whole reason a two-character cell is worth reading.
+local function growHoverRow(w, n)
+  for j = #w.cells + 1, n do
+    local hit = CreateFrame("Frame", nil, w.row)
+    hit:SetPoint("LEFT", HOVER_LABEL_W + (j - 1) * HOVER_CELL_W, 0)
+    hit:SetSize(HOVER_CELL_W, HOVER_LINE_H)
+    -- Above the row's own hit area, which is a sibling by creation order: a
+    -- tie on frame level would let the highlight swallow the tooltips.
+    hit:SetFrameLevel(w.row:GetFrameLevel() + 2)
+    hit:EnableMouse(true)
+    local fs = hoverText(hit, "GameFontHighlightSmall", "RIGHT")
+    fs:SetAllPoints(hit)
+    hit:SetScript("OnEnter", function(self)
+      w.hi:Show()
+      if not self.tip then return end
+      showTip(self, self.tipTitle, self.tip, hoverFrame)
+    end)
+    hit:SetScript("OnLeave", function()
+      w.hi:Hide()
+      GameTooltip:Hide()
+      hoverLeave()
+    end)
+    w.cells[j] = fs
+    w.hits[j] = hit
+  end
+end
+
+--- The panel, built once. Nil means this client had no tooltip chrome to build
+--- on and the caller should fall back to the glance.
+local function makeHoverGrid()
+  if hoverFrame then return hoverFrame end
+  local f = ns.safe(function()
+    return CreateFrame("Frame", "WarbandProHoverGrid", UIParent, "TooltipBackdropTemplate")
+  end)
+  if not f then return nil end
+
+  -- DIALOG rather than TOOLTIP, deliberately: the per-cell detail is the real
+  -- GameTooltip and it has to open ON TOP of this panel, not behind it.
+  f:SetFrameStrata("DIALOG")
+  f:SetClampedToScreen(true)
+  f:EnableMouse(true)
+  f:SetScript("OnLeave", hoverLeave)
+  f:Hide()
+
+  hoverFrame = f
+  hoverTitle = hoverText(f, "GameFontNormal", "LEFT")
+  hoverMeta = hoverText(f, "GameFontHighlightSmall", "LEFT")
+  hoverNote = hoverText(f, "GameFontDisableSmall", "LEFT")
+  hoverHint = hoverText(f, "GameFontNormalSmall", "LEFT")
+  hoverHint2 = hoverText(f, "GameFontDisableSmall", "LEFT")
+  return f
+end
+
+--- Paint the grid and show it beside the button.
+---
+--- Returns false when there is no panel to paint, which is the caller's cue to
+--- show the glance instead.
+local function showHoverGrid(owner)
+  if not makeHoverGrid() then return false end
+  local f = hoverFrame
+
+  local maxCols, maxLines = hoverFit()
+  local g = ns.Roster.Hover(ns.Store.db, ns.safe(UnitGUID, "player"), maxCols, maxLines)
+  local nCols = #g.columns
+  local gridW = HOVER_LABEL_W + nCols * HOVER_CELL_W
+
+  for i = #hoverHeads + 1, nCols do makeHoverHead(i) end
+  for i = #hoverRows + 1, #g.lines do makeHoverRow(i) end
+  for i = 1, #hoverRows do growHoverRow(hoverRows[i], nCols) end
+
+  local y = -HOVER_PAD
+  local function place(fs, text)
+    fs:ClearAllPoints()
+    fs:SetPoint("TOPLEFT", HOVER_PAD, y)
+    fs:SetText(text)
+    fs:Show()
+  end
+
+  place(hoverTitle, "Warband.pro")
+  y = y - 16
+
+  place(hoverMeta, format("%s %d character%s  ·  freshest %s", DOT[g.dot] or DOT.never,
+    g.characters, g.characters == 1 and "" or "s", g.ago))
+  y = y - HOVER_TEXT_H
+
+  -- The summary band: the four cross-warband lines this hover already carried,
+  -- kept because the grid under them cannot say what they say — a grid answers
+  -- per character and these answer per warband, which is the only shape in
+  -- which four lines cover twenty alts.
+  if #g.glance > 0 then y = y - HOVER_GAP end
+  for i = 1, math.max(#g.glance, #hoverGlance) do
+    local gl = g.glance[i]
+    local w = hoverGlance[i]
+    if gl and not w then
+      w = { left = hoverText(f, "GameFontHighlightSmall", "LEFT"),
+            right = hoverText(f, "GameFontHighlightSmall", "RIGHT") }
+      hoverGlance[i] = w
+    end
+    if w and not gl then
+      w.left:Hide()
+      w.right:Hide()
+    elseif w then
+      local label, right = glanceLine(gl)
+      w.left:ClearAllPoints()
+      w.left:SetPoint("TOPLEFT", HOVER_PAD, y)
+      w.left:SetText(label)
+      w.left:Show()
+      w.right:ClearAllPoints()
+      w.right:SetPoint("TOPRIGHT", -HOVER_PAD, y)
+      w.right:SetText(right)
+      w.right:Show()
+      y = y - HOVER_TEXT_H
+    end
+  end
+
+  y = y - HOVER_GAP
+  for i = 1, #hoverHeads do
+    local col, head = g.columns[i], hoverHeads[i]
+    head.hit.col = col
+    head.hit:SetShown(col ~= nil)
+    if col then
+      head.hit:ClearAllPoints()
+      head.hit:SetPoint("TOPLEFT", HOVER_PAD + HOVER_LABEL_W + (i - 1) * HOVER_CELL_W, y)
+      head.name:SetText((DOT[col.dot] or DOT.never) .. classText(col.class, col.name))
+    end
+  end
+  if nCols > 0 then y = y - HOVER_TEXT_H - 2 end
+
+  for i = 1, #hoverRows do
+    local line, w = g.lines[i], hoverRows[i]
+    if not line then
+      w.row:Hide()
+    else
+      w.row:ClearAllPoints()
+      w.row:SetPoint("TOPLEFT", HOVER_PAD, y)
+      w.row:SetWidth(gridW)
+      w.hi:Hide()
+      w.row:Show()
+      y = y - HOVER_LINE_H
+
+      -- A group header is a label and nothing else, in the orange
+      -- SavedInstances marks a section with. It has no `+` because there is
+      -- nothing to click: shutting a group is a decision you make in the tab.
+      local head = line.head
+      w.icon:SetShown(line.icon ~= nil and not head)
+      if line.icon and not head then w.icon:SetTexture(line.icon) end
+      w.label:ClearAllPoints()
+      if line.icon and not head then
+        w.label:SetPoint("LEFT", HOVER_ICON + HOVER_ICON_GAP, 0)
+        w.label:SetWidth(HOVER_LABEL_W - HOVER_ICON - HOVER_ICON_GAP - 4)
+      else
+        w.label:SetPoint("LEFT")
+        w.label:SetWidth(HOVER_LABEL_W - 4)
+      end
+      w.label:SetText(head and format("|cff%s%s|r", ORANGE, head) or line.label)
+
+      for j = 1, #w.cells do
+        local c = not head and j <= nCols and line.cells[j] or nil
+        local hit = w.hits[j]
+        if not c then
+          -- An empty cell, never a zero: Roster.lua's rule 1, drawn in a
+          -- tooltip this time.
+          w.cells[j]:SetText("")
+          hit.tip, hit.tipTitle = nil, nil
+          hit:Hide()
+        else
+          w.cells[j]:SetText(TONE[c.tone] and format("|cff%s%s|r", TONE[c.tone], c.text) or c.text)
+          -- The detail names WHOSE cell it is, in that character's class
+          -- colour, and what it is a cell OF in the section colour — the two
+          -- things a grid read across has lost by the time the mouse arrives.
+          hit.tip = c.tip
+          hit.tipTitle = g.columns[j] and classText(g.columns[j].class, g.columns[j].name) or nil
+          if hit.tipTitle and c.tip then
+            local tip = { format("|cff%s%s|r", ORANGE, line.label) }
+            for _, l in ipairs(c.tip) do tip[#tip + 1] = l end
+            hit.tip = tip
+          end
+          hit:Show()
+        end
+      end
+    end
+  end
+
+  y = y - HOVER_GAP
+  local note
+  if g.characters == 0 then
+    note = "no characters scanned yet — log in on a character and it lands here"
+  elseif g.moreColumns > 0 or g.moreRows > 0 then
+    -- Counted out loud. A hover that quietly showed nine of twenty alts would
+    -- be worse than the summary it replaced.
+    local parts = {}
+    if g.moreColumns > 0 then parts[#parts + 1] = format("+%d character%s", g.moreColumns,
+      g.moreColumns == 1 and "" or "s") end
+    if g.moreRows > 0 then parts[#parts + 1] = format("+%d row%s", g.moreRows,
+      g.moreRows == 1 and "" or "s") end
+    note = table.concat(parts, "  ·  ") .. " did not fit"
+  end
+  if note then
+    place(hoverNote, note)
+    y = y - HOVER_TEXT_H
+  else
+    hoverNote:Hide()
+  end
+
+  place(hoverHint, "Click  ·  the export string      Right-click  ·  options")
+  y = y - HOVER_TEXT_H
+  -- The tab is the follow-up surface and this is where it gets discovered: it
+  -- scrolls, it shuts a group and it pages, which is the whole of what a
+  -- tooltip cannot do.
+  place(hoverHint2, "Drag  ·  move it round the ring      /warband roster  ·  the same grid, scrollable")
+  y = y - HOVER_TEXT_H
+
+  f:SetSize(math.max(gridW, HOVER_MIN_W) + HOVER_PAD * 2, -y + HOVER_PAD)
+  f:ClearAllPoints()
+  -- Shoulder to shoulder with the button, so the cursor can cross into the
+  -- panel without passing over the minimap between them.
+  f:SetPoint("TOPRIGHT", owner, "TOPLEFT", 0, 0)
+  f:Show()
+  return true
+end
+
 --- Built once, and only when there is a Minimap to hang it on. Returns nil on a
 --- client without one rather than erroring, the same way every other API call
 --- in this addon fails a section instead of a session.
@@ -1949,6 +2370,7 @@ local function buildMinimap()
   -- this button away is on that tab, so the thing a player wants to be rid of
   -- is what hands them the way to do it.
   b:SetScript("OnClick", function(_, button)
+    UI.HideHover()
     if button == "RightButton" then
       UI.ToggleOptions()
     else
@@ -1959,14 +2381,24 @@ local function buildMinimap()
   b:SetScript("OnDragStart", function(self)
     self:SetScript("OnUpdate", dragMinimap)
     GameTooltip:Hide()
+    UI.HideHover()
   end)
   b:SetScript("OnDragStop", function(self)
     self:SetScript("OnUpdate", nil)
     ns.Store.Touch()
   end)
 
-  b:SetScript("OnEnter", minimapTooltip)
-  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  -- The grid, and the glance only when there is no panel to draw the grid in.
+  b:SetScript("OnEnter", function(self)
+    if not showHoverGrid(self) then minimapTooltip(self) end
+  end)
+  -- Leaving the button is not leaving the hover: the panel is next door and the
+  -- cursor is probably on its way there. `hoverLeave` asks where the mouse
+  -- actually ended up before it closes anything.
+  b:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+    hoverLeave()
+  end)
 
   minimapButton = b
   return b
@@ -1980,6 +2412,7 @@ function UI.RefreshMinimap()
   if not o then return end
   if o.minimap == false then
     if minimapButton then minimapButton:Hide() end
+    UI.HideHover()
     return
   end
   if not buildMinimap() then return end
