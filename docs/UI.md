@@ -536,11 +536,77 @@ keystone          Vocnar +12  Voctara +9  Voctesa +7  +2
 saved             Vocnar 2  Voctesa 1
 at cap            Vocnar Weathered Crest  Voctesa 2 currencies
 
-Click  ·  the export string
-Right-click  ·  options
-/warband roster  ·  every alt at once
-Drag  ·  move it round the ring
+                  *Vocnar  *Voctara  *Voctesa  *Vocmar
+this week
+vault · raid         2/4 (1)     4/4 (2)       1/4        —
+keystone                 +12          +9         +7        —
+lockouts
+Liberation (H)           6/8         8/8          —      saved
+world bosses               2           1          —        —
+currencies
+[] Valorstones         1,240       2,000        320        —
+[] Weathered Crest        90          45         90        —
+
++2 characters  ·  +7 rows did not fit
+Click  ·  the export string      Right-click  ·  options
+Drag  ·  move it round the ring      /warband roster  ·  the same grid, scrollable
 ```
+
+**The hover is the grid** (1.18.0). Through 1.17.1 it was the four summary
+lines above and nothing else, which is a summary where a decade of
+SavedInstances muscle memory expects the whole picture — that addon's hover is
+not the route to the answer, it *is* the answer, and the window is the
+follow-up question. So the grid moved into the hover and the Roster tab stayed
+as the surface you *act* on: it scrolls, it shuts a group, it pages, and it
+sits beside the export and import boxes the window exists for. **The hover
+reads; the tab acts.**
+
+`Roster.Hover` is the model and it is `Roster.Build` plus `Roster.Lines` — the
+same two calls `UI.RenderRoster` makes — so the hover cannot disagree with the
+tab, and neither can disagree with the bundle the export encodes. Nothing on
+this path builds a bundle: a hover is not worth an encode and a deflate.
+
+**The summary band stays above it.** A grid answers per character; those four
+lines answer *across* the warband, which is the only shape in which four lines
+cover twenty alts, and the grid under them cannot say what they say.
+
+**Three things the panel is not.**
+
+1. **Not a skin.** `TooltipBackdropTemplate` is the client's own tooltip
+   chrome — the nine-slice `GameTooltip` itself wears — so the panel inherits
+   the player's tooltip settings and UI scale rather than imitating them. This
+   is the same rule the window follows and for the same reason. GameTooltip
+   could not *be* the panel: it is two columns (`AddDoubleLine`) and a warband
+   is twenty. If the template is not there to build on, `makeHoverGrid` returns
+   nil and the button falls back to the four-line glance — a missing frame
+   costs the grid, never the session.
+2. **Not a window.** No scrollbar and no click. What does not fit is trimmed by
+   the model and **counted out loud** in the footer, which also names the tab
+   that has the rest: a hover that quietly showed nine of twenty alts would be
+   worse than the summary it replaced. `Roster.Hover` takes the column and line
+   budgets as arguments because the model has no idea how wide `UIParent` is —
+   `hoverFit` measures the screen and passes them in. Columns come off the end
+   of the sorted list, so the character at the keyboard survives every trim, and
+   a group header left standing over nothing goes with its rows.
+3. **Not a second tooltip surface.** The per-cell detail — which bosses are
+   dead, when the lockout resets, how much of a weekly cap is spent — is the
+   real `GameTooltip`, hung off the panel's left edge, titled with the
+   character's name in their class colour over the row's label in orange. That
+   is the half of SavedInstances people actually name, and it is the same
+   `cell.tip` the tab already draws.
+
+**Colour is the same grammar the tab uses.** Gold for the title, orange for a
+section heading, white for labels and plain values, green / gold / red for the
+cell tones, and class colour for a character's name and nothing else. A colour
+is a status or an identity, never both.
+
+**Leaving is a question, not an instruction.** The button and the panel are two
+frames sharing a border, so an `OnLeave` on either means nothing on its own —
+one `C_Timer.After(0.1)` then asks where the cursor actually ended up, and the
+panel closes only if it is on neither. That is what lets the rows be hovered at
+all. It is not an `OnUpdate`: the addon's only one is still the drag handler.
+
+##### The summary band
 
 **In SavedInstances, hovering the icon is not the route to the answer — it is
 the answer**, and opening a window is the follow-up question. Through 1.9.0

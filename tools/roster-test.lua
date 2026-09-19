@@ -899,6 +899,108 @@ do
   check("and a missing group list is not an error", #Roster.Lines(nil, 0, 4, nil) == 0)
 end
 
+-- ── the hover grid ──────────────────────────────────────────────────────────
+
+-- Roster.Hover is the whole grid trimmed to what a minimap tooltip can hold.
+-- Every case below is about one of the two trims, because the trims are the
+-- only thing this function adds to `Roster.Build` and `Roster.Lines` — and a
+-- hover that silently showed nine of a warband of twenty would be worse than
+-- the four-line summary it replaces.
+
+local function hoverDb()
+  local chars = {}
+  for i = 1, 4 do
+    chars["c" .. i] = char({
+      name = "Alt" .. i, realm = "R",
+      keystone = { level = 10 + i },
+      weeklyVault = { raid = { unlocked = 1, threshold = 4, progress = 2 } },
+      instances = { {
+        name = "Liberation", difficultyName = "Heroic", resetTime = NOW + 86400,
+        bosses = { { name = "Ulgrax", killed = true }, { name = "Sikran" } },
+      } },
+      currencies = { { id = 1, name = "Valorstones", quantity = 300, maxQuantity = 2000 } },
+    })
+  end
+  return db(chars)
+end
+
+do
+  local full = Roster.Hover(hoverDb(), "c1", nil, nil)
+  local model = Roster.Build(hoverDb(), "c1")
+  check("the hover draws the tab's own lines, not a second model's",
+    labels(full.lines) == labels(Roster.Lines(model.groups, 0, 4, nil)), labels(full.lines))
+  check("and the whole warband when nothing has to be trimmed",
+    #full.columns == 4 and full.moreColumns == 0 and full.moreRows == 0)
+  check("the character at the keyboard still leads", full.columns[1].name == "Alt1",
+    full.columns[1].name)
+end
+
+do
+  local g = Roster.Hover(hoverDb(), "c1", 2, nil)
+  check("a warband wider than the screen keeps the leading columns",
+    #g.columns == 2 and g.columns[1].name == "Alt1" and g.columns[2].name == "Alt2")
+  check("and says how many it could not show", g.moreColumns == 2, g.moreColumns)
+  check("the rows are sliced to the same columns",
+    g.lines[2].cells[3] == nil and g.lines[2].cells[2] ~= nil)
+  check("the header still counts every character, shown or not", g.characters == 4)
+end
+
+do
+  local full = Roster.Hover(hoverDb(), "c1", nil, nil)
+  local n = #full.lines
+  local g = Roster.Hover(hoverDb(), "c1", nil, n - 2)
+  check("a grid taller than the screen is cut from the bottom", #g.lines <= n - 2, #g.lines)
+
+  -- What it took is counted in ROWS, and a header is not a row: a heading that
+  -- went because its last row went is not two things missing from the grid.
+  local rows = 0
+  for i = #g.lines + 1, n do
+    if not full.lines[i].head then rows = rows + 1 end
+  end
+  check("and counts the data rows it took, headers aside", g.moreRows == rows,
+    g.moreRows .. " of " .. rows)
+  check("the cut never ends on a group header", not g.lines[#g.lines].head)
+end
+
+do
+  -- Cut exactly where a group begins: the header would be left standing over
+  -- nothing, which reads as a section that turned out to be empty rather than
+  -- one that did not fit. It goes with its rows.
+  local full = Roster.Hover(hoverDb(), "c1", nil, nil)
+  local lastHead
+  for i, l in ipairs(full.lines) do if l.head then lastHead = i end end
+  check("the fixture has a group to cut at", lastHead ~= nil and lastHead > 1, lastHead)
+
+  local g = Roster.Hover(hoverDb(), "c1", nil, lastHead)
+  check("a header with nothing left under it goes with the cut",
+    #g.lines == lastHead - 1 and not g.lines[#g.lines].head, labels(g.lines))
+  check("and the rows it was standing over are all counted",
+    g.moreRows == #full.lines - lastHead, g.moreRows)
+end
+
+do
+  local none = Roster.Hover(db({}), nil, 8, 20)
+  check("an empty account is an empty grid", #none.columns == 0 and #none.lines == 0)
+  check("and says so rather than guessing", none.characters == 0 and none.ago == "never")
+end
+
+do
+  -- The summary band rides along, and it answers for the WARBAND rather than
+  -- for the columns that fit: trimming the grid sideways must not quietly
+  -- shrink the one line that exists to cover the alts off the edge of it.
+  local g = Roster.Hover(hoverDb(), "c1", 1, nil)
+  -- `g.glance`, not `g.lines`: the grid has a row labelled `keystone` too, and
+  -- the two are different answers to different questions — one alt's key, and
+  -- who in the warband is holding one.
+  local band
+  for _, l in ipairs(g.glance) do
+    if l.label == "keystone" then band = l end
+  end
+  check("the hover leads with the glance lines", band ~= nil)
+  check("and the glance counts alts the grid had no column for",
+    band and #band.parts == 3 and band.more == 1, band and names(band))
+end
+
 -- ── result ──────────────────────────────────────────────────────────────────
 
 print(format("\n%d passed, %d failed", pass, fail))

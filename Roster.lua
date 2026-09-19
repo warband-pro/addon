@@ -830,6 +830,12 @@ end
 -- which tells a player the addon is installed and nothing about the warband it
 -- has been watching.
 --
+-- **The other half is `Roster.Hover` below**, which puts the grid itself in the
+-- same tooltip. These four lines did not stop being worth their pixels when it
+-- arrived — they answer ACROSS the warband, which is the one question a grid
+-- read column by column cannot — so they lead the hover as its summary band and
+-- remain the whole of what a client with no tooltip chrome to build on gets.
+--
 -- A hover can carry four lines before it stops being a glance, so it carries
 -- the four that decide a night: a vault slot already earned, the keystone in
 -- the bag, what is locked, and what has stopped accruing. The grid answers each
@@ -884,13 +890,18 @@ local function glance(cols, label, tone, fn)
   return { label = label, tone = tone, parts = parts, more = more }
 end
 
---- What the minimap hover says, before the window is opened.
+--- The glance lines for a column list — the summary band, without the freshness
+--- header that wraps it.
+---
+--- A local rather than the public entry point because two surfaces want it now:
+--- `Roster.Glance` below, and `Roster.Hover` further down, which leads its grid
+--- with the same four lines and must not pay for a second pass over `db.chars`
+--- to get them.
 ---
 --- Colours are absent here for the reason cell tones are: UI.lua owns the
 --- palette, including the class colour a name is drawn in, and a model carrying
 --- hex would have to know which surface it was painted on.
-function Roster.Glance(db, selfGuid)
-  local cols = Roster.Columns(db, selfGuid)
+local function glanceLines(cols)
   local lines = {}
   local function add(line) if line then lines[#lines + 1] = line end end
 
@@ -945,16 +956,98 @@ function Roster.Glance(db, selfGuid)
     return #hit .. " currencies"
   end))
 
-  local freshest
+  return lines
+end
+
+--- The last time anybody in this warband was read, or nil when nobody ever was.
+local function freshest(cols)
+  local newest
   for i = 1, #cols do
     local seen = cols[i].char.seenAt and cols[i].char.seenAt.lastSeen
-    if type(seen) == "number" and (not freshest or seen > freshest) then freshest = seen end
+    if type(seen) == "number" and (not newest or seen > newest) then newest = seen end
   end
+  return newest
+end
 
+--- What the minimap hover says when it cannot draw the grid.
+---
+--- Still the four cross-warband lines and the freshness header, unchanged: this
+--- is what `UI.lua` falls back to on a client whose tooltip chrome it could not
+--- build, and the summary band `Roster.Hover` leads with.
+function Roster.Glance(db, selfGuid)
+  local cols = Roster.Columns(db, selfGuid)
+  local seen = freshest(cols)
   return {
     characters = #cols,
-    ago = ns.ago(freshest),
-    dot = ns.dot(freshest),
+    ago = ns.ago(seen),
+    dot = ns.dot(seen),
+    lines = glanceLines(cols),
+  }
+end
+
+-- ── the hover grid ──────────────────────────────────────────────────────────
+
+--- The whole grid, trimmed to what a hover can hold.
+---
+--- **This is the other half of SavedInstances' primary tooltip.** The glance
+--- above answers four questions across the warband; this answers every question
+--- the Roster tab answers, in the hover itself, so a player with a decade of
+--- that addon's muscle memory gets the picture where they reach for it rather
+--- than a summary and a window to open.
+---
+--- It is the tab's model and not a second one — `Roster.Build` then
+--- `Roster.Lines`, the same two calls `UI.RenderRoster` makes — so the hover
+--- and the tab cannot disagree, and neither can disagree with the bundle the
+--- export encodes. What is different is only what fits.
+---
+--- `maxCols` and `maxLines` are the screen's, passed in rather than decided
+--- here: the model has no idea how wide UIParent is, and a constant here would
+--- be the fit-to-screen guess that shrink-to-fit exists to avoid. Nil or zero
+--- means no limit, which is what the tests use.
+---
+--- Two trims, and each reports what it took:
+---
+--- * Columns come off the END of the sorted list, so the character at the
+---   keyboard and their realm-mates survive a warband too wide for the screen.
+---   `moreColumns` is how many did not fit.
+--- * Lines come off the bottom, and `moreRows` counts only DATA rows — a group
+---   header left standing over nothing goes with them rather than reading as a
+---   section that turned out to be empty. That is `Roster.Lines`' own rule (a
+---   header never outlives its last row) applied to the cut.
+---
+--- A hover that silently showed nine of twenty alts would be worse than the
+--- summary it replaces, which is why neither trim is silent.
+function Roster.Hover(db, selfGuid, maxCols, maxLines)
+  local model = Roster.Build(db, selfGuid)
+  local all = model.columns
+
+  local shown = #all
+  if maxCols and maxCols > 0 and shown > maxCols then shown = maxCols end
+  local cols = {}
+  for i = 1, shown do cols[i] = all[i] end
+
+  -- No shut set: the tab's collapsed groups are a decision about the tab, and
+  -- a hover the player cannot click is the wrong surface to honour it on.
+  local lines = Roster.Lines(model.groups, 0, shown, nil)
+
+  local dropped = 0
+  if maxLines and maxLines > 0 and #lines > maxLines then
+    for i = #lines, maxLines + 1, -1 do
+      if not lines[i].head then dropped = dropped + 1 end
+      lines[i] = nil
+    end
+    while #lines > 0 and lines[#lines].head do lines[#lines] = nil end
+  end
+
+  local seen = freshest(all)
+  return {
+    columns = cols,
     lines = lines,
+    moreColumns = #all - shown,
+    moreRows = dropped,
+    characters = #all,
+    ago = ns.ago(seen),
+    dot = ns.dot(seen),
+    glance = glanceLines(all),
   }
 end

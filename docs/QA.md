@@ -62,6 +62,22 @@ meet a live client is this list. So run it, do not skim it.
 - [ ] Hover on a fresh install with one unscanned character — the four lines are ABSENT, not zero. This is the check the glance exists to fail
 - [ ] Hover with four or more characters holding keystones — three named, then `+N`, and the tooltip does not cover the minimap
 - [ ] Hover after a weekly reset, before logging the saved alt in — `saved` does not name them. Their stored lockout has expired and the glance will not claim it
+
+The hover grid (1.18.0). The panel under the summary band is the Roster tab's
+own model, so what it says has to match the tab exactly — open both and read
+them against each other rather than reading the panel alone.
+
+- [ ] Hover — the grid is in the tooltip: a column per character with the name in its class colour, group headings in orange, rows for the vault, lockouts, world bosses and currencies, currency rows carrying their icon
+- [ ] Every value matches the Roster tab for the same character and row. A disagreement is a second source of truth and the one thing this cannot be
+- [ ] Move the mouse off the button and onto the panel — it stays open. Move off the panel — it closes, and so does any cell tooltip
+- [ ] Hover a lockout cell — a second tooltip opens beside the panel, titled with the character in class colour over the row label in orange, listing resets-in and each boss alive or dead
+- [ ] Hover a currency cell — the same, with the weekly figure and whether it is at cap
+- [ ] Hover a cell nobody has a value in — nothing opens, and the cell is EMPTY rather than `0`
+- [ ] Click the button while the panel is open — the panel goes and the window opens. Drag the button — the panel goes and the button follows the cursor
+- [ ] Hover on a warband wider than the screen — the leading columns are drawn, the character at the keyboard among them, and the footer says `+N characters did not fit`
+- [ ] Hover on an account with more rows than the screen — the grid is cut from the bottom, the footer counts the rows, and the last line is never a group heading with nothing under it
+- [ ] Hover on a fresh install with no characters — the panel says nothing has been scanned yet and still offers the click hints
+- [ ] Raise the UI scale to maximum and hover — the panel is still on screen and still does not cover the minimap
 - [ ] Drag it round the ring — it follows the cursor and stays where dropped
 - [ ] /reload — still where you dropped it
 - [ ] Full logout and back — still there (WarbandProDB.opts.minimapAngle persisted)

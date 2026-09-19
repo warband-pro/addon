@@ -51,6 +51,22 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+- The minimap hover is the grid. Park on the button and the warband is right
+  there — a column per character, and the vault, lockouts, world bosses,
+  professions, cooldowns and currencies down the side, without opening
+  anything. It is the Roster tab's own grid rather than a second reading of
+  the same data, so the two cannot disagree.
+- Hovering a cell in that grid opens a second tooltip beside it with what the
+  number is a summary of: which bosses are dead and when the lockout resets,
+  how much of a weekly cap is spent, what a character is holding. The four
+  summary lines — vault ready, keystone, saved, at cap — stay above the grid,
+  because they answer across the warband and a grid answers per character.
+- What will not fit on your screen is cut and said out loud: the footer counts
+  the characters and rows it could not show, and the Roster tab still has all
+  of them. The character you are playing is never one of the ones cut.
+
 ## [1.17.1] — 2026-09-18 — the contract says what the addon actually sends
 
 ### Fixed
