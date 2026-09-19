@@ -105,6 +105,35 @@ Pass 3 — edge + combat
 
 Result paste back format (pasteable to AI loop):
 
+## The slice row on the export tab (1.19.0)
+
+The scope and the pager are controls now rather than slash commands. Nothing
+here is testable off-client — `refreshScope` reads a bundle and sets widget
+state — so this is the pass that says the row draws and the clicks land.
+
+- [ ] `/warband` opens Export on `[ Whole warband ]`, and that button is the
+      greyed one — the enabled button is always the scope you are NOT on
+- [ ] Click `[ This character ]` — the string rebuilds, the header gains "this
+      character only", the rows drop to one, and the byte count falls
+- [ ] Click `[ Whole warband ]` back — the full bundle returns, same string as
+      the tab opened with
+- [ ] Close the window and reopen it — it is back on `[ Whole warband ]`. The
+      scope does NOT survive a close, deliberately; the camp flow must never
+      inherit a gear flow's one-character bundle
+- [ ] `/warband copy current` still opens straight into the smaller scope, and
+      `/warband copy 2` still opens on page 2
+- [ ] With fewer characters than `ns.MAX_CHARS`: no pager, no `page N of M`
+- [ ] With more: `page 1 of 3` and `[ < ] [ > ]` beside it, `<` greyed on page
+      1 and `>` greyed on the last; the header reads "20 of 41 — the rest go
+      out a page at a time" and names no slash command
+- [ ] Switch to `[ This character ]` while paged — the pager disappears (one
+      character never pages), and switching back lands on page 1
+- [ ] Past 20KB, `[ Just this character ]` appears beside `[ Select all ]` and
+      the footer says "large"; clicking it does the same thing the slice row's
+      second button does, and it vanishes once the bundle is small
+- [ ] Widen the window to 1600 and shrink it to the 560 minimum — the row does
+      not overlap the footer, `[ Select all ]`, or the pager
+
 ## The roster grid (1.9.0)
 
 `tools/roster-test.lua` holds every rule about WHAT a cell says — 36

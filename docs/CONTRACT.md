@@ -1372,8 +1372,9 @@ bucket**. It was never read. `rows[].d` is what anyone reaching for it wanted.
 ### A warband larger than the cap is paged, not truncated — added in 1.8.0
 
 The cap is **per bundle**, not per warband. A player with 41 characters sends
-three bundles: `/warband copy` is page 1, `/warband copy 2` is the next twenty,
-and so on. Characters are ordered newest-seen first and that order is stable
+three bundles: the export tab opens on page 1 and its `[ < ] [ > ]` arrows walk
+the rest (1.19.0); `/warband copy` and `/warband copy 2` are the same walk by
+command and are unchanged. Characters are ordered newest-seen first and that order is stable
 between calls, so the pages partition the warband with no gap and no repeat.
 
 ```json

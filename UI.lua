@@ -104,12 +104,21 @@ local WIN_MAX_W, WIN_MAX_H = 1600, 1000
 
 local frame, panels, tabs
 local editBox, header, footer, rows, help
+-- The slice row on the export tab: which characters the string covers, and
+-- which page of a warband too large for one bundle. Declared up here because
+-- buildExport creates them and refreshExport repaints them.
+local scopeAll, scopeOne, slimButton, pageLabel, pagePrev, pageNext
 local junkPaste, junkHeader, junkFooter, junkRows, junkChild
 local gsHeader, gsButton, gsList, gsRows
 local rosterHead, rosterFoot, rosterCols, rosterLines, rosterChild, rosterPrev, rosterNext
 local rosterScroll
 local optionChecks = {}
 
+-- Which characters the export covers: "bundle" is the whole warband and
+-- "current" is the character at the keyboard. It is a panel control now rather
+-- than only a slash command, and it does NOT survive a close — every open
+-- starts on the whole warband, because that is the scope the camp flow relies
+-- on and the gear flows are one click from it either way. See UI.Open.
 UI.mode = "bundle"
 -- Which six characters the grid is showing. Same idiom as UI.page below and
 -- for the same reason: a warband can be larger than the surface that draws it.
@@ -180,6 +189,12 @@ local function refreshHelp()
   end
 end
 
+-- The slice buttons rebuild the string, and refreshExport is defined below
+-- them because it needs renderRows. Forward-declared rather than reordered:
+-- the tab's builder reading before its painter is the shape every other tab
+-- in this file has.
+local refreshExport
+
 local function buildExport()
   local p = panels[TAB_EXPORT]
 
@@ -197,8 +212,54 @@ local function buildExport()
     rows[i] = row
   end
 
+  -- ── the slice row ─────────────────────────────────────────────────────────
+  --
+  -- The scope was always in the wire switches and never on the screen: the
+  -- whole warband opened by default and the smaller slice lived behind
+  -- `/warband copy current`, a command a player mid-dungeon will not type. Both
+  -- mid-session gear flows (best-in-bags, the clear-out list) want this
+  -- character and the camp flow wants the warband, so the choice is one click
+  -- either way and neither one is a command any more.
+  --
+  -- Blizzard's own "you are here" idiom for a two-way choice: the button for
+  -- the scope the panel is already on is disabled. Same SetEnabled call the
+  -- roster's pager uses for an edge it cannot cross, so a player who has used
+  -- one has read the other.
+  local SLICE_Y = -(18 + MAX_ROWS * 14 + 4)
+
+  scopeAll = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  scopeAll:SetSize(104, 20)
+  scopeAll:SetPoint("TOPLEFT", 0, SLICE_Y)
+  scopeAll:SetText("Whole warband")
+  scopeAll:SetScript("OnClick", function() UI.SetScope("bundle") end)
+
+  scopeOne = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  scopeOne:SetSize(104, 20)
+  scopeOne:SetPoint("LEFT", scopeAll, "RIGHT", 4, 0)
+  scopeOne:SetText("This character")
+  scopeOne:SetScript("OnClick", function() UI.SetScope("current") end)
+
+  -- Paging, for the warband larger than one bundle holds. The header used to
+  -- name `/warband copy 2` here; the arrows are the same walk without the
+  -- command, and they only exist when there is somewhere to walk to.
+  pageNext = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  pageNext:SetSize(24, 20)
+  pageNext:SetPoint("TOPRIGHT", -20, SLICE_Y)
+  pageNext:SetText(">")
+  pageNext:SetScript("OnClick", function() UI.SetPage(UI.page + 1) end)
+
+  pagePrev = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  pagePrev:SetSize(24, 20)
+  pagePrev:SetPoint("RIGHT", pageNext, "LEFT", -2, 0)
+  pagePrev:SetText("<")
+  pagePrev:SetScript("OnClick", function() UI.SetPage(UI.page - 1) end)
+
+  pageLabel = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  pageLabel:SetPoint("RIGHT", pagePrev, "LEFT", -6, 0)
+  pageLabel:SetJustifyH("RIGHT")
+
   local well = makeWell(p)
-  well:SetPoint("TOPLEFT", 0, -18 - MAX_ROWS * 14 - 6)
+  well:SetPoint("TOPLEFT", 0, SLICE_Y - 24)
   well:SetPoint("BOTTOMRIGHT", -20, 36)
 
   local scroll = CreateFrame("ScrollFrame", "WarbandProExportScroll", p, "UIPanelScrollFrameTemplate")
@@ -264,6 +325,21 @@ local function buildExport()
     editBox:SetFocus()
     editBox:HighlightText()
   end)
+
+  -- The soft cap, as the offer it always was rather than the sentence it used
+  -- to be. Past ns.SOFT_BYTES the footer read "(large — try /warband copy
+  -- current)": a warning whose remedy was a command, printed at the one moment
+  -- the player is least likely to go and learn one. The remedy is now the
+  -- button beside the warning, and it is deliberately the second door onto the
+  -- same scope the slice row already offers — the row is where the choice
+  -- lives, this is where the warning is, and a warning you can act on without
+  -- moving your eyes is worth one extra widget.
+  slimButton = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  slimButton:SetSize(136, 22)
+  slimButton:SetPoint("BOTTOMRIGHT", selectAll, "BOTTOMLEFT", -4, 0)
+  slimButton:SetText("Just this character")
+  slimButton:SetScript("OnClick", function() UI.SetScope("current") end)
+  slimButton:Hide()
 end
 
 local function renderRows(summary)
@@ -284,7 +360,39 @@ local function renderRows(summary)
   end
 end
 
-local function refreshExport()
+-- Repaint the slice row for the scope the panel is on and the bundle it just
+-- built. Everything here is derived from that bundle rather than remembered:
+-- `pages` is absent on a warband that fits in one, so the arrows exist exactly
+-- when there is a second page to reach.
+local function refreshScope(payload, bytes)
+  if not scopeAll then return end
+  local current = UI.mode == "current"
+  scopeAll:SetEnabled(current)
+  scopeOne:SetEnabled(not current)
+
+  local b = payload and payload.bundle
+  local pages = b and b.pages
+  local page = (b and b.page) or 1
+  -- Adopt the page that was actually built. Bundle.Build clamps, so `/warband
+  -- copy 99` on a three-page warband hands back page 3 while UI.page still says
+  -- 99 — and an arrow stepping from 99 would clamp to 3 again and look dead.
+  -- The panel's idea of where it is has to be the bundle's.
+  if b then UI.page = page end
+  -- One character never pages, so the arrows belong to the warband scope only.
+  local paged = (not current and pages and pages > 1) and true or false
+  pagePrev:SetShown(paged)
+  pageNext:SetShown(paged)
+  pageLabel:SetShown(paged)
+  if paged then
+    pageLabel:SetText(format("page %d of %d", page, pages))
+    pagePrev:SetEnabled(page > 1)
+    pageNext:SetEnabled(page < pages)
+  end
+
+  slimButton:SetShown((not current and bytes and bytes > ns.SOFT_BYTES) and true or false)
+end
+
+function refreshExport()
   local str, bytes, payload, rawBytes =
     ns.Export.Build({ currentOnly = UI.mode == "current", page = UI.page })
   UI.current = str or ""
@@ -295,6 +403,7 @@ local function refreshExport()
 
   local summary = ns.Bundle.Summary(payload)
   renderRows(summary)
+  refreshScope(payload, bytes)
 
   if not str then
     -- One plain sentence before the diagnostics. `/warband status` is what the
@@ -334,26 +443,36 @@ local function refreshExport()
       if summary[i].dot ~= "red" and summary[i].dot ~= "never" then allStale = false break end
     end
     -- And the cap. One bundle holds MAX_CHARS characters, so a larger warband
-    -- goes out a page at a time and the header has to say which page this is
-    -- and how to get the next — the count alone reads as a loss, and the old
-    -- line made that literal by offering `/warband clear <name>` as the
-    -- remedy. Deleting an alt is the wrong answer for the player who has
-    -- twenty-one of them; the site merges pages rather than replacing what it
-    -- holds, so all of them fit if they are all sent.
+    -- goes out a page at a time and the header has to say how much is waiting —
+    -- the count alone reads as a loss, and the old line made that literal by
+    -- offering `/warband clear <name>` as the remedy. Deleting an alt is the
+    -- wrong answer for the player who has twenty-one of them; the site merges
+    -- pages rather than replacing what it holds, so all of them fit if they are
+    -- all sent.
+    --
+    -- Which page this is, and the walk to the next one, moved to the arrows on
+    -- the slice row — this line said "/warband copy 2 for the next 20" and was
+    -- the last instruction on the tab that was a command rather than a control.
     local dropped = payload.bundle.droppedOverCap
     local pages = payload.bundle.pages
     local warnLine = ""
     if dropped and pages then
-      local next_ = (payload.bundle.page or 1) % pages + 1
-      warnLine = format("  |cff%s·  page %d of %d — /warband copy %d for the next %d|r",
-        WARN, payload.bundle.page or 1, pages, next_, math.min(dropped, ns.MAX_CHARS))
+      warnLine = format("  |cff%s·  %d of %d — the rest go out a page at a time|r",
+        WARN, payload.bundle.count, payload.bundle.count + dropped)
     elseif allStale then
       warnLine = format("  |cff%s·  all stale — log those alts in again for fresher numbers|r", WARN)
     end
-    header:SetText(format("%d character%s  ·  freshest %s%s%s",
-      #summary, #summary == 1 and "" or "s",
+    -- The scope in words as well as in the buttons. "1 character" is not an
+    -- answer for the player who has one: it reads the same whether the panel
+    -- sliced the warband or the warband is that small.
+    local scope = UI.mode == "current" and "this character only  ·  " or ""
+    header:SetText(format("%s%d character%s  ·  freshest %s%s%s",
+      scope, #summary, #summary == 1 and "" or "s",
       #summary > 0 and ns.ago(payload.bundle.freshestSeenAt) or "never", bank, warnLine))
-    local note = bytes > ns.SOFT_BYTES and format("  |cff%s(large — try /warband copy current)|r", WARN) or ""
+    -- The "(large — try /warband copy current)" note is gone from here: past the
+    -- soft cap the offer is the [Just this character] button beside this line,
+    -- which refreshScope shows. The byte count stays, because it is a fact.
+    local note = bytes > ns.SOFT_BYTES and format("  |cff%s·  large|r", WARN) or ""
     footer:SetText(format("|cff%s%s  ·  %d bytes from %d of JSON|r%s", MUTED, ns.WIRE, bytes, rawBytes or 0, note))
     -- `lastExport` is NOT stamped here any more — 2026-08-24.
     --
@@ -1685,6 +1804,28 @@ function UI.SelectTab(id)
   end
 end
 
+--- Switch which characters the export covers and rebuild the string.
+---
+--- `UI.page` resets, deliberately: page 2 of a warband means nothing to a
+--- bundle holding the one character at the keyboard, and coming back the other
+--- way should land on the first twenty rather than wherever the player had
+--- walked to before.
+function UI.SetScope(mode)
+  if UI.mode == mode then return end
+  UI.mode = mode
+  UI.page = 1
+  refreshExport()
+end
+
+--- Walk to another page of a warband too large for one bundle. Clamped here so
+--- the arrows can be plain +1/-1; Bundle.Build clamps again on its own account.
+function UI.SetPage(page)
+  page = math.max(math.floor(tonumber(page) or 1), 1)
+  if page == UI.page then return end
+  UI.page = page
+  refreshExport()
+end
+
 --- Open the window on a tab. Fails closed in combat: the request is queued and
 --- honored when the fight ends, rather than fighting the taint rules mid-pull.
 function UI.Open(tab, mode, page)
@@ -1694,7 +1835,13 @@ function UI.Open(tab, mode, page)
     return
   end
   UI.pendingOpen = nil
-  if mode then UI.mode = mode end
+  -- Every open starts on the whole warband unless the caller names a scope.
+  -- It used to keep whatever the last open left behind, which mattered little
+  -- while the only way to set it was `/warband copy current` and matters a lot
+  -- now that it is one click: a gear-flow export must not silently hand the
+  -- camp flow a one-character bundle the next time the window opens. The slice
+  -- is one click away in either direction, so there is nothing to remember.
+  UI.mode = mode or "bundle"
   UI.page = math.max(math.floor(tonumber(page) or 1), 1)
   UI.rosterPage = 1
   build()

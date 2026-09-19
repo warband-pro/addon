@@ -358,15 +358,36 @@ its own.
 ### Export tab
 
 - Header line of freshness: "6 characters · freshest 12m ago · warband bank 1h
-  ago (by Vocnar)" — readable before you copy, so you know it's not stale.
-- **The page line, when the warband is larger than one bundle holds** (1.8.0):
-  "page 1 of 3 — /warband copy 2 for the next 20". One bundle carries at most
-  `ns.MAX_CHARS`, so a 41-character warband is three copies, and the header is
-  where the player learns there are two more to make. It replaced a line that
-  reported the count left out and offered `/warband clear <name>` — deleting an
-  alt to make room, which is the wrong answer for the player who has the
-  problem. See [`CONTRACT.md`](CONTRACT.md) § paging for why the pages
-  accumulate on the far side rather than overwriting each other.
+  ago (by Vocnar)" — readable before you copy, so you know it's not stale. In the
+  smaller scope it opens with the scope in words: "this character only · 1
+  character · freshest 2m ago", because "1 character" alone reads the same
+  whether the panel sliced the warband or the warband is that small.
+- **The slice row** (1.19.0): `[ Whole warband ] [ This character ]`, and on the
+  right the pager. The scope was always a wire switch and never a control — the
+  tab opened on the whole warband and the smaller slice lived behind `/warband
+  copy current`, a command a player mid-dungeon does not type. Both mid-session
+  gear flows want this character and the camp flow wants the warband, so it is
+  one click either way. The button for the scope you are already on is
+  **disabled**, which is the same "you are here" `SetEnabled` the roster's pager
+  uses. Both slash commands still work and are unchanged.
+- **The choice does not survive a close.** `UI.Open` sets the scope to the whole
+  warband unless the caller names one, so a best-in-bags export cannot silently
+  hand the camp flow a one-character bundle the next time the window opens. It
+  used to keep the last scope, which mattered little when only a slash command
+  could set it and matters a lot now that a click can.
+- **The pager, when the warband is larger than one bundle holds** (1.8.0, the
+  arrows 1.19.0): `page 1 of 3  [ < ] [ > ]`, and the header says "20 of 41 —
+  the rest go out a page at a time". One bundle carries at most `ns.MAX_CHARS`,
+  so a 41-character warband is three copies. The header said "page 1 of 3 —
+  /warband copy 2 for the next 20" until the arrows replaced it: it was the last
+  instruction on the tab that was a command rather than a control. The arrows
+  belong to the warband scope only — one character never pages — and
+  `refreshScope` adopts the page `Bundle.Build` actually clamped to, so a
+  `/warband copy 99` cannot leave an arrow looking dead. The line before all of
+  this reported the count left out and offered `/warband clear <name>` — deleting
+  an alt to make room, which is the wrong answer for the player who has the
+  problem. See [`CONTRACT.md`](CONTRACT.md) § paging for why the pages accumulate
+  on the far side rather than overwriting each other.
 - Character rows with the traffic-light dots, then the string in a
   ScrollFrame + multiline EditBox inside an inset well:
   - `SetMaxLetters(0)` — the default cap would truncate the wire
@@ -375,8 +396,15 @@ its own.
     who clicked elsewhere first
   - `OnTextChanged` reverts user typing — this box is copied *from*, and a
     broken paste must never reach the website
-- Footer: wire name, bytes on the wire from bytes of JSON, and a warning past
-  `ns.SOFT_BYTES` pointing at `/warband copy current`.
+- Footer: wire name, bytes on the wire from bytes of JSON, and past
+  `ns.SOFT_BYTES` the word "large" plus a `[ Just this character ]` button beside
+  `[ Select all ]` (1.19.0). The note read "(large — try /warband copy current)":
+  a warning whose remedy was a command, printed at the one moment the player is
+  least likely to go and learn one. It is the same offer as the slice row's
+  second button and deliberately a second door onto it — the row is where the
+  choice lives, the footer is where the warning is, and a warning you can act on
+  without moving your eyes is worth the widget. It is hidden in the smaller scope,
+  where the cap is not in play.
 
 ### Import tab
 

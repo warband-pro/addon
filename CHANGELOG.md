@@ -51,6 +51,29 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+- The export tab asks which characters you want, and both answers are one
+  click. `[ Whole warband ]` is still what it opens on; `[ This character ]`
+  sits beside it for the mid-session jobs — you got an upgrade and you want
+  best-in-bags, or you want the clear-out list for the bags you are looking at.
+  The smaller export used to be `/warband copy current`, which is fine if you
+  remember it and useless in the middle of a dungeon.
+- Arrows for a warband too large for one string. If you have more than twenty
+  characters the tab says `page 1 of 3` and you walk the rest with `[ < ]` and
+  `[ > ]` instead of typing `/warband copy 2`. The website merges the pages, so
+  all of them land.
+
+### Changed
+
+- The "this is a large one" warning at the bottom of the export tab now comes
+  with the button that fixes it. It used to name a slash command at the one
+  moment you are least likely to go and learn one.
+- The export tab always opens on the whole warband. Pick the single-character
+  slice, close the window, and the next open is back to the full bundle — so an
+  export you made for gear cannot quietly become the one your camp relies on.
+- Both slash commands work exactly as before.
+
 ## [1.18.0] — 2026-09-19 — the minimap hover is the whole grid
 
 ### Added
