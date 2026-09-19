@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.18.0] — 2026-09-19 — the minimap hover is the whole grid
+
 ### Added
 
 - The minimap hover is the grid. Park on the button and the warband is right
