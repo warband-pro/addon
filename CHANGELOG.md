@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.19.0] — 2026-09-19 — the export slice is one click, not a slash command
+
 ### Added
 
 - The export tab asks which characters you want, and both answers are one
