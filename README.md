@@ -35,7 +35,7 @@ Vocgrim — 12m ago — fresh
 
 Confirm → warband.pro upserts each char. Missing chars stay, just stale.
 
-Default is multi-char bundle so you don't remember per-char exports. Single-char `/warband copy current` exists for streaming / testing.
+Default is multi-char bundle so you don't remember per-char exports. The single-char slice is a `[ This character ]` button on the export tab, one click either way; `/warband copy current` still gets there directly.
 
 ## What it captures — Altoholic + SavedInstances superset, pruned
 
