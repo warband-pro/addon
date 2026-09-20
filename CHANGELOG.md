@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.19.1] — 2026-09-20 — the currency group leads with what you are losing
+
 ### Changed
 
 - The currency group leads with what you are losing. A currency any of your
