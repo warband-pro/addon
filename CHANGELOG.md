@@ -51,6 +51,21 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Changed
+
+- The currency group leads with what you are losing. A currency any of your
+  characters is at the cap of goes to the top of the group, the ones close to a
+  cap or done for the week come next, and the rest stay in name order. It used
+  to be sixteen rows of alphabet with the red one somewhere in the middle, which
+  only warned you if you read all of them.
+- The group header counts them — `currencies · 2 at cap` — beside the `N hidden`
+  it already said, so the answer to "do I need to go spend something" is the
+  label rather than a scan down the column. With nothing at a cap the header
+  reads exactly as it did.
+- The minimap hover shows the same grid, so it leads with the same rows.
+- Cell colours, the hover text, the 90% warning and the show-every-currency
+  switch are untouched.
+
 ## [1.19.0] — 2026-09-19 — the export slice is one click, not a slash command
 
 ### Added

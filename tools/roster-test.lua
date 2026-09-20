@@ -260,8 +260,86 @@ do
   -- fraction anyone can read.
   check("an uncapped currency renders as a bare number",
     textAt(model, "Gold Dust", 1) == "12,000", textAt(model, "Gold Dust", 1))
-  check("currencies sort by name",
-    model.groups[1].rows[1].label == "Gold Dust", model.groups[1].rows[1].label)
+  -- Name order is the tiebreak rather than the headline: Valorstones is at 95%
+  -- of its cap and leads the group for it (the urgency block below owns that
+  -- rule), and the two rows with nothing to say keep the alphabet behind it.
+  local rows = model.groups[1].rows
+  check("currencies with nothing to say sort by name",
+    rows[2].label == "Gold Dust" and rows[3].label == "Resonance Crystals",
+    rows[2].label .. ", " .. rows[3].label)
+end
+
+--- Every row label in a group, in the order the model put them.
+local function rowLabels(g)
+  local out = {}
+  for i, r in ipairs(g.rows) do out[i] = r.label end
+  return table.concat(out, ", ")
+end
+
+do
+  -- **Urgency leads, then the alphabet.** A currency at its cap is being thrown
+  -- away while the player reads down the group, so it goes to the top rather
+  -- than waiting for its letter; the warnings follow; everything else keeps the
+  -- name order it had. The rank comes off the cells, so a row can never lead
+  -- the group while its own colour says nothing is wrong.
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 1, name = "Aardvark Stone", quantity = 10, maxQuantity = 2000 },
+      { id = 2, name = "Hero Mistcrest", quantity = 90, maxQuantity = 90 },
+      { id = 3, name = "Nearly There", quantity = 1900, maxQuantity = 2000 },
+      { id = 4, name = "Zebra Token", quantity = 10, maxQuantity = 2000 },
+      { id = 5, name = "Weathered Crest", quantity = 300, maxQuantity = 300 },
+    } }),
+  }), nil)
+
+  local _, g = row(model, "Hero Mistcrest")
+  check("capped currencies lead, warnings follow, the rest stay alphabetical",
+    rowLabels(g) == "Hero Mistcrest, Weathered Crest, Nearly There, Aardvark Stone, Zebra Token",
+    rowLabels(g))
+  check("and the header counts what is at cap", g.label == "currencies · 2 at cap", g.label)
+  check("leading the group did not change what the cell says",
+    row(model, "Hero Mistcrest").cells[1].tone == "bad"
+      and textAt(model, "Hero Mistcrest", 1) == "90/90",
+    textAt(model, "Hero Mistcrest", 1))
+end
+
+do
+  -- One character at the cap is the warband at the cap: this is a grid, and the
+  -- row answers for everybody in it. Voctara is nowhere near hers and the row
+  -- still leads, because Vocnar is losing the currency either way.
+  local model = Roster.Build(db({
+    a = char({ name = "Vocnar", currencies = {
+      { id = 1, name = "Alpha", quantity = 10, maxQuantity = 2000 },
+      { id = 2, name = "Omega", quantity = 2000, maxQuantity = 2000 },
+    } }),
+    b = char({ name = "Voctara", currencies = {
+      { id = 1, name = "Alpha", quantity = 10, maxQuantity = 2000 },
+      { id = 2, name = "Omega", quantity = 10, maxQuantity = 2000 },
+    } }),
+  }), nil)
+
+  local _, g = row(model, "Omega")
+  check("one character at the cap lifts the whole row",
+    rowLabels(g) == "Omega, Alpha", rowLabels(g))
+  check("the character who is not at it still reads plain",
+    row(model, "Omega").cells[2].tone == "plain")
+end
+
+do
+  -- Both counts are honest at once, and in the order they matter: what is being
+  -- lost now, then what the header is leaving out.
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 1, name = "Capped", quantity = 2000, maxQuantity = 2000 },
+      { id = 2, name = "Fine", quantity = 10, maxQuantity = 2000 },
+      { id = 3, name = "Timewarped Badge", quantity = 4000, maxQuantity = 0 },
+      { id = 4, name = "Old Mark", quantity = 12, maxQuantity = 0 },
+    } }),
+  }), nil)
+
+  local _, g = row(model, "Capped")
+  check("at cap and hidden are both named",
+    g.label == "currencies · 1 at cap · 2 hidden", g.label)
 end
 
 do

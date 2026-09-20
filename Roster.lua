@@ -44,6 +44,7 @@ local Roster = {}
 ns.Roster = Roster
 
 local floor, sort, format = math.floor, table.sort, string.format
+local concat = table.concat
 
 -- ── cells ───────────────────────────────────────────────────────────────────
 
@@ -451,11 +452,55 @@ local function currencies(groups, cols, showAll)
     end
   end
 
+  -- **Urgency leads, then the alphabet.** Sorting by name is the right tiebreak
+  -- and the wrong headline: a currency at its cap is being thrown away while it
+  -- sits in row nine because it starts with an H, and the red cell only warns
+  -- the player who reads all sixteen rows looking for one. So the rows rank by
+  -- the worst thing any character's cell says — `bad` (at the cap) above `warn`
+  -- (nearly there, or this week's allowance already earned) above everything
+  -- else — and ties keep the name order they were built in.
+  --
+  -- The rank is read back off the CELLS rather than recomputed from the
+  -- currency, and that is the whole reason it cannot drift: there is one
+  -- definition of capped in this function, and a row that led the group while
+  -- its cells were plain would be exactly the lie the tone rule exists to
+  -- prevent. `sort` is not stable in 5.1, so the build order rides along as the
+  -- tiebreak rather than being assumed.
+  local rank, built, atCap = {}, {}, 0
+  for i = 1, g._n do
+    local r = g.rows[i]
+    local worst = 2
+    -- `#cols`, not `#r.cells`: a character with nothing to say for this row
+    -- leaves a hole, and `#` on a table with holes is not a length.
+    for j = 1, #cols do
+      local c = r.cells[j]
+      if c and c.tone == "bad" then
+        worst = 0
+        break
+      elseif c and c.tone == "warn" then
+        worst = 1
+      end
+    end
+    if worst == 0 then atCap = atCap + 1 end
+    rank[r], built[r] = worst, i
+  end
+  sort(g.rows, function(a, b)
+    if rank[a] ~= rank[b] then return rank[a] < rank[b] end
+    return built[a] < built[b]
+  end)
+
   -- Honest about the omission, the way the glance's `+2` is. A group header
   -- that silently drops four rows is a bug report waiting to be filed; one that
   -- says how many were dropped sends the player to the switch that shows them.
-  if hidden > 0 then
-    g.label = format("currencies · %d hidden", hidden)
+  -- The at-cap count is that same honesty pointed the other way — not what the
+  -- header is leaving out, but what the warband is losing right now — so one
+  -- glance at the label answers "do I need to go spend something" without
+  -- reading the rows at all. Both can be true at once.
+  local notes = {}
+  if atCap > 0 then notes[#notes + 1] = format("%d at cap", atCap) end
+  if hidden > 0 then notes[#notes + 1] = format("%d hidden", hidden) end
+  if #notes > 0 then
+    g.label = "currencies · " .. concat(notes, " · ")
   end
 
   push(groups, g)
