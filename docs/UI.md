@@ -262,6 +262,25 @@ that counts them sends the player to the switch that shows them. That switch is
 rather than one per currency. A warband holding nothing but legacy currencies
 gets no group at all, by the same rule that drops every other empty group.
 
+**Urgency leads, then the alphabet.** Name order is the right tiebreak and the
+wrong headline: a currency at its cap is being thrown away while the player
+reads, and in a group docs measured at sixteen rows the red cell only warns the
+player who reads all sixteen looking for one. So the rows rank by the worst
+thing any character's cell says — at the cap first, then the warnings (90% of a
+cap, or this week's allowance already earned), then everything else in the name
+order it had. The rank is read back off the cells rather than recomputed, which
+is what stops a row leading the group while its own colour says nothing is
+wrong.
+
+And the header counts them — `currencies · 2 at cap`, `currencies · 2 at cap ·
+4 hidden` when both are true. It is the same honesty device as `N hidden`
+pointed the other way: not what the header is leaving out, but what the warband
+is losing right now, so one look at the label answers *do I need to go spend
+something* without reading a row. With nothing at a cap the header is exactly
+what it was. **This is deliberately not crest-scoped** — the addon holds no
+season table and the season-scoped lines stay on the website, so any capped
+currency leads.
+
 **Colour is the two things you can act on.** SavedInstances paints green under
 the cap, red at it and yellow at a weekly cap; the green half is decoration
 here, because this grid's rule is that colour is state and sixteen green rows

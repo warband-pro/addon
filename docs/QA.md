@@ -252,6 +252,11 @@ for most accounts.
       season's: crests, valorstones, coffer key shards, whatever is capped
 - [ ] The group header reads `currencies · N hidden` and N matches what went
       missing
+- [ ] A currency you are at the cap of is the FIRST row of the group, above the
+      near-cap and weekly-done rows, and the rest are still in name order
+- [ ] The header counts them — `currencies · N at cap`, or `N at cap · M hidden`
+      when both are true — and with nothing at a cap it reads as it did
+- [ ] The minimap hover shows the same group in the same order
 - [ ] Options → **Show every currency in the Roster grid** — the hidden rows
       come back on the spot, without a `/reload`, and the header goes back to
       plain `currencies`
