@@ -114,6 +114,36 @@ local function itemName(link)
   return name
 end
 
+--- Whether the client positively says a vendor will not buy this item.
+---
+--- The sell price is position 11 of `C_Item.GetItemInfo`'s return list, read
+--- positionally because that is the only place the client states it — the
+--- instant lookup `ns.itemInfo` uses does not carry it. Gear.lua reads position
+--- 16 the same way for the same reason.
+---
+--- **Only positive knowledge counts, and the asymmetry is the whole point.**
+--- `GetItemInfo` answers nothing at all for an item this session has never
+--- seen, and a nil read must never take a working Sell button away from a row
+--- the vendor would in fact have bought. So this is false for "no price" and
+--- false for "not cached", and true only for a price the client gave as zero —
+--- a quest item, a token, the things that answer a click with "the vendor
+--- doesn't want this" and nothing else.
+---
+--- Gear.lua avoids this call on a warband bank scan because it is the slow,
+--- cache-dependent one. The same caution does not apply here: the only items
+--- asked about are greys and list matches in the **carried** bags, which the
+--- client has cached by definition, and the question is only asked while the
+--- panel is drawing itself.
+local function vendorRefuses(link)
+  if type(link) ~= "string" then return false end
+  local info = C_Item and C_Item.GetItemInfo
+  if type(info) ~= "function" then return false end
+  local price = ns.safe(function()
+    return (select(11, info(link)))
+  end)
+  return price == 0
+end
+
 --- Everything currently in the carried bags, indexed by item string, plus the
 --- grey stacks.
 ---
@@ -150,6 +180,7 @@ local function scanCarried()
           name = itemName(info.hyperlink),
           quality = 0,
           grey = true,
+          nosell = vendorRefuses(info.hyperlink),
           k = "sell",
           r = "grey",
         }
@@ -179,6 +210,7 @@ function Junk.Resolve()
             link = m.link,
             name = m.name or ("item " .. tostring(v.id or "?")),
             quality = m.quality,
+            nosell = vendorRefuses(m.link),
             k = v.k,
             r = v.r,
             g = v.g,
@@ -223,12 +255,62 @@ function Junk.DisenchantMacro(bag, slot)
   return "/cast " .. spell .. "\n/use " .. bag .. " " .. slot
 end
 
+--- Whether a row is a candidate for the disenchant fallback.
+---
+--- Quality is the whole test — uncommon or better, and never a grey. It is
+--- deliberately not the site's `de` verdict: this answers the question the site
+--- was never asked, which is what to offer instead of a sale the vendor will
+--- refuse. A wrong yes costs a secure button the game declines to cast; a wrong
+--- no costs the player the one action left, so the test errs toward offering.
+function Junk.Disenchantable(row)
+  if type(row) ~= "table" or row.grey then return false end
+  return type(row.quality) == "number" and row.quality >= 2
+end
+
+--- Whether this row's `[Sell]` button should exist at all.
+---
+--- **The one predicate, and the reason it is a function rather than the two
+--- lines it replaces.** The panel row asks it and so does the vendor-window
+--- sell-all, so the count on that button can never disagree with the buttons
+--- the player can see. Two copies of `k ~= "del"` would have drifted the first
+--- time either grew a case.
+---
+--- It answers "is a sale on offer here", not "is a sale what the list
+--- recommends": a `de` row on an enchanter still carries a live Sell beside its
+--- Disenchant, as it always has. A caller that wants sell-verdict rows only
+--- pairs this with `VerdictLabel`.
+function Junk.Sellable(row)
+  if type(row) ~= "table" then return false end
+  -- The vendor's own answer beats the site's: a verdict of sell on an item
+  -- with no sell price is a button that can only ever print "the vendor
+  -- doesn't want this".
+  if row.nosell then return false end
+  return row.k ~= "del" or row.grey == true
+end
+
 --- What the row says it is for. `del` is advice only — nothing in this addon
 --- deletes an item, and the game would not let it.
+---
+--- **An item the vendor will not buy falls back the same way a `de` row does
+--- without the profession**, and that symmetry is the point: the panel already
+--- reads "sell" for a disenchant it cannot do, so it reads "disenchant" — or,
+--- failing that, "delete by hand" — for a sale it cannot make. The verdict
+--- column is the one the player reads before clicking, so it is the column that
+--- has to be honest about what is actually on offer.
 function Junk.VerdictLabel(row, canDisenchant)
-  if row.grey then return "sell" end
-  if row.k == "de" then return canDisenchant and "disenchant" or "sell" end
+  if row.grey then
+    -- A grey with no sell price is the one grey nobody can do anything with.
+    return row.nosell and "delete by hand" or "sell"
+  end
   if row.k == "del" then return "delete by hand" end
+  if row.k == "de" then
+    if canDisenchant then return "disenchant" end
+    return row.nosell and "delete by hand" or "sell"
+  end
+  if row.nosell then
+    if canDisenchant and Junk.Disenchantable(row) then return "disenchant" end
+    return "delete by hand"
+  end
   return "sell"
 end
 

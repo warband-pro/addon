@@ -942,14 +942,24 @@ function UI.RenderJunk()
       -- at all: nothing here deletes an item and the game would not allow it,
       -- so the button is not merely disabled by position — there is no sell
       -- for this row to do, and offering one was advice the site did not give.
-      local sellable = r.k ~= "del" or r.grey
+      --
+      -- Since the sell-price check it is also drawn for an item the vendor
+      -- will not buy at any price, which is the same shape of problem: the
+      -- click could only ever have printed "the vendor doesn't want this".
+      -- `Junk.Sellable` is the one place that answers this, so the vendor
+      -- window's sell-all cannot count a row the panel does not offer.
+      local sellable = ns.Junk.Sellable(r)
       w.sell:SetShown(sellable)
       w.sell:SetEnabled(sellable and ns.Junk.merchantOpen)
       w.sell:SetScript("OnClick", function()
         if ns.Junk.Sell(r.bag, r.slot) then UI.RenderJunk() end
       end)
 
-      local wantsDE = canDE and r.k == "de" and not r.grey
+      -- Read off the verdict rather than recomputed from `k`, so the button and
+      -- the word beside it cannot disagree — including on the fallback, where
+      -- an unsellable item the site only said to sell now reads "disenchant"
+      -- and has to grow the button that word promises.
+      local wantsDE = verdict == "disenchant"
       if wantsDE then
         w.de:Show()
         w.de:SetAttribute("type", "macro")

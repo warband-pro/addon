@@ -28,6 +28,16 @@ end
 local BAGS = {}    -- [bagID] = { [slot] = { itemID, hyperlink, quality } }
 local PROFESSIONS = {}
 
+-- Vendor sell price by item id, which the client states at position 11 of
+-- GetItemInfo and nowhere else.
+--
+-- **An id absent from this table is an item this session has never cached**,
+-- and the call answers nothing at all — not zero. That is the distinction the
+-- whole fallback turns on, so the fake has to be able to make it: most fixtures
+-- below are deliberately left out of here, which is what keeps them exercising
+-- the "no data, still offer Sell" path.
+local PRICES = {}
+
 local function link(id, name, s)
   return "|cffa335ee|H" .. (s or ("item:" .. id .. "::::::::80:250::1:1:12053:::")) .. "|h[" .. name .. "]|h|r"
 end
@@ -47,6 +57,17 @@ _G.C_Container = {
   end,
   UseContainerItem = function(id, slot)
     BAGS[id][slot] = nil
+  end,
+}
+_G.C_Item = {
+  GetItemInfo = function(hyperlink)
+    local text = tostring(hyperlink)
+    local id = tonumber(text:match("|Hitem:(%d+)") or text:match("^item:(%d+)"))
+    local price = id and PRICES[id]
+    if price == nil then return nil end
+    -- name, link, quality, ilvl, minLevel, type, subType, stackCount,
+    -- equipLoc, icon, sellPrice — the eleventh.
+    return "Name", hyperlink, 1, 1, 1, "Armor", "Cloth", 1, "INVTYPE_HEAD", 1, price
   end,
 }
 _G.C_Spell = { GetSpellName = function() return "Disenchant" end }
@@ -244,6 +265,99 @@ check("a dominated reason names the better item, not the worse one",
   Junk.ReasonText({ r = "dominated" }) == "you own a better one")
 check("a reason this build does not know reads blank, not nil",
   Junk.ReasonText({ r = "something-newer" }) == "")
+
+-- ── items the vendor will not buy ───────────────────────────────────────────
+--
+-- The bug: the panel offered Sell for every non-`del` row, so a quest item or a
+-- token on the list drew a live button whose only possible outcome was "the
+-- vendor doesn't want this". The fix reads the sell price and falls back the
+-- same way a `de` row falls back without the profession.
+
+check("an item with a zero sell price is disenchantable at uncommon",
+  Junk.Disenchantable({ quality = 2 }) == true)
+check("a common item is not worth a disenchant button",
+  Junk.Disenchantable({ quality = 1 }) == false)
+check("a grey is never the disenchant fallback", Junk.Disenchantable({ grey = true, quality = 4 }) == false)
+check("an item of unknown quality is not disenchanted on a guess",
+  Junk.Disenchantable({}) == false)
+check("nothing is not a row", Junk.Disenchantable(nil) == false)
+
+check("an ordinary sell row is sellable", Junk.Sellable({ k = "sell" }) == true)
+check("a del row is not", Junk.Sellable({ k = "del" }) == false)
+check("a grey is", Junk.Sellable({ k = "sell", grey = true }) == true)
+-- The one the bug was about.
+check("an item the vendor refuses is not sellable, whatever the site said",
+  Junk.Sellable({ k = "sell", nosell = true }) == false)
+check("nor is a grey the vendor refuses",
+  Junk.Sellable({ k = "sell", grey = true, nosell = true }) == false)
+check("a de row still carries a live sell beside its disenchant, as it always has",
+  Junk.Sellable({ k = "de" }) == true)
+check("nothing is not a row", Junk.Sellable(nil) == false)
+
+check("an unsellable item an enchanter can break down reads disenchant",
+  Junk.VerdictLabel({ k = "sell", nosell = true, quality = 4 }, true) == "disenchant")
+check("the same item without the profession reads delete by hand",
+  Junk.VerdictLabel({ k = "sell", nosell = true, quality = 4 }, false) == "delete by hand")
+check("an unsellable common item reads delete by hand even for an enchanter",
+  Junk.VerdictLabel({ k = "sell", nosell = true, quality = 1 }, true) == "delete by hand")
+-- The symmetry the fix is built on: the panel already reads "sell" for a
+-- disenchant it cannot do, so it reads "delete by hand" for a sale it cannot make.
+check("a de row with no profession and no sell price has nothing left but the bin",
+  Junk.VerdictLabel({ k = "de", nosell = true }, false) == "delete by hand")
+check("a de row with the profession is unaffected by the sell price",
+  Junk.VerdictLabel({ k = "de", nosell = true }, true) == "disenchant")
+check("a grey nobody will buy reads delete by hand",
+  Junk.VerdictLabel({ grey = true, k = "sell", nosell = true }, false) == "delete by hand")
+check("a sell row with a price is untouched", Junk.VerdictLabel({ k = "sell" }, true) == "sell")
+
+-- ── the price read, end to end ──────────────────────────────────────────────
+
+local S_TOKEN = "item:210796::::::::80:250::4:6:12053:1:28:::"
+PRICES = {}
+resetBags()
+BAGS[0][6] = { itemID = 210796, hyperlink = link(210796, "Sigil of Something", S_TOKEN), quality = 3 }
+storeList({ { k = "sell", s = S_TOKEN, r = "dominated" } })
+
+rows = Junk.Resolve()
+check("an item the client has not cached keeps its Sell button", (function()
+  for _, r in ipairs(rows) do
+    if r.name == "Sigil of Something" then return r.nosell == false and Junk.Sellable(r) == true end
+  end
+  return false
+end)())
+
+PRICES[210796] = 0
+rows = Junk.Resolve()
+check("a cached zero price is read off the live item and marks the row", (function()
+  for _, r in ipairs(rows) do
+    if r.name == "Sigil of Something" then return r.nosell == true and Junk.Sellable(r) == false end
+  end
+  return false
+end)())
+check("and the row's verdict stops saying sell", (function()
+  for _, r in ipairs(rows) do
+    if r.name == "Sigil of Something" then return Junk.VerdictLabel(r, false) == "delete by hand" end
+  end
+  return false
+end)())
+
+PRICES[210796] = 4500
+rows = Junk.Resolve()
+check("a positive price leaves the row alone", (function()
+  for _, r in ipairs(rows) do
+    if r.name == "Sigil of Something" then return r.nosell == false and Junk.Sellable(r) == true end
+  end
+  return false
+end)())
+
+-- The rest of the list must not move because one row did.
+check("the greys and the other rows are untouched by the price read", (function()
+  local greys, others = 0, 0
+  for _, r in ipairs(rows) do
+    if r.grey then greys = greys + 1 elseif r.name ~= "Sigil of Something" then others = others + 1 end
+  end
+  return greys == 1 and others == 0
+end)(), #rows)
 
 print("")
 print(string.format("%d passed, %d failed", pass, fail))
