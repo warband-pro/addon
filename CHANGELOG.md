@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.20.1] — 2026-09-21 — the grid stops burying the rows that pick a character
+
 ### Removed
 
 - The roster tab and the minimap hover no longer carry the professions and
