@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.19.2] — 2026-09-21 — the panel stops offering a sale no vendor will make
+
 ### Fixed
 
 - The clear-out panel stops offering Sell for items no vendor will buy. Quest
