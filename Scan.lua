@@ -72,20 +72,16 @@ end
 -- enhancement) have been stable for twenty years and Midnight phials are still
 -- flasks.
 --
--- healthPotion and tempPotion cannot be told apart from each other by class, so
--- they are emitted only for ids listed in POTION_IDS. Until that table is
--- filled they are absent rather than zero, which the contract reads as
--- "unknown" instead of "you have none".
+-- Health and temporary potions cannot be told apart from each other by class,
+-- so both ride inside `potion`: an id table kept for the split would go stale
+-- every patch for a distinction no page on the site reads.
 local SUBCLASS = { [1] = "potion", [3] = "phial", [5] = "foodFeast", [6] = "weaponRune" }
-local POTION_IDS = {}   -- [itemID] = "healthPotion" | "tempPotion"
 
 local function newCounts()
   return { phial = 0, potion = 0, foodFeast = 0, weaponRune = 0 }
 end
 
 local function addCounts(into, id, count)
-  local named = POTION_IDS[id]
-  if named then into[named] = (into[named] or 0) + count end
   local info = ns.itemInfo(id)
   if info and info.classID == 0 then
     local bucket = SUBCLASS[info.subclassID]

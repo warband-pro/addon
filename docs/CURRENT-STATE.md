@@ -153,9 +153,6 @@ this is a stored-for-the-addon field rather than an unfinished crossing.
 
 `bankBags`, `bindZone`, `playtimeSec`, `auctions.goldHeld`, `mail.seenAt`,
 `professions.expansionTier` / `knownRecipes` / `totalRecipes`, `instances.lfgID`.
-Also `consumables.healthPotion` and `consumables.tempPotion` — both are gated on
-`POTION_IDS` in `Scan.lua`, **which is an empty table**, so neither field is
-ever emitted.
 
 ---
 
@@ -234,7 +231,7 @@ Each of these is a GitHub issue labelled `agent` in the repo it belongs to.
 |---|---------|----------|---------------------|
 | ~~A1~~ | ~~The trading post's five event handlers are defined and never registered.~~ **Closed 2026-09-17.** All five `PERKS_*` names are in `EVENTS`, so opening the shelf refreshes it and buying something marks it purchased without waiting for the next login. | [`#46`](https://github.com/warband-pro/addon/issues/46) | Done, plus the check this row asked for: `tools/validate.mjs` now fails the build when any `handlers.X` names an event `EVENTS` does not register. It was put in `validate.mjs` rather than `freshness-test.lua` because it is a static property of `Core.lua` — no fake client needed, and it runs in the packaging job every push. |
 | ~~A2~~ | ~~Nothing on the app side reads `tradingPost`.~~ **Closed 2026-09-17**, hours after it was written down: the app decodes the section, stores it, joins this month's shelf to what the account already owns and ranks what is leaving as a deadline. | [`app#130`](https://github.com/warband-pro/app/issues/130) | Nothing to do here — but it makes **A1 sharper, not moot**: the app now renders a shelf that this addon only reads at `PLAYER_LOGIN`. |
-| [A3](https://github.com/warband-pro/addon/issues/47) | **`consumables.healthPotion` and `tempPotion` are specified and never emitted** — `POTION_IDS` is empty. | `Scan.lua` | Either fill the table or delete the two branches and the contract lines, so the wire stops describing a field it never sends. |
+| ~~A3~~ | ~~`consumables.healthPotion` and `tempPotion` are specified and never emitted.~~ **Closed 2026-09-21.** Deleted the branches, the `POTION_IDS` table and the contract lines — health and temporary potions ride inside `potion`, which is what `Scan.Consumables` has always emitted. | [`app#267`](https://github.com/warband-pro/app/issues/267) | Done, plus the check this row asked for in spirit: `tools/validate.mjs` now fails the build when the `consumables` example in `CONTRACT.md` names a bucket `Scan.lua` does not emit, or misses one it does. |
 | ~~A4~~ | ~~Housing decor ownership has no capture.~~ **Closed 2026-09-17.** `Scan.Decor` reads `C_HousingCatalog`'s searcher and `decor` rides at the payload root. Issue #48's first question — *is there an API to call* — resolved yes, which is what unblocked it. | [`#48`](https://github.com/warband-pro/addon/issues/48) | Done. The remaining risk is not the design but the names: `C_HousingCatalog` is as unexercised here as `C_PerksProgram` was, so `docs/QA.md`'s new section is what settles it in game. |
 | [A5](https://github.com/warband-pro/app/issues/137) | **The Great Vault `pvp` bucket is captured and ranks nowhere.** | `Instances.lua` sends it; the app has no `pvp` activity kind | App-side decision: rank it, or state that PvP is out of scope. |
 

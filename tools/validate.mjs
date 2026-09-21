@@ -237,6 +237,43 @@ for (const file of luaFiles) {
   }
 }
 
+// --- the contract's `consumables` example names the buckets Scan.lua emits -
+//
+// The same silent class again, one layer up. `Scan.Consumables` buckets by
+// item subclass and the contract prints an example object beside it, and
+// nothing connects the two — a field the example names that no bucket emits
+// is a promise no paste ever keeps, and a bucket with no example key is a
+// reading no consumer goes looking for.
+//
+// **It has happened.** The example carried `healthPotion` and `tempPotion`,
+// gated on a `POTION_IDS` table that was empty, while the `potion` bucket the
+// code actually filled had no key in the example at all.
+{
+  const scan = read('Scan.lua');
+  const subclass = scan.match(/local SUBCLASS = \{([^{}]*)\}/);
+  if (!subclass) {
+    fail('Scan.lua — could not find the `local SUBCLASS = {` buckets to check the contract against');
+  } else {
+    const emitted = new Set([...subclass[1].matchAll(/=\s*"([a-zA-Z]+)"/g)].map((m) => m[1]));
+    const contract = read('docs/CONTRACT.md');
+    const example = contract.match(/"consumables":\s*\{([^{}]*)\}/);
+    if (!example) {
+      fail('docs/CONTRACT.md — could not find the `"consumables": {...}` example to check against Scan.lua');
+    } else {
+      const named = new Set([...example[1].matchAll(/"([a-zA-Z]+)":/g)].map((m) => m[1]));
+      for (const key of named) {
+        if (!emitted.has(key)) {
+          fail(`docs/CONTRACT.md — the consumables example names "${key}", which no Scan.lua bucket emits. Fix the example or emit the bucket.`);
+        }
+      }
+      for (const key of emitted) {
+        if (!named.has(key)) {
+          fail(`docs/CONTRACT.md — Scan.lua emits the "${key}" bucket, which the consumables example never names. Fix the example or drop the bucket.`);
+        }
+      }
+    }
+  }
+}
 // --- packaging hygiene ---------------------------------------------------
 for (const required of ['LICENSE', 'README.md', 'CHANGELOG.md', 'Vendor/LibDeflate.lua']) {
   if (!here(required)) fail(`${required} is missing`);

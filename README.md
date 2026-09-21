@@ -47,7 +47,7 @@ Midnight-relevant only, mounts/pets/toys/recipes full 10k list skipped (counts o
 - Professions: [{id,name,skill,max}], cooldowns ready-time later
 - Lockouts: instances[{name,instanceID,difficulty LFR/N/H/M,locked,resetTime,extended,bosses[{name,killed}]}], worldBosses[{name,killed,resetTime}]
 - Mythic+/Vault: keystone{level,dungeonID}, runs[{mapID,level,timed}], score, weeklyVault{raid,mplus,world progress/threshold/unlocked}
-- Consumables rollup for Tonight Plan: {phial,healthPotion,tempPotion,foodFeast,weaponRune}
+- Consumables rollup for Tonight Plan: {phial,potion,foodFeast,weaponRune}
 - Gear (1.1.0+): gear[{slot,where equipped/bag/bank/warbank,id,ilvl,s item string}] — equipped items plus anything in a bag or bank that could be equipped. `/warband gear off` drops this from the export without losing what was captured.
 - Talents (1.1.0+): talents{activeSpecID,specs[{specID,name,role,heroSpecID,loadout,seenAt}]} — accumulates across a spec switch rather than replacing.
 - Per-section seenAt: lastSeen,bag,bank,warbank,currency,instance,vault,gear,talents — for 🟢<6h 🟡<3d 🔴>3d ⚪never dots.

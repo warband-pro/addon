@@ -51,6 +51,10 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+- **The bundle stops describing potion counts it never sends.** The contract listed separate health and temporary potion fields that no paste ever carried — both ride inside the shared potion count, which is what the site reads.
+
 ## [1.21.1] — 2026-09-21 — the numbers are the brightest thing in the grid
 
 ### Changed

@@ -123,7 +123,7 @@ Top-level:
     "world": {"progress":3,"threshold":3,"unlocked":true}
   },
 
-  "consumables": {"phial":120,"healthPotion":80,"tempPotion":40,"foodFeast":200,"weaponRune":20},
+  "consumables": {"phial":120,"potion":160,"foodFeast":200,"weaponRune":20},
 
   "seenAt": {
     "lastSeen":1724001000,
@@ -1287,11 +1287,10 @@ about 30% more wire when on.
 ### 3. `consumables` is `{phial, potion, foodFeast, weaponRune}`
 
 Bucketed by item subclass (flask / potion / food-drink / item-enhancement), not
-by a table of item ids that goes stale every patch. `healthPotion` and
-`tempPotion` cannot be told apart from each other by class, so they are **absent
-rather than zero** until `POTION_IDS` in Scan.lua is filled with Midnight ids —
-absent means "unknown", zero would mean "you have none", and the Tonight Plan
-blocks a raid on that difference.
+by a table of item ids that goes stale every patch. Health and temporary
+potions cannot be told apart from each other by class, so both ride inside
+`potion` — and the shape names only the buckets `Scan.Consumables` actually
+emits, so a reader never meets a field that is permanently "unknown".
 
 ### 4. `weeklyVault` buckets carry counts, not a single boolean
 
