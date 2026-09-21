@@ -251,6 +251,33 @@ player does on the addon's behalf every time an expansion retires a currency and
 mints four more. The signal is already on the wire here, so this is decided
 rather than configured — the same move as the expired lockout above.
 
+**And the season's own currencies are pinned past that test.** The live rule has
+one hole in it and it is the hole a delve night falls into: a Restored Coffer Key
+has no total cap, no weekly cap and — once the player has stopped picking up
+shards — nothing earned this week either, so the currency they check *before*
+queueing for a delve is the one the heuristic hides. The answer worth having is
+the one a row that is not drawn cannot print: **zero coffer keys is itself the
+signal**, go earn shards.
+
+So `Roster.lua` holds one table of the season's currency ids at the top of its
+currency section — Restored Coffer Key, Coffer Key Shards, Undercoin, Untainted
+Mana-Crystals, Tidal Spark Dust and the five Mistcrests for Season 2 of Midnight
+— and a pinned currency gets a row whenever *anybody* in the warband has had it
+read, metered or not. Pinning does not invent a currency nobody has ever seen.
+
+**A pinned zero is a reading rather than a gap**, and it is the one place rule 1
+above is answered by the stamp instead of the value: a character whose currency
+list was read and carries no line for Restored Coffer Key holds none of them, so
+the cell says `0`, because `seenAt.currency` is what says we looked. A character
+whose currencies were never read keeps the empty cell, exactly as everywhere
+else. Everything unpinned behaves as described above, hidden count included.
+
+This is developer maintenance once a season and **not player configuration** —
+there is no checkbox for it and there is not going to be one, for the same reason
+the group has no per-currency checklist. Whoever ships the season rollover edits
+those ids and nothing else; a retired currency needs no removal, because it stops
+matching anything anybody scanned and the row goes with it.
+
 **Each row draws the currency's own icon before its name.** SavedInstances does
 this and it is most of why its currency list reads faster than ours did: the
 icon arrives before the word, so you find Valorstones by shape rather than by
@@ -283,9 +310,9 @@ And the header counts them — `currencies · 2 at cap`, `currencies · 2 at cap
 pointed the other way: not what the header is leaving out, but what the warband
 is losing right now, so one look at the label answers *do I need to go spend
 something* without reading a row. With nothing at a cap the header is exactly
-what it was. **This is deliberately not crest-scoped** — the addon holds no
-season table and the season-scoped lines stay on the website, so any capped
-currency leads.
+what it was. **The count is deliberately not crest-scoped** — the season table above is a
+list of ids and nothing more, and the season-scoped *judgements* stay on the
+website, so any capped currency leads.
 
 **Colour is the two things you can act on.** SavedInstances paints green under
 the cap, red at it and yellow at a weekly cap; the green half is decoration

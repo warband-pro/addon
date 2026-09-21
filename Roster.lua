@@ -366,6 +366,52 @@ local function liveCurrency(cur)
   return false
 end
 
+-- **And the season's own currencies get a row regardless.** The live test above
+-- is the right rule with one hole in it, and it is the hole a delve night falls
+-- into: a Restored Coffer Key has no total cap, no weekly cap and — once you
+-- have stopped picking up shards — nothing earned this week either, so the
+-- currency you check BEFORE queueing for a delve is the one the heuristic
+-- hides. The answer worth having is the one it cannot say at all: **zero coffer
+-- keys is itself the signal**, go earn shards, and a row that is not drawn
+-- cannot print a nought.
+--
+-- So one pinned table, keyed by id, and it stays decided rather than
+-- configured — there is no checkbox here and there is not going to be one, for
+-- the same reason SavedInstances' per-currency checklist is the thing this group
+-- exists not to be. This is developer maintenance once a season instead.
+--
+-- **SEASON 2 OF MIDNIGHT (12.1).** Whoever ships the season rollover edits
+-- these ids and nothing else in this file: they are the whole of its season
+-- knowledge, they are not localized the way `name` is, and a retired currency
+-- needs no removal to stop mattering — it simply stops matching anything
+-- anybody scanned, and the row goes with it.
+local PINNED = {
+  [3028] = true,  -- Restored Coffer Key
+  [3310] = true,  -- Coffer Key Shards
+  [2803] = true,  -- Undercoin
+  [3356] = true,  -- Untainted Mana-Crystals
+  [3509] = true,  -- Tidal Spark Dust
+  -- Mistcrests are one currency per upgrade track rather than one currency with
+  -- five tiers, so the season's crest is five ids and all five are pinned.
+  [3437] = true,  -- Adventurer Mistcrest
+  [3438] = true,  -- Veteran Mistcrest
+  [3444] = true,  -- Champion Mistcrest
+  [3445] = true,  -- Hero Mistcrest
+  [3446] = true,  -- Myth Mistcrest
+}
+
+-- **Where a pinned zero is allowed to be a zero.** Rule 1 at the top of this
+-- file says absent is not zero, and a pinned row is the one place the two
+-- readings pull against each other: "we read your currencies and you hold none
+-- of that one" is the signal the pin exists to print, and "nobody has looked in
+-- there" is not. `seenAt.currency` is exactly that distinction and has carried
+-- it since the section was first stored, so the zero is spent only on a
+-- character whose currency list was actually read.
+local function readCurrencies(c)
+  local seen = c.seenAt
+  return type(seen) == "table" and seen.currency ~= nil
+end
+
 local function currencies(groups, cols, showAll)
   local g = group("currencies")
 
@@ -375,7 +421,7 @@ local function currencies(groups, cols, showAll)
       if cur.id and cur.name then
         local k = seen[cur.id]
         if not k then
-          k = { id = cur.id, name = cur.name, live = false }
+          k = { id = cur.id, name = cur.name, live = false, pinned = PINNED[cur.id] or false }
           seen[cur.id] = k
           keys[#keys + 1] = k
         end
@@ -391,7 +437,7 @@ local function currencies(groups, cols, showAll)
 
   local hidden = 0
   for _, k in ipairs(keys) do
-    if not (showAll or k.live) then
+    if not (showAll or k.live or k.pinned) then
       hidden = hidden + 1
     else
       addRow(g, cols, k.name, function(c)
@@ -447,6 +493,11 @@ local function currencies(groups, cols, showAll)
             return cell(commas(q), tone, tip)
           end
         end
+        -- No entry for a pinned currency is a reading rather than a gap: the
+        -- scan walks the whole currency list in one pass, so a character it read
+        -- and which carries no line for Restored Coffer Key holds none of them.
+        -- That nought is the point of pinning it.
+        if k.pinned and readCurrencies(c) then return cell("0", "plain") end
         return nil
       end, k.icon)
     end
