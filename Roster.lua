@@ -506,40 +506,6 @@ local function currencies(groups, cols, showAll)
   push(groups, g)
 end
 
-local function professions(groups, cols)
-  local g = group("professions")
-
-  local keys, seen = {}, {}
-  for i = 1, #cols do
-    for _, p in ipairs(cols[i].char.professions or {}) do
-      if p.name and not seen[p.name] then
-        seen[p.name] = true
-        keys[#keys + 1] = p.name
-      end
-    end
-  end
-  sort(keys)
-
-  for _, name in ipairs(keys) do
-    addRow(g, cols, name, function(c)
-      for _, p in ipairs(c.professions or {}) do
-        if p.name == name then
-          local skill = num(p.skill)
-          if not skill then return nil end
-          local max = num(p.maxLevel)
-          if max and max > 0 then
-            return cell(skill .. "/" .. max, skill >= max and "good" or "plain")
-          end
-          return cell(tostring(skill), "plain")
-        end
-      end
-      return nil
-    end)
-  end
-
-  push(groups, g)
-end
-
 -- **The row group whose useful state is the EXPIRED one.** Every other timer in
 -- this grid counts towards something being taken away — a lockout, a weekly
 -- allowance — and Roster's rule for those is that a stamp in the past means the
@@ -601,60 +567,6 @@ local function cooldowns(groups, cols)
       return nil
     end)
   end
-
-  push(groups, g)
-end
-
--- The consumable keys the scanner actually writes, with what a player calls
--- them. Not every key is worth a row on its own — a rune and a potion are one
--- decision at raid time — but they are counted separately in the DB and
--- collapsing them here would hide which one you are short of.
-local CONSUMABLES = {
-  { key = "phial", label = "phials" },
-  { key = "healthPotion", label = "health potions" },
-  { key = "tempPotion", label = "combat potions" },
-  { key = "foodFeast", label = "food" },
-  { key = "weaponRune", label = "weapon runes" },
-}
-
-local function pockets(groups, cols)
-  local g = group("pockets")
-
-  addRow(g, cols, "gold", function(c) return cell(money(c.gold), "plain") end)
-
-  addRow(g, cols, "bag space", function(c)
-    local bags = c.bags
-    if type(bags) ~= "table" or #bags == 0 then return nil end
-    local free, size = 0, 0
-    for _, bag in ipairs(bags) do
-      -- `free` nil is a container that was not read (CONTRACT.md), and adding
-      -- it as zero would report a full bag as roomy.
-      if type(bag.free) ~= "number" then return nil end
-      free = free + bag.free
-      size = size + (num(bag.size) or 0)
-    end
-    return cell(free .. "/" .. size, free <= 4 and "warn" or "plain")
-  end)
-
-  for _, con in ipairs(CONSUMABLES) do
-    addRow(g, cols, con.label, function(c)
-      local n = c.consumables and num(c.consumables[con.key])
-      if not n then return nil end
-      -- A zero phial count is a reading, not a failure: red is this grid's
-      -- "something is wrong or expired" and nothing is wrong about an empty
-      -- stack you have not shopped for yet. The currencies keep red because
-      -- at the cap is a loss happening now.
-      return cell(tostring(n), "plain")
-    end)
-  end
-
-  addRow(g, cols, "mail", function(c)
-    local m = c.mail
-    local n = m and num(m.countItems)
-    if not n or n == 0 then return nil end
-    local soon = m and num(m.soonestExpiryHours)
-    return cell(tostring(n), (soon and soon < 72) and "bad" or "plain")
-  end)
 
   push(groups, g)
 end
@@ -787,9 +699,7 @@ function Roster.Build(db, selfGuid)
     thisWeek(groups, cols)
     lockouts(groups, cols)
     currencies(groups, cols, opts.allCurrencies and true or false)
-    professions(groups, cols)
     cooldowns(groups, cols)
-    pockets(groups, cols)
     fromSite(groups, cols)
   end
 

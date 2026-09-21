@@ -1428,7 +1428,7 @@ function UI.RenderRoster()
       -- under it. Gold is what SavedInstances marks structure with.
       --
       -- The `+`/`-` in front of it is the whole of the affordance. A shut group
-      -- names the count it is holding, because `pockets` with a rule under it
+      -- names the count it is holding, because `lockouts` with a rule under it
       -- and nothing else looks like a group that had nothing to say.
       setLabel(w, format("|cff%s%s %s%s|r", WARN, line.closed and "+" or "-", line.head,
         line.closed and format("  (%d)", line.hidden) or ""), nil)

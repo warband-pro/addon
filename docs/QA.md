@@ -247,7 +247,7 @@ a widget left over from a wider window still drawing last render's cell.
 - [ ] **The 24-row ceiling is gone.** On a character with a full currency list,
       scroll the grid to the bottom: every row has a label and cells, and there
       is no run of blank rows under the last one
-- [ ] A group header (`currencies`, `pockets`) has a faint rule behind it
+- [ ] A group header (`currencies`, `lockouts`) has a faint rule behind it
 - [ ] Moving down the rows lights each one under the cursor, full width, and
       the highlight leaves when the mouse leaves the grid
 - [ ] Group headers do NOT highlight — they are not rows you read across
@@ -303,7 +303,7 @@ an alchemist is easiest, and a second profession on the same character makes the
 merge check possible.
 
 - [ ] Open the profession window on a character with a cooldown *running*. Close
-      it, `/warband roster` — a `cooldowns` group under `professions`, one row
+      it, `/warband roster` — a `cooldowns` group under `currencies`, one row
       named after the recipe, cell showing the time left
 - [ ] Hover it — the profession name, `ready in`, and the charge count if it is
       a charge cooldown

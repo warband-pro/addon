@@ -68,8 +68,6 @@ them down the side.
 |  | Nerub-ar (Heroic) 2/8    8/8     --      --            |  |
 |  | - currencies                                           |  |
 |  | Valorstones      1,900/2,000  240/2,000  --            |  |
-|  | - pockets                                              |  |
-|  | gold             48,205g 1,204g  980g    12g           |  |
 |  +--------------------------------------------------------+  |
 |  warband bank 1h ago (by Vocnar) · 5,000g                  // |
 +--------------------------------------------------------------+
@@ -123,9 +121,9 @@ Only the shut ones are stored, so an addon nobody has clicked this on carries
 no key at all.
 
 This is the half of SavedInstances' category config that is worth having
-without the config: seven groups against a window that shows about forty rows
+without the config: five groups against a window that shows about forty rows
 means the grid is a scroll, and a player who is looking at lockouts is not
-looking at professions. Shutting is in-place and reversible in one click, which
+looking at currencies. Shutting is in-place and reversible in one click, which
 a checkbox on another tab is not.
 
 **A shut group is not an empty one, and the count is what says so.** A header
@@ -188,11 +186,19 @@ SavedInstances marks structure with, and the data rows stay uncoloured.
 **Row groups, in order:** `this week` (the three vault buckets, keystone, m+
 score), `lockouts` (one row per instance-and-difficulty anybody is saved to,
 raids first, plus a world-boss count), `currencies` (one row per currency the
-game is still metering for somebody — see below), `professions`
-(skill over max), `pockets` (gold, bag space, the five consumable counts, and
-mail when something is waiting). The warband bank is account-wide and so has no
+game is still metering for somebody — see below), `cooldowns` (one row per
+trade skill cooldown anybody is metering), `from warband.pro` (what a `wbc1!`
+paste left for each character). The warband bank is account-wide and so has no
 column to live in; it is the footer line, with how many of its tabs were
 actually read.
+
+**`professions` and `pockets` were removed in 1.20.1**, and the reason is the
+question the grid exists to answer: *what character do I swap to, for what
+activity.* A skill number and a bag count do not answer it, and nine profession
+rows and eight pocket rows between them pushed the groups that do below the
+fold. Both are still captured and both still go out on `wb1!` — the site reads
+them; the grid no longer draws them. Gold survives as the column header figure,
+where it costs no row.
 
 **Values are right-justified in their cell, labels are not.** A centred value
 moves with its own width, so `0/2` and `43,418g` begin in different places and a
@@ -299,7 +305,7 @@ red since 1.9.0, so the grid and the hover disagreed about the same currency.
 
 #### The cooldown rows — the group whose useful state is the expired one
 
-Trade skill cooldowns sit under the professions, one row per recipe: the alchemy
+Trade skill cooldowns sit under the currencies, one row per recipe: the alchemy
 transmutes, the daily forges, anything the client meters. It is SavedInstances'
 trade skill row, and it is the one place in this grid where **a timestamp in the
 past is the answer rather than something to refuse.**
