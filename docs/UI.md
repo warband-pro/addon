@@ -178,10 +178,23 @@ a cell that is a child of the scroll frame do not otherwise line up.
 a 14px row across twelve columns is exactly where an eye loses its place, and
 these are the two things SavedInstances gets from LibQTip that we owed it.
 
-The header text and its `+`/`-` are gold (`WARN`, `ffd100`), not grey. Grey put
-a header at the same weight as the data under it — worse, it read as disabled —
-which left the stripe doing the separation on its own. Gold is what
-SavedInstances marks structure with, and the data rows stay uncoloured.
+**Two inks: labels are grey and values are white.** A group's name, a row's
+name and the words around a count are chrome and read dim; the number in the
+cell is what you came for and is the brightest thing in the frame. Anything
+that is neither is a *tone*, and the tones are the whole attention system —
+green earned, gold close, red gone, class colour for whose it is.
+
+Through 1.21.0 this was one weight: labels, headings and values all arrived in
+`GameFontHighlightSmall`, so the tab opened onto a wall of same-brightness text
+and the number you were after had to be found rather than seen. Dimming the
+chrome is the whole of the fix; no tone changed and no colour was added.
+
+The header text and its `+`/`-` are grey, and the stripe under them carries the
+separation at 10%. **They were gold**, for a reason that the ink ramp retired:
+grey read as disabled while the data rows were *white*, which put a heading at
+less weight than the rows it named. With the labels grey and only the values
+bright, a heading no longer has to out-shout its block — it has to step out of
+the way, and the one thing on the line that is not text does the separating.
 
 **Row groups, in order:** `this week` (the three vault buckets, keystone, m+
 score), `lockouts` (one row per instance-and-difficulty anybody is saved to,
@@ -206,6 +219,16 @@ column of numbers offers the eye no edge to run down. Flushing them to the right
 of the 56px cell gives one, which is what SavedInstances' compact values do. The
 row labels stay left-justified and the column headers stay centred — a name is a
 label, not a member of a series.
+
+**And the digits are tabular.** An edge is only half the job: the game font this
+window is otherwise built from is proportional, so its `1` is narrower than its
+`8` and a column of `3/8`, `11/8`, `6/8` wanders either side of its own slashes
+even when every value ends flush. Cells are drawn in the client's own number
+face (`NumberFontNormalSmall`, Arial Narrow), resized to the window's small
+font so a cell does not stand taller than the label beside it. It is taken as a
+template NAME rather than as a font object because a non-Latin client swaps the
+file behind that name; cells are ASCII by construction, and the names — which
+are not — stay in the game font.
 
 **Hover is where the parity actually lands.** A cell is two or three characters
 because that is what makes a row readable *across*; everything it summarises
@@ -709,10 +732,16 @@ cover twenty alts, and the grid under them cannot say what they say.
    is the half of SavedInstances people actually name, and it is the same
    `cell.tip` the tab already draws.
 
-**Colour is the same grammar the tab uses.** Gold for the title, orange for a
-section heading, white for labels and plain values, green / gold / red for the
-cell tones, and class colour for a character's name and nothing else. A colour
-is a status or an identity, never both.
+**Colour is the same grammar the tab uses**, and so is the ink ramp: grey for
+labels and group headings, white for values, green / gold / red for the cell
+tones, gold for the title, and class colour for a character's name and nothing
+else. A colour is a status or an identity, never both.
+
+A group heading here is a grey label over its own rule, at the tab's 10% —
+**it was an orange word and no rule at all**, which is a colour standing in for
+a line on the one surface that most needs to stay quiet behind its values.
+Orange survives where it has no alternative: inside the per-cell `GameTooltip`,
+which has no texture to rule a section off with.
 
 **Leaving is a question, not an instruction.** The button and the panel are two
 frames sharing a border, so an `OnLeave` on either means nothing on its own —
@@ -757,6 +786,10 @@ one the format is most likely to destroy:
 ready` green, `saved` gold, `at cap` red — and the names carry their class
 colour, which is identity. That is SavedInstances' rule and the reason its
 tooltip stays readable at twenty characters.
+
+A label with no tone reads grey, which is the `keystone` line: it used to
+arrive in the same white as the `+12` beside it and so said *look here* about
+nothing at all.
 
 **Shrink-to-fit is decided, not configured.** A line names at most three
 characters and appends `+2` for the rest. This is SavedInstances' fit-to-screen

@@ -51,6 +51,21 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Changed
+
+- **The Roster tab and the minimap hover read as a glance: the numbers are the
+  brightest thing in the frame.** Row labels and group headings are grey now,
+  and the values they stand over are white — which is the difference between
+  finding a number and seeing it. The grouping still reads as grouping: a
+  heading sits on its own rule, in the hover as well as the tab.
+- Values in both grids are drawn in the client's own number face, so a column of
+  `3/8`, `11/8` and `6/8` lines up on its slashes as well as on its right edge.
+  The game font's `1` is narrower than its `8`, which is why they used to wander.
+- The state colours are untouched and still the only thing shouting: green for a
+  vault slot already earned, gold for close, red for gone, and a character's name
+  in their class colour. Nothing new was added to that list — the greys came out
+  of the text that was competing with it.
+
 ## [1.21.0] — 2026-09-21 — zero coffer keys is a number you can see
 
 ### Added
