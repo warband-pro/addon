@@ -51,6 +51,27 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+- **The Roster grid keeps a row for this season's currencies whether the game is
+  still metering them or not.** Restored Coffer Keys, Coffer Key Shards,
+  Undercoin, Untainted Mana-Crystals, Tidal Spark Dust and the five Mistcrests
+  each get a line per character. A key has no cap and nothing earned against it
+  once you stop picking up shards, so the grid used to drop it into the same
+  hidden pile as Timewarped Badges — and a character with none was the one you
+  most wanted to find before a Bountiful Delve.
+- A character you have logged into who holds none of a pinned currency now reads
+  `0` there rather than a blank cell. None is the answer; go earn shards. A
+  character whose currencies have never been read keeps the empty cell, because
+  that still means nobody looked.
+
+### Changed
+
+- Nothing else about the currency group moved. Everything outside that pinned
+  list still earns its row the same way, the header still counts what is at a cap
+  and what it left out, and a pinned currency at its cap still leads the group in
+  red.
+
 ## [1.20.1] — 2026-09-21 — the grid stops burying the rows that pick a character
 
 ### Removed

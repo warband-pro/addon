@@ -390,6 +390,85 @@ do
 end
 
 do
+  -- **The pin.** The live heuristic hides exactly the currency a delve night is
+  -- planned around: a Restored Coffer Key has no cap of either kind and nothing
+  -- earned this week, so it sorts with the Timewarped Badges and never draws.
+  -- Season 2's ids are pinned past the heuristic for that, and the heuristic is
+  -- untouched for everything else — the badge below is still hidden and still
+  -- counted.
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 3028, name = "Restored Coffer Key", quantity = 3, maxQuantity = 0 },
+      { id = 3310, name = "Coffer Key Shards", quantity = 40, maxQuantity = 0 },
+      { id = 4, name = "Timewarped Badge", quantity = 4000, maxQuantity = 0 },
+    } }),
+  }), nil)
+
+  check("a pinned currency the game is not metering still gets a row",
+    row(model, "Restored Coffer Key") ~= nil)
+  check("and it renders as the bare number it is",
+    textAt(model, "Restored Coffer Key", 1) == "3", textAt(model, "Restored Coffer Key", 1))
+  check("an unpinned pile is still left out", row(model, "Timewarped Badge") == nil)
+  local _, g = row(model, "Restored Coffer Key")
+  check("a pinned row is not one of the hidden", g.label == "currencies · 1 hidden", g.label)
+
+  -- Pinning does not invent a currency nobody in the warband has ever had read.
+  check("a pinned currency nobody scanned is not a row", row(model, "Undercoin") == nil)
+end
+
+do
+  -- **Zero is the signal, and absent is still not zero.** Vocnar has no coffer
+  -- keys and his currency list was read, so the cell says so — that nought is
+  -- the whole reason the key is pinned. Voctara has never had hers read at all,
+  -- and a `0` under her name would be the lie rule 1 exists to prevent.
+  local model = Roster.Build(db({
+    a = char({ name = "Vocnar", seenAt = { lastSeen = NOW - 60, currency = NOW - 60 },
+      currencies = {
+        { id = 3310, name = "Coffer Key Shards", quantity = 40, maxQuantity = 0 },
+      } }),
+    b = char({ name = "Voctara", seenAt = { lastSeen = NOW - 60, currency = NOW - 90 },
+      currencies = {
+        { id = 3310, name = "Coffer Key Shards", quantity = 10, maxQuantity = 0 },
+        { id = 3028, name = "Restored Coffer Key", quantity = 2, maxQuantity = 0 },
+      } }),
+    c = char({ name = "Voczar", currencies = {
+      { id = 3310, name = "Coffer Key Shards", quantity = 10, maxQuantity = 0 },
+    } }),
+  }), nil)
+
+  check("a scanned character holding none of a pinned currency reads 0",
+    textAt(model, "Restored Coffer Key", 1) == "0",
+    tostring(textAt(model, "Restored Coffer Key", 1)))
+  check("and the nought is a number with no opinion attached",
+    row(model, "Restored Coffer Key").cells[1].tone == "plain")
+  check("the character who holds some still reads the number",
+    textAt(model, "Restored Coffer Key", 2) == "2",
+    tostring(textAt(model, "Restored Coffer Key", 2)))
+  check("a character whose currencies were never read keeps an empty cell",
+    row(model, "Restored Coffer Key").cells[3] == nil,
+    tostring(textAt(model, "Restored Coffer Key", 3)))
+end
+
+do
+  -- Pinning changes which rows exist and nothing about what they say: a pinned
+  -- currency at its cap still leads the group in red, above a pinned one that is
+  -- merely present.
+  local model = Roster.Build(db({
+    a = char({ currencies = {
+      { id = 3028, name = "Restored Coffer Key", quantity = 0, maxQuantity = 0 },
+      { id = 3445, name = "Hero Mistcrest", quantity = 90, maxQuantity = 90 },
+    } }),
+  }), nil)
+
+  local _, g = row(model, "Hero Mistcrest")
+  check("a pinned currency at its cap still leads the group",
+    rowLabels(g) == "Hero Mistcrest, Restored Coffer Key", rowLabels(g))
+  check("in red, and the header still counts it",
+    row(model, "Hero Mistcrest").cells[1].tone == "bad" and g.label == "currencies · 1 at cap",
+    g.label)
+end
+
+do
   -- The icon. It rides the row rather than a cell, because a currency is the
   -- same currency down the whole line — and it is threaded from the DB rather
   -- than read at draw time so an alt offline since last week still shows one.
