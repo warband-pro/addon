@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.20.0] — 2026-09-21 — one button empties the clear-out list
+
 ### Added
 
 - A `Sell list (N)` button on the vendor window. Open a merchant with a
