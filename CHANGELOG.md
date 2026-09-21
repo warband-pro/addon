@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.21.1] — 2026-09-21 — the numbers are the brightest thing in the grid
+
 ### Changed
 
 - **The Roster tab and the minimap hover read as a glance: the numbers are the
