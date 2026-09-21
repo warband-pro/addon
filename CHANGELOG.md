@@ -51,6 +51,22 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+- A `Sell list (N)` button on the vendor window. Open a merchant with a
+  clear-out list in your bags and it sits below the frame on the right, counting
+  what is ready to go. Click it and you get a confirm with the item count and
+  what the lot is worth; confirm and they all sell, with a chat line saying what
+  you got. The panel's own Sell buttons have not changed — they are still there
+  for the one item you want to pick out by hand.
+- The button sells only what the panel offers to sell. Items warband.pro said
+  to delete, items no vendor will buy, and — if you are an enchanter — items it
+  said to disenchant all stay in your bags. The disenchant rows keep their own
+  Sell button in the panel, so you can still overrule that one item at a time.
+- Anything that left your bags between pasting the list and reaching the vendor
+  is skipped rather than guessed at. The list is re-read when you confirm, not
+  when the button was drawn.
+
 ## [1.19.2] — 2026-09-21 — the panel stops offering a sale no vendor will make
 
 ### Fixed

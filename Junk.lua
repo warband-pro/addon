@@ -114,34 +114,34 @@ local function itemName(link)
   return name
 end
 
---- Whether the client positively says a vendor will not buy this item.
+--- What one of this item sells to a vendor for, in copper, or nil.
 ---
 --- The sell price is position 11 of `C_Item.GetItemInfo`'s return list, read
 --- positionally because that is the only place the client states it — the
 --- instant lookup `ns.itemInfo` uses does not carry it. Gear.lua reads position
 --- 16 the same way for the same reason.
 ---
---- **Only positive knowledge counts, and the asymmetry is the whole point.**
+--- **nil and zero are different answers and the difference is the whole point.**
 --- `GetItemInfo` answers nothing at all for an item this session has never
 --- seen, and a nil read must never take a working Sell button away from a row
---- the vendor would in fact have bought. So this is false for "no price" and
---- false for "not cached", and true only for a price the client gave as zero —
---- a quest item, a token, the things that answer a click with "the vendor
---- doesn't want this" and nothing else.
+--- the vendor would in fact have bought. So nil means "not cached, assume it
+--- sells" and only a literal zero means the vendor refuses — a quest item, a
+--- token, the things that answer a click with "the vendor doesn't want this"
+--- and nothing else. `Junk.Sellable` reads that zero; the vendor window's
+--- sell-all totals the positive ones.
 ---
 --- Gear.lua avoids this call on a warband bank scan because it is the slow,
 --- cache-dependent one. The same caution does not apply here: the only items
 --- asked about are greys and list matches in the **carried** bags, which the
---- client has cached by definition, and the question is only asked while the
---- panel is drawing itself.
-local function vendorRefuses(link)
-  if type(link) ~= "string" then return false end
+--- client has cached by definition, and the question is only asked while a
+--- panel or the vendor button is drawing itself.
+local function sellPrice(link)
+  if type(link) ~= "string" then return nil end
   local info = C_Item and C_Item.GetItemInfo
-  if type(info) ~= "function" then return false end
-  local price = ns.safe(function()
+  if type(info) ~= "function" then return nil end
+  return ns.safe(function()
     return (select(11, info(link)))
   end)
-  return price == 0
 end
 
 --- Everything currently in the carried bags, indexed by item string, plus the
@@ -167,20 +167,27 @@ local function scanCarried()
           link = info.hyperlink,
           name = itemName(info.hyperlink),
           quality = info.quality,
+          -- A stack sells whole, so the vendor button's total is the unit price
+          -- times this. The price itself is read in Resolve, for the rows that
+          -- turn out to need it rather than for every slot walked.
+          count = info.stackCount or 1,
         }
       end
       -- Greys are found here rather than sent over the wire: the website's
       -- copy of your bags is as old as your last paste, and a vendor-trash
       -- list is only useful if it is about what you are carrying now.
       if info.quality == 0 then
+        local greyPrice = sellPrice(info.hyperlink)
         greys[#greys + 1] = {
           bag = bagID,
           slot = slot,
           link = info.hyperlink,
           name = itemName(info.hyperlink),
           quality = 0,
+          count = info.stackCount or 1,
           grey = true,
-          nosell = vendorRefuses(info.hyperlink),
+          price = greyPrice,
+          nosell = greyPrice == 0,
           k = "sell",
           r = "grey",
         }
@@ -204,13 +211,19 @@ function Junk.Resolve()
       local matches = byString[v.s]
       if matches then
         for _, m in ipairs(matches) do
+          -- Asked here rather than in the bag walk: a warband with full bags is
+          -- two hundred slots and a handful of verdicts, and this is the slow
+          -- cache-dependent call `sellPrice`'s header warns about.
+          local price = sellPrice(m.link)
           rows[#rows + 1] = {
             bag = m.bag,
             slot = m.slot,
             link = m.link,
             name = m.name or ("item " .. tostring(v.id or "?")),
             quality = m.quality,
-            nosell = vendorRefuses(m.link),
+            count = m.count or 1,
+            price = price,
+            nosell = price == 0,
             k = v.k,
             r = v.r,
             g = v.g,
@@ -336,4 +349,99 @@ function Junk.ReasonText(row)
   if row.r == "dominated" then return "you own a better one" end
   if row.r == "gap" and row.g then return row.g .. " behind" end
   return ""
+end
+
+-- ── selling the whole list ──────────────────────────────────────────────────
+--
+-- The panel's per-row Sell buttons are for picking; this is for the job the
+-- player actually came to the vendor to do. It lives in Junk.lua rather than
+-- in UI.lua for the reason Roster.lua exists: what gets sold and what it is
+-- worth is a decision, and a decision that only exists inside a frame is one
+-- no test can audit. UI.lua is left with a button and a confirm.
+
+--- Copper as the game writes it — "45g 20s", zero parts left out.
+---
+--- Not `GetCoinTextureString`: this text goes into a StaticPopup and into a
+--- chat line, and the icon form is unreadable at the popup's font size and
+--- carries no meaning into a log the player scrolls back through.
+function Junk.Money(copper)
+  if type(copper) ~= "number" or copper < 0 then return "0c" end
+  copper = math.floor(copper)
+  local parts = {}
+  local g = math.floor(copper / 10000)
+  local s = math.floor((copper % 10000) / 100)
+  local c = copper % 100
+  if g > 0 then parts[#parts + 1] = g .. "g" end
+  if s > 0 then parts[#parts + 1] = s .. "s" end
+  if c > 0 or #parts == 0 then parts[#parts + 1] = c .. "c" end
+  return table.concat(parts, " ")
+end
+
+--- Which resolved rows a sell-all would sell, how many, and what they are worth.
+---
+--- **`Sellable` alone is not the test, and that is deliberate.** It answers
+--- "is a sale on offer", which is true of a `de` row on an enchanter — that row
+--- carries a live Sell beside its Disenchant so the player can overrule the
+--- advice one item at a time. Overruling it twelve items at a time under one
+--- confirm is not the same act, so the sell-all takes only rows whose verdict
+--- *is* sell: the site said sell, or it is a grey. Pairing the two predicates
+--- is what `Junk.Sellable`'s own header says a caller wanting sell-verdict rows
+--- should do.
+---
+--- `total` is a floor rather than a guess. A row whose price the client has not
+--- cached is still sold — the same asymmetry `sellPrice` is built on — but it
+--- contributes nothing to the total and is counted in `unpriced` so the confirm
+--- can say "at least" instead of quietly understating the take.
+function Junk.SellPlan(rows, canDisenchant)
+  local plan = { rows = {}, count = 0, total = 0, unpriced = 0 }
+  if type(rows) ~= "table" then return plan end
+  for _, row in ipairs(rows) do
+    if Junk.Sellable(row) and Junk.VerdictLabel(row, canDisenchant) == "sell" then
+      plan.rows[#plan.rows + 1] = row
+      plan.count = plan.count + 1
+      -- A stack sells whole, so the price is per item and the take is not.
+      if type(row.price) == "number" and row.price > 0 then
+        plan.total = plan.total + row.price * (row.count or 1)
+      else
+        plan.unpriced = plan.unpriced + 1
+      end
+    end
+  end
+  return plan
+end
+
+--- The plan for the bags as they are this instant.
+---
+--- Thin on purpose: it exists so that neither the button's label nor the
+--- confirm can be built from a walk anybody made earlier. Bags change between
+--- the paste and the vendor visit, and between opening the vendor and pressing
+--- the button — a coordinate from a stale walk sells whatever is sitting in
+--- that slot now, which is the one failure this file's header forbids.
+function Junk.SellPlanNow()
+  local rows = Junk.Resolve()
+  return Junk.SellPlan(rows, Junk.CanDisenchant())
+end
+
+--- Sell every row in a plan. Returns how many sold and what they came to.
+---
+--- Merchant-gated twice over — here and inside `Junk.Sell` — because the frame
+--- can close between the confirm and the loop, and `UseContainerItem` off a
+--- merchant equips or uses the item instead.
+---
+--- No timer and no batching: the player's click on the confirm is the hardware
+--- event that drives this, and a loop that continued on a timer afterwards
+--- would be selling without one.
+function Junk.SellAll(plan)
+  if not Junk.merchantOpen then return 0, 0 end
+  if type(plan) ~= "table" or type(plan.rows) ~= "table" then return 0, 0 end
+  local sold, copper = 0, 0
+  for _, row in ipairs(plan.rows) do
+    if Junk.Sell(row.bag, row.slot) then
+      sold = sold + 1
+      if type(row.price) == "number" and row.price > 0 then
+        copper = copper + row.price * (row.count or 1)
+      end
+    end
+  end
+  return sold, copper
 end

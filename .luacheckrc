@@ -46,6 +46,10 @@ read_globals = {
   "PanelTemplates_SetNumTabs", "PanelTemplates_SetTab", "PanelTemplates_TabResize",
   "PlaySound", "SOUNDKIT",
 
+  -- the vendor window's sell-all (UI.lua): Blizzard's own merchant frame, which
+  -- the button parents itself to, and the confirm it puts under the click.
+  "MerchantFrame", "StaticPopup_Show",
+
   -- /warband perf (Perf.lua)
   "debugprofilestop", "UpdateAddOnMemoryUsage", "GetAddOnMemoryUsage",
   "UpdateAddOnCPUUsage", "GetAddOnCPUUsage", "GetCVar",
@@ -97,6 +101,14 @@ read_globals = {
   "GetInstanceInfo", "LoggingCombat",
   -- The auction house, for the shopping list's one action.
   "C_AuctionHouse",
+}
+
+-- The confirm dialog. The table is the game's and stays read-only; the one key
+-- in it is this addon's, named like everything else it owns. Spelling the field
+-- out rather than declaring the whole table writable keeps the leak audit
+-- honest: a typo'd second dialog name would be a warning rather than a shrug.
+read_globals.StaticPopupDialogs = {
+  fields = { WARBANDPRO_SELL_LIST = { read_only = false } },
 }
 
 ignore = {

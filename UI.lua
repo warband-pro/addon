@@ -952,7 +952,12 @@ function UI.RenderJunk()
       w.sell:SetShown(sellable)
       w.sell:SetEnabled(sellable and ns.Junk.merchantOpen)
       w.sell:SetScript("OnClick", function()
-        if ns.Junk.Sell(r.bag, r.slot) then UI.RenderJunk() end
+        if ns.Junk.Sell(r.bag, r.slot) then
+          UI.RenderJunk()
+          -- The vendor window's button counts the same rows, so a sale made
+          -- from the panel has to move its label too.
+          UI.RefreshMerchantButton()
+        end
       end)
 
       -- Read off the verdict rather than recomputed from `k`, so the button and
@@ -1963,6 +1968,7 @@ end
 --- which only fires when the resolved list actually has rows — an empty panel
 --- popping over every vendor visit would train people to turn it off.
 function UI.MerchantChanged(open)
+  UI.RefreshMerchantButton()
   if UI.JunkIsShown() then UI.RenderJunk() end
   local opts = ns.Store.db and ns.Store.db.opts
   if open then
@@ -1979,6 +1985,139 @@ function UI.MerchantChanged(open)
     -- has made the window theirs, and it stays.
     if UI.JunkIsShown() then frame:Hide() end
   end
+end
+
+-- ── the vendor window's sell-all ────────────────────────────────────────────
+--
+-- The clear-out panel lists every verdict with a Sell button beside it, and the
+-- job it is actually for is selling the whole list — one click at a time, in a
+-- panel that only does anything at a vendor anyway. So the sell-all goes where
+-- the selling happens: on MerchantFrame itself, the way Zygor has put "Sell
+-- Grays" there for fifteen years.
+--
+-- **It is not the panel's button moved.** The panel stays exactly as it is, for
+-- the item you want to keep; this is for the other eleven. Nothing here decides
+-- what sells — `Junk.SellPlan` does, and it is tested — so the button and the
+-- rows a player can see can never disagree about the list.
+--
+-- The confirm is not optional and it is not a nicety. Greys are greys, but this
+-- list is gear the website judged, and the only way back from a mistake is the
+-- vendor's twelve-slot buyback tab. One dialog stating the count and the take
+-- is cheap against an item sold in a click the player did not mean to make.
+
+local merchantButton
+
+local SELL_ALL_POPUP = "WARBANDPRO_SELL_LIST"
+
+--- What the confirm says. A floor rather than a guess when the client has not
+--- cached every price — see `Junk.SellPlan`.
+local function sellAllPrompt(plan)
+  return format(
+    "Sell %d item%s from your clear-out list for %s%s?\n\nThe vendor's buyback tab holds the last 12.",
+    plan.count,
+    plan.count == 1 and "" or "s",
+    plan.unpriced > 0 and "at least " or "",
+    ns.Junk.Money(plan.total)
+  )
+end
+
+--- Sell the list, from the confirm's OnAccept and nowhere else.
+---
+--- **Resolved here, not when the button was drawn.** The label's count comes
+--- from a walk made at MERCHANT_SHOW; the bags may have moved since, and a
+--- bag/slot from that walk is exactly the stale coordinate Junk.lua's header
+--- forbids. Rows that left the bags are simply not in this plan, which is the
+--- same thing the panel's missing count already reports.
+function UI.SellList()
+  local plan = ns.Junk.SellPlanNow()
+  local sold, copper = ns.Junk.SellAll(plan)
+  if sold > 0 then
+    ns.print(format("sold %d item%s for %s (buyback available)",
+      sold, sold == 1 and "" or "s", ns.Junk.Money(copper)))
+  else
+    ns.print("nothing on the clear-out list is still in your bags")
+  end
+  UI.RefreshMerchantButton()
+  if UI.JunkIsShown() then UI.RenderJunk() end
+end
+
+--- The button, built once against MerchantFrame.
+---
+--- Below the frame on the right, which is the one edge with nothing on it: the
+--- Merchant and Buyback tabs hang off the bottom-left, the money frame sits
+--- inside the bottom-right, and anchoring over either would cost the player a
+--- control the game gave them.
+---
+--- Returns nil rather than erroring on a client with no MerchantFrame. Nothing
+--- here is secure, so there is no combat rule to obey — a merchant window does
+--- not open in combat in the first place.
+local function buildMerchantButton()
+  if merchantButton then return merchantButton end
+  if not MerchantFrame then return nil end
+
+  local b = CreateFrame("Button", "WarbandProSellListButton", MerchantFrame, "UIPanelButtonTemplate")
+  b:SetSize(124, 22)
+  b:SetPoint("TOPRIGHT", MerchantFrame, "BOTTOMRIGHT", -6, 1)
+  b:SetScript("OnClick", function()
+    local plan = ns.Junk.SellPlanNow()
+    if plan.count == 0 then
+      UI.RefreshMerchantButton()
+      return
+    end
+    if type(StaticPopup_Show) ~= "function" then return end
+    StaticPopup_Show(SELL_ALL_POPUP, sellAllPrompt(plan))
+  end)
+  b:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine("Warband.pro clear-out list")
+    GameTooltip:AddLine("Sells everything the list says to sell. Asks first.", 1, 1, 1, true)
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  b:Hide()
+
+  -- `preferredIndex = 3` is the standard guard against tainting Blizzard's own
+  -- popup slots, and `text = "%s"` is what lets the caller build the sentence:
+  -- the count and the price are only known at click time.
+  if StaticPopupDialogs then
+    StaticPopupDialogs[SELL_ALL_POPUP] = {
+      text = "%s",
+      button1 = "Sell",
+      button2 = "Cancel",
+      OnAccept = function() UI.SellList() end,
+      timeout = 0,
+      whileDead = true,
+      hideOnEscape = true,
+      showAlert = true,
+      preferredIndex = 3,
+    }
+  end
+
+  merchantButton = b
+  return b
+end
+
+--- Show the button with a live count, or hide it. Safe to call at any time.
+---
+--- Hidden rather than disabled at zero, which is the opposite of the panel's
+--- own rule and for the opposite reason: a disabled row explains why a sale is
+--- not on offer for an item you are looking at, while a disabled button on
+--- Blizzard's vendor frame would be this addon leaving furniture in a window
+--- that is not its own.
+function UI.RefreshMerchantButton()
+  if not ns.Junk.merchantOpen then
+    if merchantButton then merchantButton:Hide() end
+    return
+  end
+  local b = buildMerchantButton()
+  if not b then return end
+  local plan = ns.Junk.SellPlanNow()
+  if plan.count == 0 then
+    b:Hide()
+    return
+  end
+  b:SetText(format("Sell list (%d)", plan.count))
+  b:Show()
 end
 
 -- ── minimap button ──────────────────────────────────────────────────────────

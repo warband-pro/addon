@@ -47,6 +47,27 @@ after using it, not only after the export pass.
 - [ ] /warband junk while in combat — chat says it will open when you drop out, and it does
 - [ ] /console taintLog 1 — repeat the merchant + disenchant pass — /reload — Logs/taint.log has no WarbandPro line
 
+## Sell list — the vendor window button (1.20.0)
+
+Nothing in this pass is reachable off a live merchant, which is why it is here
+rather than in `tools/junk-test.lua`. The plan behind it — what counts, what it
+totals, what it sells — is tested there; this checks that the button is in the
+game and points at the right list.
+
+- [ ] Away from a vendor: no button anywhere, and MerchantFrame looks untouched when you open one with no stored list
+- [ ] Open a vendor with a list live in your bags — `Sell list (N)` appears below the frame on the right, clear of the Merchant and Buyback tabs, N matching the `[Sell]` buttons in the panel
+- [ ] Hover it — tooltip names the clear-out list and says it asks first
+- [ ] Click — popup states the item count, a gold total, and that buyback holds the last 12
+- [ ] Cancel — nothing sold, button still there with the same count
+- [ ] Confirm — every sell row goes, chat prints "sold N items for Xg Ys (buyback available)", button hides at zero
+- [ ] Check the vendor's Buyback tab — the items are in it
+- [ ] Enchanter with a `de` row on the list: the row keeps its own `[Sell]` in the panel, the button's count does NOT include it, and confirming leaves it in your bags
+- [ ] A `del` row and an unsellable item are both still in your bags afterwards
+- [ ] Paste a list, put half of it in the bank, then visit a vendor and confirm — only the carried rows sell, nothing else in your bags is touched
+- [ ] Sell one row from the panel — the vendor button's count drops by one
+- [ ] Close the vendor — the button disappears
+- [ ] /console taintLog 1 — open a vendor, sell the list, /reload — Logs/taint.log has no WarbandPro line
+
 ## The window and the ways in (1.5.0)
 
 Nothing in CI touches a frame, and there is no Lua interpreter on the

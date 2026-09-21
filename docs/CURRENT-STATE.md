@@ -202,6 +202,7 @@ Every game-state action is behind a click or a typed command:
 | Action | What triggers it |
 |--------|------------------|
 | Sell one bag slot | the row's `[Sell]` button, which re-checks the merchant is still open. Drawn only for rows `Junk.Sellable` accepts — never a `del` row, and never an item the client gives a sell price of 0, which the vendor would refuse |
+| Sell the whole list | the `Sell list (N)` button on Blizzard's `MerchantFrame`, then a `StaticPopup` confirm stating the count, the take and that buyback is available. The plan is `Junk.SellPlan` — `Junk.Sellable` **and** a verdict of `sell`, so never a `de` row on an enchanter, never a `del` row, never an unsellable one — and it is rebuilt at the confirm, not read off the button's label |
 | Disenchant | a **secure** `SecureActionButtonTemplate` the player clicks; the addon only bakes the macro text out of combat |
 | Delete | **never.** No button is drawn for a `del` verdict — nor for an unsellable item, whose verdict falls back to `disenchant` or `delete by hand` — and nothing in the addon deletes an item |
 | Equip the set, load the build, save the Equipment Manager set | the `Equip N & save set` button, or `/warband equip [raid\|mplus\|delve]` |
@@ -214,7 +215,9 @@ deserves the audit:
    `PLAYER_EQUIPMENT_CHANGED` — but only ever as the tail of an `Apply` the
    player started, and it aborts if combat begins.
 2. **Auto-opening the Import tab at a merchant**, behind `opts.autoJunk`,
-   **default off**. It opens a window; it sells nothing.
+   **default off**. It opens a window; it sells nothing. The `Sell list (N)`
+   button appears on the same event and is the same shape of promise: it draws
+   itself, and nothing is sold until the player clicks it and confirms.
 3. **Combat logging** — `LoggingCombat(true/false)` on zoning, behind
    `opts.autoLog`, **default off**, raids only.
 
