@@ -114,7 +114,7 @@ local function resetBags()
     [0] = {
       [1] = { itemID = 221151, hyperlink = link(221151, "Ironclaw Warhelm", S_HELM), quality = 3 },
       [3] = { itemID = 215135, hyperlink = link(215135, "Band of the Quiet Grove", S_RING), quality = 4 },
-      [5] = { itemID = 3300, hyperlink = link(3300, "Rabbit's Foot"), quality = 0 },
+      [5] = { itemID = 3300, hyperlink = link(3300, "Rabbit's Foot"), quality = 0, stackCount = 4 },
     },
     [1] = {
       -- A second copy of the helm, in a different bag and slot.
@@ -358,6 +358,94 @@ check("the greys and the other rows are untouched by the price read", (function(
   end
   return greys == 1 and others == 0
 end)(), #rows)
+
+-- ── selling the whole list ──────────────────────────────────────────────────
+--
+-- The vendor window's "Sell list (N)" button. What it counts, what it says the
+-- take is, and what it actually sells — all three read the same plan, which is
+-- the point of the plan being a function rather than a loop inside a frame.
+
+check("money reads the way the game writes it", Junk.Money(452000) == "45g 20s", Junk.Money(452000))
+check("a silver-and-copper take keeps both", Junk.Money(2507) == "25s 7c", Junk.Money(2507))
+check("a round gold amount says only gold", Junk.Money(120000) == "12g", Junk.Money(120000))
+check("nothing is 0c rather than blank", Junk.Money(0) == "0c", Junk.Money(0))
+check("a nonsense amount does not print nil", Junk.Money(nil) == "0c", Junk.Money(nil))
+
+-- The plan takes sell-verdict rows only. A `de` row on an enchanter keeps its
+-- own Sell button in the panel — overruling the advice one item at a time is a
+-- different act from overruling twelve under one confirm.
+local plan = Junk.SellPlan({
+  { k = "sell", price = 1000, count = 1 },
+  { k = "sell", grey = true, price = 25, count = 4 },
+  { k = "de", price = 9999, count = 1, quality = 4 },
+  { k = "del", price = 500, count = 1 },
+  { k = "sell", nosell = true, price = 0, count = 1 },
+}, true)
+check("the plan takes the sell rows and the greys", plan.count == 2, plan.count)
+check("a stack is priced by the stack", plan.total == 1000 + 25 * 4, plan.total)
+check("everything in the plan is priced", plan.unpriced == 0, plan.unpriced)
+check("a disenchant row is not swept into a sell-all", (function()
+  for _, r in ipairs(plan.rows) do if r.k == "de" then return false end end
+  return true
+end)())
+
+-- Without the profession that same `de` row reads "sell" in the panel, so the
+-- sell-all takes it: the button counts what the player can see offered.
+local noProf = Junk.SellPlan({ { k = "de", price = 9999, count = 1, quality = 4 } }, false)
+check("a de row the character cannot disenchant is an ordinary sell", noProf.count == 1, noProf.count)
+
+check("an uncached price is still sold, and counted as unpriced", (function()
+  local p = Junk.SellPlan({ { k = "sell", count = 1 } }, false)
+  return p.count == 1 and p.total == 0 and p.unpriced == 1
+end)())
+check("a missing stack size counts as one", (function()
+  local p = Junk.SellPlan({ { k = "sell", price = 700 } }, false)
+  return p.total == 700
+end)())
+check("nothing is an empty plan, not an error", Junk.SellPlan(nil, false).count == 0)
+
+-- End to end against the fake bags: what the button would say, then what
+-- pressing it does.
+PRICES = { [3300] = 50, [215135] = 8000, [221151] = 6000 }
+resetBags()
+storeList({
+  { k = "sell", s = S_RING, r = "gap", g = 56 },
+  { k = "del", s = S_HELM, r = "dominated" },
+})
+PROFESSIONS = {}
+Junk.merchantOpen = false
+plan = Junk.SellPlanNow()
+-- The ring, plus the grey stack of four. Both helm copies are `del`.
+check("the live plan counts the ring and the grey stack", plan.count == 2, plan.count)
+check("and totals the stack at four", plan.total == 8000 + 50 * 4, plan.total)
+
+check("nothing sells away from a merchant", (function()
+  local sold, copper = Junk.SellAll(plan)
+  return sold == 0 and copper == 0 and BAGS[0][3] ~= nil
+end)())
+
+Junk.merchantOpen = true
+local sold, copper = Junk.SellAll(plan)
+check("every row in the plan sells", sold == 2, sold)
+check("the take is what the plan said", copper == 8200, copper)
+check("the ring is gone", BAGS[0][3] == nil)
+check("the grey is gone", BAGS[0][5] == nil)
+-- The safety property, restated for the sell-all: a `del` row is advice, and a
+-- button that sold the whole list would have taken it anyway.
+check("a delete-by-hand row is still in the bags", BAGS[0][1] ~= nil)
+
+check("with the bags emptied the button has nothing to offer", Junk.SellPlanNow().count == 0)
+
+-- Half the list left the bags between the paste and the vendor. The plan is
+-- rebuilt from the walk that just happened, so the rows that went missing are
+-- simply not in it — no stale coordinate, no wrong item sold.
+resetBags()
+BAGS[0][5] = nil
+plan = Junk.SellPlanNow()
+check("a row that left the bags is not in the plan", plan.count == 1, plan.count)
+sold = Junk.SellAll(plan)
+check("and only the live row sells", sold == 1, sold)
+Junk.merchantOpen = false
 
 print("")
 print(string.format("%d passed, %d failed", pass, fail))

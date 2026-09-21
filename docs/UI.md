@@ -522,6 +522,40 @@ the item instead of selling it.
 as your last paste; vendor trash is only worth listing if it is what you are
 carrying now.
 
+### Sell list — the button on the vendor window (1.20.0)
+
+**The panel is for picking; the vendor window is for selling.** A `Sell list
+(N)` button is parented to Blizzard's own `MerchantFrame`, below it on the
+right — the one edge with nothing on it, since the Merchant and Buyback tabs
+hang off the bottom-left and the money frame sits inside the bottom-right. It
+exists only while a merchant is open and this character has at least one live
+sell row, and it hides again at zero rather than sitting there disabled: a dark
+row explains itself inside this addon's own panel, and a dark button in
+Blizzard's window is furniture left in someone else's house.
+
+**It sells exactly what the panel offers, because it asks the same function.**
+`Junk.SellPlan` takes the rows where `Junk.Sellable` is true *and* the verdict
+reads `sell` — the site said sell, or it is a grey. A `de` row on an enchanter
+keeps its own `[Sell]` in the panel and is not in the plan: overruling the
+advice one item at a time is a different act from overruling twelve under one
+confirm. `del` rows and unsellable ones are never in it at all.
+
+**The confirm is required, and it is not the grays-button precedent.** Zygor's
+button sells vendor trash; this sells gear a website judged, and the only way
+back is the vendor's twelve-slot buyback tab. The `StaticPopup` states the
+count and the take — "at least" when the client has not cached every price,
+since an uncached item still sells but cannot be totalled — and names buyback.
+There is no timer and no auto-sell on merchant open: the confirm click is the
+one hardware event that drives the loop.
+
+**The plan is rebuilt at the confirm, not read off the label.** The count on
+the button comes from the walk made at `MERCHANT_SHOW`; bags move between
+opening a vendor and pressing a button, and a bag position from that walk is
+exactly the stale coordinate `Junk.lua`'s header forbids. Rows that left the
+bags are simply absent from the second walk, which is the same thing the
+panel's missing count already reports. A chat line says what sold and for how
+much when it is done.
+
 ### Options tab
 
 Native checkboxes over the same `WarbandProDB.opts` the slash commands write —
