@@ -51,6 +51,19 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+- The clear-out panel stops offering Sell for items no vendor will buy. Quest
+  items, tokens and anything else with no sell price used to draw a live Sell
+  button that could only answer with "the vendor doesn't want this"; now the row
+  drops the button and its verdict says what is actually left — `disenchant` if
+  you are an enchanter and the item is uncommon or better, `delete by hand`
+  otherwise. It is the same fallback the panel already did in the other
+  direction, where a disenchant verdict reads `sell` if you cannot enchant.
+- An item the client has not loaded yet still offers Sell. The price is only
+  acted on when the game states it, so a cold login under-reads rather than
+  taking away a button that would have worked.
+
 ## [1.19.1] — 2026-09-20 — the currency group leads with what you are losing
 
 ### Changed
