@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.21.0] — 2026-09-21 — zero coffer keys is a number you can see
+
 ### Added
 
 - **The Roster grid keeps a row for this season's currencies whether the game is
