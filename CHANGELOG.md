@@ -51,6 +51,12 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.21.3] — 2026-09-21 — the contract moves from CLAUDE.md to AGENTS.md
+
+### Changed
+
+- **The agent contract lives in AGENTS.md now, and CLAUDE.md points at it.** Same words, new file — nothing a player touches changes.
+
 ## [1.21.2] — 2026-09-21 — the bundle stops describing potion counts it never sends
 
 ### Fixed
