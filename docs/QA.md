@@ -79,7 +79,7 @@ meet a live client is this list. So run it, do not skim it.
 - [ ] Click it again — window closes
 - [ ] Right-click — Options tab; right-click again — closes
 - [ ] Hover — tooltip names the addon, the character count and the freshest age
-- [ ] Hover on an account with a vault slot earned, a keystone, a live lockout and a capped currency — one line each, labels coloured green / white / gold / red, names in class colour
+- [ ] Hover on an account with a vault slot earned, a keystone, a live lockout and a capped currency — one line each, labels coloured green / grey / gold / red, names in class colour. `keystone` has no tone, so its label is grey and the `+12` beside it is the bright thing
 - [ ] Hover on a fresh install with one unscanned character — the four lines are ABSENT, not zero. This is the check the glance exists to fail
 - [ ] Hover with four or more characters holding keystones — three named, then `+N`, and the tooltip does not cover the minimap
 - [ ] Hover after a weekly reset, before logging the saved alt in — `saved` does not name them. Their stored lockout has expired and the glance will not claim it
@@ -88,7 +88,8 @@ The hover grid (1.18.0). The panel under the summary band is the Roster tab's
 own model, so what it says has to match the tab exactly — open both and read
 them against each other rather than reading the panel alone.
 
-- [ ] Hover — the grid is in the tooltip: a column per character with the name in its class colour, group headings in orange, rows for the vault, lockouts, world bosses and currencies, currency rows carrying their icon
+- [ ] Hover — the grid is in the tooltip: a column per character with the name in its class colour, grey group headings each on their own rule, rows for the vault, lockouts, world bosses and currencies, currency rows carrying their icon
+- [ ] The values are the brightest text in the panel and the row labels are grey. Squint at it: the numbers should be what survives
 - [ ] Every value matches the Roster tab for the same character and row. A disagreement is a second source of truth and the one thing this cannot be
 - [ ] Move the mouse off the button and onto the panel — it stays open. Move off the panel — it closes, and so does any cell tooltip
 - [ ] Hover a lockout cell — a second tooltip opens beside the panel, titled with the character in class colour over the row label in orange, listing resets-in and each boss alive or dead
@@ -216,6 +217,8 @@ that used to be a header stops being clickable when it becomes a data row.
 - [ ] Click a group's label — its rows fold away, the header stays with a `+`
       in front of it and the count of rows it is holding
 - [ ] Click it again — the same rows come back, in the same order
+- [ ] Group headings are grey on a stripe, not gold, and the stripe is what separates one group from the next. Row labels are grey and the cells are white — the numbers hit first on a glance
+- [ ] A column of fractions (`3/8`, `11/8`, `6/8`) lines up on its slashes as well as on its right edge. Ragged digits mean the number face did not load and the cells fell back to the game font
 - [ ] Hover a header — it highlights and says which way the click goes; hover a
       data row — it highlights and says nothing
 - [ ] Click a data row — nothing happens, and no group shuts

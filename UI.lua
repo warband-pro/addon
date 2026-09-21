@@ -34,6 +34,20 @@ ns.UI = UI
 -- Native text colors, not the website's: this window lives inside the game's
 -- own chrome now, so the freshness dots use the client's traffic-light palette
 -- and the muted lines use its gray.
+--
+-- **Two inks, and the split is what turns the grid into a glance.** A LABEL is
+-- chrome — a group's name, a row's name, the words around a count — and it is
+-- drawn in the client's grey. A VALUE is the thing you came for and it is
+-- drawn in its plain white, the brightest ink this window has. Everything that
+-- is neither is a TONE, and the tones are the whole attention system: green
+-- earned, gold close, red gone, and a class colour for whose it is.
+--
+-- **This used to be one weight.** Labels, headings and values all arrived in
+-- `GameFontHighlightSmall`, so a wall of same-brightness text is what the tab
+-- and the hover opened onto and the number you were after had to be found
+-- rather than seen. Dimming the chrome is the whole of the fix — no tone
+-- changed, no colour was added, and nothing about a value changed except what
+-- is around it.
 local DOT = {
   green  = "|cff00ff00*|r",
   yellow = "|cffffd100*|r",
@@ -41,10 +55,13 @@ local DOT = {
   never  = "|cff808080*|r",
 }
 local MUTED, WARN, BAD, GOOD = "808080", "ffd100", "ff2020", "00ff00"
--- Section headings inside a tooltip, and the one colour this window did not
--- already have. SavedInstances marks a sub-header — an LFR wing, a group of
--- rows — in orange, one step off the gold it marks a title with, so structure
--- inside a panel reads as structure without competing with the panel's name.
+-- The section line inside a per-cell tooltip: which row the cell under the
+-- mouse belongs to, over its detail. SavedInstances marks a sub-header — an
+-- LFR wing, a group of rows — in orange, one step off the gold it marks a
+-- title with. It stays here and nowhere else: a GameTooltip has no texture to
+-- rule a section off with, so colour is the only structure available to it.
+-- Both grids used to take it for their group headings and gave it up to the
+-- ink ramp above — they have a stripe, which is a line doing a line's job.
 local ORANGE = "ff8000"
 
 local TAB_ROSTER, TAB_EXPORT, TAB_IMPORT, TAB_OPTIONS = 1, 2, 3, 4
@@ -1031,6 +1048,41 @@ local function classText(class, text)
   return text
 end
 
+--- A cell's FontString: the client's own number face, at this window's size.
+---
+--- Right-aligned AND tabular, which are two halves of one job. The alignment
+--- gives a column an edge to read down — a centred value drifts with its own
+--- width, so `0/2` and `43,418g` would start in different places — and the
+--- face is what lines the digits up INSIDE that edge. The game font the rest
+--- of this window is built from is proportional: its `1` is narrower than its
+--- `8`, so a column of `3/8`, `11/8`, `6/8` wanders either side of its own
+--- slashes even when every value ends flush against the same pixel.
+---
+--- `NumberFontNormalSmall` is the face the client draws its own numbers in,
+--- and it is taken as a TEMPLATE NAME rather than as a font object because a
+--- non-Latin client swaps the file behind that name — taking the name is how
+--- the swap comes with us. Cells are ASCII by construction (`3/8`, `+12`,
+--- `4,500/20,000`, `ready`), so nothing in one asks that font for a glyph it
+--- does not have; the names, which do, are in the headers and stay in the
+--- game font.
+---
+--- The size comes off a sibling FontString rather than from a constant: the
+--- number face is two points taller than this window's small game font, and a
+--- cell standing taller than the label beside it is the thing the alignment
+--- was supposed to fix.
+local function numberText(parent, sibling)
+  -- A client without that font object costs the tabular digits, not the grid.
+  local fs = ns.safe(function()
+    return parent:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+  end) or parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  local path, _, flags = fs:GetFont()
+  local size = select(2, sibling:GetFont())
+  if path and size then fs:SetFont(path, size, flags or "") end
+  fs:SetJustifyH("RIGHT")
+  fs:SetWordWrap(false)
+  return fs
+end
+
 --- Everything about a character that does not fit in a column header.
 ---
 --- A header is 56px and a name plus a realm plus a level plus an item level
@@ -1152,7 +1204,12 @@ local function makeRosterLine(i)
   icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
   icon:Hide()
 
-  local label = rosterChild:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  -- Grey, because a row's name is chrome: you are here for the cells to the
+  -- right of it, and `Nerub-ar Palace (Heroic)` is only how you know which row
+  -- they belong to. `GameFontDisableSmall` is the client's own grey rather
+  -- than a hex of ours, so this tracks the player's font settings the way the
+  -- rest of the window does.
+  local label = rosterChild:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   label:SetPoint("TOPLEFT", 0, y)
   label:SetWidth(LABEL_W)
   label:SetJustifyH("LEFT")
@@ -1213,15 +1270,12 @@ local function growLine(w, n)
     hit:SetSize(CELL_W, LINE_H)
     hit:SetFrameLevel(rosterChild:GetFrameLevel() + 2)
     hit:EnableMouse(true)
-    local fs = hit:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    -- The number face, flushed right. `numberText` above carries the whole of
+    -- why. The name headers stay centred in the game font — they are labels,
+    -- not a series, and a name is the one thing in this grid that is not a
+    -- number.
+    local fs = numberText(hit, w.label)
     fs:SetAllPoints(hit)
-    -- RIGHT, not CENTER: a centred value drifts left and right with its own
-    -- width, so `0/2` and `43,418g` start in different places and a column of
-    -- numbers has no edge to read down. Flushing them to the cell's right edge
-    -- gives one. The name headers above stay centred — they are labels, not a
-    -- series. This is what SavedInstances does with its compact values.
-    fs:SetJustifyH("RIGHT")
-    fs:SetWordWrap(false)
     hit:SetScript("OnEnter", function(self)
       if w.hi then w.hi:Show() end
       showTip(self, self.tipTitle, self.tip)
@@ -1423,16 +1477,21 @@ function UI.RenderRoster()
       -- stripe under it is what stops `currencies` reading as one more row of
       -- the block above it.
       --
-      -- Gold, not grey. The stripe alone was carrying the separation and grey
-      -- reads as disabled, so the header sat at the same weight as the data
-      -- under it. Gold is what SavedInstances marks structure with.
+      -- **Grey after all, and the stripe carries the separation.** This was
+      -- gold, for a reason that stopped being true one line above: grey read
+      -- as disabled while the data rows were WHITE, which left the heading at
+      -- less weight than the rows under it. The labels are grey now and only
+      -- the values are bright, so a heading no longer has to out-shout the
+      -- block it names — it has to step out of the way, and the one thing on
+      -- the line that is not text does the separating. The stripe went from 5%
+      -- to 10% to take that on.
       --
       -- The `+`/`-` in front of it is the whole of the affordance. A shut group
       -- names the count it is holding, because `lockouts` with a rule under it
       -- and nothing else looks like a group that had nothing to say.
-      setLabel(w, format("|cff%s%s %s%s|r", WARN, line.closed and "+" or "-", line.head,
+      setLabel(w, format("%s %s%s", line.closed and "+" or "-", line.head,
         line.closed and format("  (%d)", line.hidden) or ""), nil)
-      w.stripe:SetColorTexture(1, 1, 1, 0.05)
+      w.stripe:SetColorTexture(1, 1, 1, 0.10)
       w.stripe:Show()
       w.rowHit:EnableMouse(true)
       w.rowHit.group = line.head
@@ -1480,8 +1539,10 @@ function UI.RenderRoster()
     rosterHead:SetText(format("|cff%s%d character%s, and nothing read yet — play one and it fills in|r",
       MUTED, #all, #all == 1 and "" or "s"))
   else
-    rosterHead:SetText(format("%d character%s%s", #all, #all == 1 and "" or "s",
-      pages > 1 and format("  ·  |cff%sshowing %d-%d · drag the corner to widen|r", MUTED, first + 1,
+    -- The count is the value and everything after it is the sentence it sits
+    -- in, so the count keeps the bright ink and the words take the grey.
+    rosterHead:SetText(format("%d|cff%s character%s%s|r", #all, MUTED, #all == 1 and "" or "s",
+      pages > 1 and format("  ·  showing %d-%d · drag the corner to widen", first + 1,
         math.min(first + nCols, #all)) or ""))
   end
 
@@ -2191,8 +2252,11 @@ local function glanceLine(line)
   -- The names the model dropped to keep the tooltip off the minimap. `+2` is
   -- honest about the omission where simply stopping at three would not be.
   if line.more > 0 then right = right .. format("  |cff%s+%d|r", MUTED, line.more) end
-  local label = line.label
-  if TONE[line.tone] then label = format("|cff%s%s|r", TONE[line.tone], label) end
+  -- A label with a tone keeps it: the tone IS the attention system and this
+  -- band is where it does the most work. A label with none is chrome and reads
+  -- grey — that is the `keystone` line, which used to arrive in the same white
+  -- as the level beside it and so said "look here" about nothing at all.
+  local label = format("|cff%s%s|r", TONE[line.tone] or MUTED, line.label)
   return label, right
 end
 
@@ -2391,7 +2455,18 @@ local function makeHoverRow(i)
   icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
   icon:Hide()
 
-  local label = hoverText(row, "GameFontHighlightSmall", "LEFT")
+  -- The rule under a group heading, and the whole of what separates one group
+  -- from the next now that the heading is grey. The tab has had this since the
+  -- grid arrived — its `stripe`, at the same 10% — and the hover was doing the
+  -- same job with an orange word, which is a colour standing in for a line.
+  local rule = row:CreateTexture(nil, "BACKGROUND")
+  rule:SetAllPoints(row)
+  rule:SetColorTexture(1, 1, 1, 0.10)
+  rule:Hide()
+
+  -- Grey for the same reason the tab's row labels are: the label says which
+  -- row, and the cells to the right of it are what you came to read.
+  local label = hoverText(row, "GameFontDisableSmall", "LEFT")
   label:SetPoint("LEFT")
 
   row:SetScript("OnEnter", function(self) self.hi:Show() end)
@@ -2405,7 +2480,7 @@ local function makeHoverRow(i)
   -- the middle of a hover.
   row.hi = hi
 
-  hoverRows[i] = { row = row, hi = hi, icon = icon, label = label, cells = {}, hits = {} }
+  hoverRows[i] = { row = row, hi = hi, rule = rule, icon = icon, label = label, cells = {}, hits = {} }
   return hoverRows[i]
 end
 
@@ -2421,7 +2496,9 @@ local function growHoverRow(w, n)
     -- tie on frame level would let the highlight swallow the tooltips.
     hit:SetFrameLevel(w.row:GetFrameLevel() + 2)
     hit:EnableMouse(true)
-    local fs = hoverText(hit, "GameFontHighlightSmall", "RIGHT")
+    -- The same number face the tab's cells use, for the same reason: this is
+    -- the surface where a column of digits has the least room to be ragged in.
+    local fs = numberText(hit, w.label)
     fs:SetAllPoints(hit)
     hit:SetScript("OnEnter", function(self)
       w.hi:Show()
@@ -2492,8 +2569,10 @@ local function showHoverGrid(owner)
   place(hoverTitle, "Warband.pro")
   y = y - 16
 
-  place(hoverMeta, format("%s %d character%s  ·  freshest %s", DOT[g.dot] or DOT.never,
-    g.characters, g.characters == 1 and "" or "s", g.ago))
+  -- Two values and the words between them: the count and the age are what
+  -- this line is for, so they keep the bright ink and the rest takes the grey.
+  place(hoverMeta, format("%s %d|cff%s character%s  ·  freshest |r%s", DOT[g.dot] or DOT.never,
+    g.characters, MUTED, g.characters == 1 and "" or "s", g.ago))
   y = y - HOVER_TEXT_H
 
   -- The summary band: the four cross-warband lines this hover already carried,
@@ -2551,10 +2630,13 @@ local function showHoverGrid(owner)
       w.row:Show()
       y = y - HOVER_LINE_H
 
-      -- A group header is a label and nothing else, in the orange
-      -- SavedInstances marks a section with. It has no `+` because there is
-      -- nothing to click: shutting a group is a decision you make in the tab.
+      -- A group heading is a grey label over its own rule — the tab's stripe,
+      -- at the tab's weight. It was an orange word and no rule at all, which
+      -- is colour doing a line's job on the one surface that most needs to
+      -- stay quiet behind its values. It has no `+` because there is nothing
+      -- to click: shutting a group is a decision you make in the tab.
       local head = line.head
+      w.rule:SetShown(head ~= nil)
       w.icon:SetShown(line.icon ~= nil and not head)
       if line.icon and not head then w.icon:SetTexture(line.icon) end
       w.label:ClearAllPoints()
@@ -2565,7 +2647,7 @@ local function showHoverGrid(owner)
         w.label:SetPoint("LEFT")
         w.label:SetWidth(HOVER_LABEL_W - 4)
       end
-      w.label:SetText(head and format("|cff%s%s|r", ORANGE, head) or line.label)
+      w.label:SetText(head or line.label)
 
       for j = 1, #w.cells do
         local c = not head and j <= nCols and line.cells[j] or nil
