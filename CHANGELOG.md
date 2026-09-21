@@ -51,6 +51,16 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Removed
+
+- The roster tab and the minimap hover no longer carry the professions and
+  pockets rows — skill levels, gold, bag space, phials, potions, food, weapon
+  runes and waiting mail. They answered a different question than the grid is
+  for, and between them they pushed the vault, the lockouts and the currencies
+  off the bottom of the window. Gold stays, in the column header where it costs
+  no row. Nothing stops being captured and nothing comes off the string you
+  paste into warband.pro.
+
 ## [1.20.0] — 2026-09-21 — one button empties the clear-out list
 
 ### Added

@@ -124,46 +124,16 @@ do
 end
 
 do
-  local model = Roster.Build(db({
+  -- `money()`'s only remaining caller is the column header, and the same rule
+  -- applies there: a character with no gold reading has no figure, not `0g`.
+  local cols = Roster.Columns(db({
     a = char({ name = "Has", gold = 12345678 }),
     b = char({ name = "Not" }),
   }), nil)
-  -- Both columns exist; only one has a cell. The other is nil, not "0g".
-  local r = row(model, "gold")
-  check("gold renders for the character that has it", r and r.cells[1].text == "1,234g",
-    r and r.cells[1] and r.cells[1].text)
-  check("a character with no gold reading gets an empty cell, not 0g",
-    r and r.cells[2] == nil)
-end
-
-do
-  -- A bag whose `free` the client would not answer is not a full bag.
-  local model = Roster.Build(db({
-    a = char({ bags = { { bagID = 0, size = 30, free = 3 }, { bagID = 1, size = 28 } } }),
-  }), nil)
-  check("a bag with no free count makes the whole row absent rather than wrong",
-    row(model, "bag space") == nil)
-end
-
-do
-  local model = Roster.Build(db({
-    a = char({ bags = { { bagID = 0, size = 30, free = 12 }, { bagID = 1, size = 28, free = 8 } } }),
-  }), nil)
-  check("bag space sums the containers that were read", textAt(model, "bag space", 1) == "20/58",
-    textAt(model, "bag space", 1))
-end
-
-do
-  -- Zero IS a reading here and it is still drawn, but it is not a fault:
-  -- red in this grid means wrong or expired, and a stack you have not shopped
-  -- for yet is neither. A column of red 0s read as a column of failures.
-  local model = Roster.Build(db({ a = char({ consumables = { phial = 0, foodFeast = 200 } }) }), nil)
-  check("a consumable that was counted at zero is drawn as 0", textAt(model, "phials", 1) == "0")
-  check("and it carries no opinion about it", row(model, "phials").cells[1].tone == "plain")
-  check("a counted consumable reads the same either way",
-    row(model, "food").cells[1].tone == "plain")
-  check("a consumable key the scan never wrote has no row",
-    row(model, "health potions") == nil)
+  -- The sort is by name within a realm, so Has is column 1 and Not is column 2.
+  check("a column's gold is a whole thousands-separated figure", cols[1].gold == "1,234g",
+    cols[1].gold)
+  check("a character with no gold reading gets no figure, not 0g", cols[2].gold == nil)
 end
 
 -- ── the vault ───────────────────────────────────────────────────────────────
@@ -483,18 +453,6 @@ do
   }), nil)
   check("a group whose every row was filtered is not drawn",
     row(model, "Timewarped Badge") == nil and model.groups[1] == nil)
-end
-
--- ── professions ─────────────────────────────────────────────────────────────
-
-do
-  local model = Roster.Build(db({
-    a = char({ professions = { { name = "Alchemy", skill = 100, maxLevel = 100 } } }),
-    b = char({ professions = { { name = "Alchemy", skill = 42, maxLevel = 100 } } }),
-  }), nil)
-  check("a profession reads as skill over max", textAt(model, "Alchemy", 1) == "100/100")
-  check("a maxed profession reads as good", row(model, "Alchemy").cells[1].tone == "good")
-  check("an unmaxed one does not", row(model, "Alchemy").cells[2].tone == "plain")
 end
 
 -- ── profession cooldowns ────────────────────────────────────────────────────
