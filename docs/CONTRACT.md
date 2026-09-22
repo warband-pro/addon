@@ -1362,6 +1362,45 @@ Three rules:
   not filled in. A consumer that ignores `r` renders vault progress exactly as
   it did before this existed.
 
+#### `vaultChoices` — the generated offer, since 1.22.0
+
+```json
+"vaultChoices":[{"b":"mplus","slot":11,"id":215135,"ilvl":675,"s":"item:215135::…",
+                 "n":"Seal of…","cls":4,"sub":0,
+                 "st":{"ITEM_MOD_HASTE_RATING_SHORT":740}}],
+"vaultClaimedAt":1724003600
+```
+
+`rows[].r` is what a slot *would* pay. `vaultChoices` is what the vault
+actually offered once the player opened it post-reset, read from each
+activity's `rewards` through `C_WeeklyRewards.GetItemHyperlink` — the same
+resolution the client's own frame uses. One entry per offer, at most nine,
+shaped like `r` with one field more: `b` names the bucket whose slot offered
+it. `seenAt.vaultChoices` stamps the read that stored them.
+
+Three states, and the site must read all three off these fields plus the
+progress it already has:
+
+- offers generated and unclaimed: `vaultChoices` present, `vaultClaimedAt`
+  absent. This is the recommender's input.
+- claimed: `vaultChoices` absent with `vaultClaimedAt` set, while slots are
+  still earned. The addon clears the offers on the pass that observes the
+  claim — an empty read on its own never destroys anything, because an
+  unopened vault reads exactly like a claimed one; the tell is
+  HasAvailableRewards, which is server state rather than cache.
+- never opened this week: both absent. The example `r` stands in for
+  planning, not for ranking.
+
+Three rules a consumer must not soften:
+
+- **There is no `where`.** Same reason as `r`: a choice is not owned yet,
+  and calling it a bag item would put it in a best-in-bags candidate pool.
+- **Item rewards only.** Currency and quest entries never reach the wire,
+  and neither does a keystone.
+- **Additive on `wb1!`.** Absent from every bundle exported before 1.22.0.
+  A `vaultChoices` read from before the last reset is not this week's offer;
+  gate it on the reset like every other weekly field.
+
 `level` on the **bucket** is a max across rows whose ordering it does not own.
 That is fine where the field is a keystone level and wrong where it is a
 difficulty id — raid ids sort LFR (17) above Mythic (16), so the "best" slot it

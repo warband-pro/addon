@@ -188,6 +188,10 @@ numbers.
 - [ ] With a Great Vault slot earned: export, paste, and the site's vault panel
       names the item that slot is offering (`rows[].r`; needs the vault frame
       opened at least once this session so the client has the links)
+- [ ] With the vault opened post-reset: export, and the payload carries one
+      `vaultChoices` entry per generated offer
+      (`/dump WarbandProDB.chars[guid].vaultChoices`); claim the item and the
+      next pass clears the choices and stamps `vaultClaimedAt`
 - [ ] `/warband equip raid` with a raid setup pasted — the gear equips AND the
       talent build assigned to raid loads, and the receipt names it
 - [ ] `/warband equip delve` with no delve setup — says so, equips nothing, and

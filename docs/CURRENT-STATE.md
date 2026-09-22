@@ -89,7 +89,7 @@ data → UI → `Core.lua` last, because Core registers the events.
 
 | Captured | Where | Reaches the app's ranking? |
 |----------|-------|:--:|
-| Great Vault — `raid`/`mplus`/`world`/`pvp` buckets, with per-slot `rows[]` | `Instances.Vault`, `Instances.lua` | **yes**, except `pvp` |
+| Great Vault — `raid`/`mplus`/`world`/`pvp` buckets, with per-slot `rows[]`, the example `r`, and the generated `vaultChoices` | `Instances.Vault`, `Instances.lua` | **not yet** — captured for `app#313`; `pvp` ranks nowhere (A5) |
 | Keystone in the bag — level, dungeon | `Instances.Keystone`, `Instances.lua` | **yes** |
 | Owned gear — `gear[]` with `where`, `ilvl`, `st` stat map, `set` tier id | `Gear.Visit`, `Gear.lua` | **yes** (Best in Bags, the `equip` line) |
 | Level, XP, `restXP`, `xpMax` | `Scan.Identity`, `Scan.lua` | **yes** for level; rested is display-only |

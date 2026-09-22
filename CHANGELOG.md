@@ -51,6 +51,10 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Added
+
+- **The export carries your Great Vault's generated choices, once you have opened the vault in game.** Progress said which slots were earned; the offers themselves never crossed the wire, so the site could rank how close a slot was and never which pick to take. After the reset, open the vault on a character and the next export names each offer per slot; claiming clears them, and a vault never opened reads as unopened rather than empty.
+
 ## [1.21.3] — 2026-09-21 — the contract moves from CLAUDE.md to AGENTS.md
 
 ### Changed

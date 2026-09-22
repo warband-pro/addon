@@ -28,6 +28,15 @@
                              "s":"item:215135::::::::80:250::4:6:12053:1:28:::"}},
                        {"t":4,"p":3,"l":0},{"t":8,"p":3,"l":0}]}
     },
-    "seenAt":{"lastSeen":1724000000,"vault":1724000000}
+    "vaultChoices":[
+      {"b":"mplus","slot":11,"id":215135,"ilvl":658,"n":"Seal of the Poisoned Pact",
+       "cls":4,"sub":0,"st":{"ITEM_MOD_HASTE_RATING_SHORT":740},
+       "s":"item:215135::::::::80:250::4:6:12053:1:28:::"},
+      {"b":"raid","slot":5,"id":212022,"ilvl":665,"n":"Aureate Sentry's Hauberk",
+       "cls":4,"sub":2,"set":1234,
+       "st":{"ITEM_MOD_CRIT_RATING_SHORT":612,"ITEM_MOD_STAMINA_SHORT":2400},
+       "s":"item:212022::::::::80:250::6:6:12053:10390:1520:1:28:2462:::"}
+    ],
+    "seenAt":{"lastSeen":1724000000,"vault":1724000000,"vaultChoices":1724000000}
   }]
 }
