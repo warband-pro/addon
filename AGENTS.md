@@ -130,7 +130,7 @@ node tools/validate.mjs
 node tools/vector.mjs
 node tools/slop.mjs --unreleased
 node tools/released.mjs
-for t in import junk gear gearset freshness roster; do lua5.1 tools/$t-test.lua; done
+for t in import junk gear gearset freshness roster vault; do lua5.1 tools/$t-test.lua; done
 node tools/vector.mjs --write && git diff --exit-code -- docs/contract/vectors
 ```
 
@@ -471,7 +471,7 @@ node tools/vector.mjs           # wb1! round-trips
 node tools/slop.mjs --unreleased   # the notes read like a person wrote them
 node tools/released.mjs            # the newest changelog version has a tag
 
-for t in import junk gear gearset freshness roster; do lua5.1 tools/$t-test.lua; done
+for t in import junk gear gearset freshness roster vault; do lua5.1 tools/$t-test.lua; done
 
 # The fixture check, which is NOT the line above and fails separately:
 node tools/vector.mjs --write && git diff --exit-code -- docs/contract/vectors
