@@ -118,6 +118,14 @@ apt-get update && apt-get install -y --no-install-recommends lua5.1 luarocks
 luarocks install luacheck
 ```
 
+On Windows, run the Lua half inside WSL Debian — the same two commands with
+`wsl --distribution Debian --exec` in front, then `luacheck` and `lua5.1` the
+same way. Do not substitute `winget`'s Lua: it is 5.4, and 5.4 reads
+5.1-invalid syntax as fine, so the `tools/*-test.lua` gate would pass code the
+client cannot run. The Node half (`tools/validate.mjs`, `tools/vector.mjs`,
+`tools/slop.mjs --unreleased`, `tools/released.mjs`) runs natively — measured
+2026-09-22, all four green on Windows Node. The full gate is green in WSL Debian too — luacheck 1.2.0 with 0 warnings, 713 Lua assertions passing across the seven test files. One trap: regenerating fixtures (`vector.mjs --write` plus the diff) is Node-version-sensitive, so CI pins 22 and is the authority there — a local diff under another Node is the toolchain, not drift.
+
 ### Verify, as one block
 
 The **Verify** section below is the authority; this is the copy-pasteable form,
