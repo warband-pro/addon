@@ -51,6 +51,16 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.22.1] — 2026-09-22 — the Windows setup notes live in the agent contract
+
+### Changed
+
+- **The contributor setup notes cover Windows now.** The agent contract
+
+toolchain section says where each half of the checks runs on a Windows
+machine — Lua through WSL Debian, Node natively. Nothing a player touches
+changes.
+
 ## [1.22.0] — 2026-09-22 — the export carries your Great Vault's generated choices
 
 ### Added
