@@ -1312,21 +1312,31 @@ local function buildRoster()
 
   rosterHead = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   rosterHead:SetPoint("TOPLEFT")
-  rosterHead:SetPoint("TOPRIGHT")
+  rosterHead:SetPoint("TOPRIGHT", -104, 0)
   rosterHead:SetJustifyH("LEFT")
 
-  rosterCols = {}
+  -- The season the detail answers for. One entry today â€” the wire carries this
+  -- season only â€” so it sits disabled; Roster.Seasons gaining a second entry
+  -- is what enables it, and nothing here has to move then.
+  local seasonBtn = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  seasonBtn:SetSize(96, 18)
+  seasonBtn:SetPoint("TOPRIGHT", 0, -2)
+  seasonBtn:SetText(ns.Roster.SEASON_LABEL or "Season")
+  seasonBtn:Disable()
 
-  local well = makeWell(p)
-  rosterWell = well
-  well:SetPoint("TOPLEFT", SIDEBAR_W + 8, -50)
-  well:SetPoint("BOTTOMRIGHT", -20, 34)
+  rosterCols = {}
+  -- The sidebar owns the panel left edge (buildSidebar below); the strip
+  -- and grid start past it.
   buildSidebar(p)
   buildVaultStrip(p)
 
+  rosterWell = makeWell(p)
+  rosterWell:SetPoint("TOPLEFT", SIDEBAR_W + 8, -50)
+  rosterWell:SetPoint("BOTTOMRIGHT", -20, 34)
+
   local scroll = CreateFrame("ScrollFrame", "WarbandProRosterScroll", p, "UIPanelScrollFrameTemplate")
-  scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 8, -8)
-  scroll:SetPoint("BOTTOMRIGHT", well, "BOTTOMRIGHT", -8, 8)
+  scroll:SetPoint("TOPLEFT", rosterWell, "TOPLEFT", 8, -8)
+  scroll:SetPoint("BOTTOMRIGHT", rosterWell, "BOTTOMRIGHT", -8, 8)
   rosterScroll = scroll
 
   rosterChild = CreateFrame("Frame", nil, scroll)
@@ -1359,7 +1369,7 @@ local function buildRoster()
 
   -- Widening the window is only worth doing because it buys columns, so the
   -- grid redraws when it happens. Watch the SCROLL frame rather than the panel,
-  -- because that is what fittingCols measures — and because an anchored frame
+  -- because that is what fittingCols measures â€” and because an anchored frame
   -- reads 0 wide until the first layout pass, so this is also what turns the
   -- opening render's fallback single column into the real one.
   --
@@ -1801,126 +1811,225 @@ end
 --- One native checkbox with a label beside it and a muted description under
 --- it. The label and description are our own FontStrings rather than the
 --- template's, so a template rename cannot silently drop the text.
-local function makeOption(p, y, label, desc, get, set)
-  local check = CreateFrame("CheckButton", nil, p, "UICheckButtonTemplate")
+-- ── options tab: three panes ──────────────────────────────────────────────
+--
+-- Plumber's settings shape (LeftSection / CentralSection / RightSection): the
+-- left nav names the three categories, the center lists that category's
+-- options, the right shows the selected option's checkbox and description.
+-- Every control keeps working and persists the same saved variables — the six
+-- get/set pairs below are the old flat tab's, moved verbatim — so this is
+-- presentation only. The selected nav and list rows are disabled, the same
+-- "you are here" idiom the export slice row and the roster pager use.
+
+local OPT_CATS = { "Data", "Automation", "Display" }
+local OPT_DEFS = {}
+local optNavBtns, optListBtns, optGroups, optDetailAnchor
+
+local function makeOption(parent, label, desc, get, set)
+  local g = CreateFrame("Frame", nil, parent)
+  g:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+  g:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
+  g:SetHeight(140)
+  local check = CreateFrame("CheckButton", nil, g, "UICheckButtonTemplate")
   check:SetSize(26, 26)
-  check:SetPoint("TOPLEFT", 0, y)
+  check:SetPoint("TOPLEFT", 0, 0)
   check:SetScript("OnClick", function(self) set(self:GetChecked() and true or false) end)
 
-  local text = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local text = g:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   text:SetPoint("LEFT", check, "RIGHT", 4, 0)
   text:SetText(label)
+  if ns.Theme and ns.Theme.Ink then ns.Theme.Ink(text, "normal") end
 
-  local sub = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  local sub = g:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   sub:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 30, 4)
-  sub:SetPoint("RIGHT", p, "RIGHT", -8, 0)
+  sub:SetPoint("RIGHT", g, "RIGHT", 0, 0)
   sub:SetJustifyH("LEFT")
   sub:SetText(desc)
+  if ns.Theme and ns.Theme.Ink then ns.Theme.Ink(sub, "body") end
 
   optionChecks[#optionChecks + 1] = { check = check, get = get }
-  return check
+  g:Hide()
+  return g
+end
+
+local function optButton(parent, x, w, y)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(w, 20)
+  b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+  b.bar = b:CreateTexture(nil, "OVERLAY")
+  b.bar:SetColorTexture(0.55, 0.42, 0.28, 1)
+  b.bar:SetSize(2, 12)
+  b.bar:SetPoint("LEFT", 2, 0)
+  b.bar:Hide()
+  b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  b.text:SetPoint("LEFT", 10, 0)
+  b.text:SetJustifyH("LEFT")
+  return b
+end
+
+local function firstOfCat(cat)
+  for idx, d in ipairs(OPT_DEFS) do
+    if d.cat == cat then return idx end
+  end
+  return 1
+end
+
+local function renderOptions()
+  if not optNavBtns then return end
+  for i, b in ipairs(optNavBtns) do
+    local selected = (i == UI.optCat)
+    b.text:SetText(selected
+      and format("|cffffffff%s|r", OPT_CATS[i])
+      or format("|cffD7C0A3%s|r", OPT_CATS[i]))
+    b:SetEnabled(not selected)
+    if selected then b.bar:Show() else b.bar:Hide() end
+  end
+  local shown = {}
+  for idx, d in ipairs(OPT_DEFS) do
+    if d.cat == UI.optCat then shown[#shown + 1] = idx end
+  end
+  for i, b in ipairs(optListBtns) do
+    local idx = shown[i]
+    if not idx then
+      b:Hide()
+    else
+      b:Show()
+      b.optIdx = idx
+      local selected = (idx == UI.optItem)
+      b.text:SetText(selected
+        and format("|cffffffff%s|r", OPT_DEFS[idx].label)
+        or format("|cffD7C0A3%s|r", OPT_DEFS[idx].label))
+      b:SetEnabled(not selected)
+      if selected then b.bar:Show() else b.bar:Hide() end
+    end
+  end
+  for idx, g in ipairs(optGroups) do g:SetShown(idx == UI.optItem) end
+  for _, o in ipairs(optionChecks) do
+    o.check:SetChecked(o.get() and true or false)
+  end
 end
 
 local function buildOptions()
   local p = panels[TAB_OPTIONS]
   local opts = function() return ns.Store.db and ns.Store.db.opts end
 
-  makeOption(p, 0,
-    "Capture gear",
-    "Equipped, bag, bank and warband-bank gear — and talents — ride the export string. "
-      .. "Turning this off keeps what is already stored; it is just left out of the next bundle.",
-    function() local o = opts() return o and o.includeGear end,
-    function(v)
-      local o = opts()
-      if not o then return end
-      o.includeGear = v
-      ns.Store.Touch()
-      if v then
-        ns.Scan.Bags()   -- current bag contents; equipped and the rest follow
-        ns.Gear.All()
-      end
-    end)
+  OPT_DEFS = {
+    { cat = 1, label = "Capture gear",
+      desc = "Equipped, bag, bank and warband-bank gear - and talents - ride the export string. "
+        .. "Turning this off keeps what is already stored; it is just left out of the next bundle.",
+      get = function() local o = opts() return o and o.includeGear end,
+      set = function(v)
+        local o = opts()
+        if not o then return end
+        o.includeGear = v
+        ns.Store.Touch()
+        if v then
+          ns.Scan.Bags()   -- current bag contents; equipped and the rest follow
+          ns.Gear.All()
+        end
+      end },
+    { cat = 1, label = "Include item links",
+      desc = "Full hyperlinks for every bag stack, for debugging a specific item. "
+        .. "Costs about a third more wire.",
+      get = function() local o = opts() return o and o.includeLinks end,
+      set = function(v)
+        local o = opts()
+        if not o then return end
+        o.includeLinks = v
+        ns.Store.Touch()
+      end },
+    { cat = 2, label = "Open the clear-out list at merchants",
+      desc = "When a merchant window opens and the cleanup list has something in your bags, "
+        .. "the Import tab opens by itself and closes when you leave the merchant.",
+      get = function() local o = opts() return o and o.autoJunk end,
+      set = function(v)
+        local o = opts()
+        if not o then return end
+        o.autoJunk = v
+        ns.Store.Touch()
+      end },
+    { cat = 2, label = "Turn combat logging on in raids",
+      desc = "Starts /combatlog when you zone into a raid and stops it when you leave, so an upload to "
+        .. "Warcraft Logs has the pulls in it. Raids only, and off by default - it writes a file "
+        .. "that grows with every pull, which is not a cost to hand somebody who did not ask.",
+      get = function() local o = opts() return o and o.autoLog end,
+      set = function(v)
+        local o = opts()
+        if not o then return end
+        o.autoLog = v
+        ns.Store.Touch()
+        -- Applied now rather than at the next loading screen: turning it on
+        -- while already standing in the raid is exactly when somebody turns it
+        -- on, and waiting would look broken.
+        ns.syncCombatLog()
+      end },
+    { cat = 3, label = "Show the minimap button",
+      desc = "The icon on the minimap ring - click it for the export string, right-click it for options, "
+        .. "drag it anywhere round the ring. Turning it off leaves /warband and the addon compartment.",
+      get = function() local o = opts() return o and o.minimap end,
+      set = function(v)
+        local o = opts()
+        if not o then return end
+        o.minimap = v
+        ns.Store.Touch()
+        UI.RefreshMinimap()
+      end },
+    { cat = 3, label = "Show every currency in the Roster grid",
+      desc = "The grid lists the currencies the game is still metering - one with a cap, a weekly cap, "
+        .. "or something earned towards it this week - and its header says how many it left out. "
+        .. "Turn this on to list every currency any character is carrying.",
+      get = function() local o = opts() return o and o.allCurrencies end,
+      set = function(v)
+        local o = opts()
+        if not o then return end
+        o.allCurrencies = v
+        ns.Store.Touch()
+        UI.RenderRoster()
+      end },
+  }
 
-  makeOption(p, -66,
-    "Include item links",
-    "Full hyperlinks for every bag stack, for debugging a specific item. "
-      .. "Costs about a third more wire.",
-    function() local o = opts() return o and o.includeLinks end,
-    function(v)
-      local o = opts()
-      if not o then return end
-      o.includeLinks = v
-      ns.Store.Touch()
+  optNavBtns = {}
+  for i = 1, #OPT_CATS do
+    local b = optButton(p, 0, 124, -(i - 1) * 22)
+    b.navIdx = i
+    b:SetScript("OnClick", function(self)
+      UI.optCat = self.navIdx
+      UI.optItem = firstOfCat(self.navIdx)
+      renderOptions()
     end)
+    optNavBtns[i] = b
+  end
 
-  makeOption(p, -132,
-    "Open the clear-out list at merchants",
-    "When a merchant window opens and the cleanup list has something in your bags, "
-      .. "the Import tab opens by itself and closes when you leave the merchant.",
-    function() local o = opts() return o and o.autoJunk end,
-    function(v)
-      local o = opts()
-      if not o then return end
-      o.autoJunk = v
-      ns.Store.Touch()
+  optListBtns = {}
+  for i = 1, #OPT_DEFS do
+    local b = optButton(p, 134, 180, -(i - 1) * 22)
+    b:SetScript("OnClick", function(self)
+      UI.optItem = self.optIdx
+      renderOptions()
     end)
+    optListBtns[i] = b
+  end
 
-  makeOption(p, -198,
-    "Show the minimap button",
-    "The icon on the minimap ring — click it for the export string, right-click it for this tab, "
-      .. "drag it anywhere round the ring. Turning it off leaves /warband and the addon compartment.",
-    function() local o = opts() return o and o.minimap end,
-    function(v)
-      local o = opts()
-      if not o then return end
-      o.minimap = v
-      ns.Store.Touch()
-      UI.RefreshMinimap()
-    end)
+  optDetailAnchor = CreateFrame("Frame", nil, p)
+  optDetailAnchor:SetPoint("TOPLEFT", p, "TOPLEFT", 324, 0)
+  optDetailAnchor:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -8, 24)
+  optGroups = {}
+  for idx, d in ipairs(OPT_DEFS) do
+    optGroups[idx] = makeOption(optDetailAnchor, d.label, d.desc, d.get, d.set)
+  end
 
-  makeOption(p, -264,
-    "Show every currency in the Roster grid",
-    "The grid lists the currencies the game is still metering — one with a cap, a weekly cap, "
-      .. "or something earned towards it this week — and its header says how many it left out. "
-      .. "Turn this on to list every currency any character is carrying.",
-    function() local o = opts() return o and o.allCurrencies end,
-    function(v)
-      local o = opts()
-      if not o then return end
-      o.allCurrencies = v
-      ns.Store.Touch()
-      UI.RenderRoster()
-    end)
-
-  makeOption(p, -330,
-    "Turn combat logging on in raids",
-    "Starts /combatlog when you zone into a raid and stops it when you leave, so an upload to "
-      .. "Warcraft Logs has the pulls in it. Raids only, and off by default — it writes a file "
-      .. "that grows with every pull, which is not a cost to hand somebody who did not ask.",
-    function() local o = opts() return o and o.autoLog end,
-    function(v)
-      local o = opts()
-      if not o then return end
-      o.autoLog = v
-      ns.Store.Touch()
-      -- Applied now rather than at the next loading screen: turning it on
-      -- while already standing in the raid is exactly when somebody turns it
-      -- on, and waiting would look broken.
-      ns.syncCombatLog()
-    end)
+  UI.optCat, UI.optItem = 1, 1
 
   local version = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   version:SetPoint("BOTTOMLEFT", 0, 2)
   version:SetPoint("BOTTOMRIGHT", 0, 2)
   version:SetJustifyH("LEFT")
-  version:SetText(format("Warband.pro v%s  ·  no network calls — the export moves only when you copy it",
+  version:SetText(format("Warband.pro v%s  ·  no network calls - the export moves only when you copy it",
     ns.VERSION))
 end
 
 local function refreshOptions()
-  for _, o in ipairs(optionChecks) do
-    o.check:SetChecked(o.get() and true or false)
-  end
+  renderOptions()
 end
 
 -- ── the window ──────────────────────────────────────────────────────────────
