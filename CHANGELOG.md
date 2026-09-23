@@ -57,6 +57,9 @@ MAJOR has to be a wire break.**
 
 - **The Roster tab grows a sidebar.** All plus one row per character with compact vault and keystone status, then the account-wide resource rows; clicking a row narrows the grid to that character, and the selected character gets Great Vault slot buttons (locked dimmed, unlocked bright). The grid itself is unchanged.
 
+- **Options is a three-pane settings panel.** Data, Automation, and Display down the left; the middle lists the category; the right shows the checkbox and what it does. Every control persists the same saved variables.
+- **Export and Import wear the theme too.** Plaque headers name the string each tab holds; the strings, the slice row, and the paste flow behave exactly as before.
+
 ## [1.22.1] — 2026-09-22 — the Windows setup notes live in the agent contract
 
 ### Changed

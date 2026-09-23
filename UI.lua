@@ -129,7 +129,9 @@ local editBox, header, footer, rows, help
 -- which page of a warband too large for one bundle. Declared up here because
 -- buildExport creates them and refreshExport repaints them.
 local scopeAll, scopeOne, slimButton, pageLabel, pagePrev, pageNext
+local exportPlaque
 local junkPaste, junkHeader, junkFooter, junkRows, junkChild
+local importPlaque
 local gsHeader, gsButton, gsList, gsRows
 local rosterHead, rosterFoot, rosterCols, rosterLines, rosterChild, rosterPrev, rosterNext
 local rosterScroll
@@ -286,8 +288,15 @@ local function buildExport()
   pageLabel:SetPoint("RIGHT", pagePrev, "LEFT", -6, 0)
   pageLabel:SetJustifyH("RIGHT")
 
+  -- The plaque over the string well, reading the scope the panel is on.
+  exportPlaque = ns.Theme and ns.Theme.MakePlaque and ns.Theme.MakePlaque(p, "Whole warband") or nil
+  if exportPlaque then
+    exportPlaque:SetPoint("TOPLEFT", 0, SLICE_Y - 26)
+    exportPlaque:SetPoint("TOPRIGHT", -20, SLICE_Y - 26)
+  end
+
   local well = makeWell(p)
-  well:SetPoint("TOPLEFT", 0, SLICE_Y - 24)
+  well:SetPoint("TOPLEFT", 0, SLICE_Y - (exportPlaque and 60 or 24))
   well:SetPoint("BOTTOMRIGHT", -20, 36)
 
   local scroll = CreateFrame("ScrollFrame", "WarbandProExportScroll", p, "UIPanelScrollFrameTemplate")
@@ -397,6 +406,9 @@ local function refreshScope(payload, bytes)
   local current = UI.mode == "current"
   scopeAll:SetEnabled(current)
   scopeOne:SetEnabled(not current)
+  if exportPlaque and ns.Theme and ns.Theme.SetPlaqueText then
+    ns.Theme.SetPlaqueText(exportPlaque, current and "This character" or "Whole warband")
+  end
 
   local b = payload and payload.bundle
   local pages = b and b.pages
@@ -705,9 +717,16 @@ local function buildImport()
 
   -- The native single-line input, not a bare EditBox: InputBoxTemplate carries
   -- the recessed border every stock text field wears.
+  -- The plaque over the paste section; everything below shifts down for it.
+  importPlaque = ns.Theme and ns.Theme.MakePlaque and ns.Theme.MakePlaque(p, "The site's answer") or nil
+  if importPlaque then
+    importPlaque:SetPoint("TOPLEFT", 0, -18)
+    importPlaque:SetPoint("TOPRIGHT", -2, -18)
+  end
+
   junkPaste = CreateFrame("EditBox", nil, p, "InputBoxTemplate")
-  junkPaste:SetPoint("TOPLEFT", 6, -18)
-  junkPaste:SetPoint("TOPRIGHT", -2, -18)
+  junkPaste:SetPoint("TOPLEFT", 6, -54)
+  junkPaste:SetPoint("TOPRIGHT", -2, -54)
   junkPaste:SetHeight(20)
   junkPaste:SetAutoFocus(false)
   junkPaste:SetMaxLetters(0)
@@ -797,8 +816,8 @@ local function buildImport()
   end)
 
   junkHeader = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  junkHeader:SetPoint("TOPLEFT", 0, -46)
-  junkHeader:SetPoint("TOPRIGHT", 0, -46)
+  junkHeader:SetPoint("TOPLEFT", 0, -82)
+  junkHeader:SetPoint("TOPRIGHT", 0, -82)
   junkHeader:SetJustifyH("LEFT")
 
   -- The gear-set row: one status line and one button, above the junk list —
@@ -807,14 +826,14 @@ local function buildImport()
   -- protected, and the tab is already gone before combat can make it so.
   gsButton = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
   gsButton:SetSize(150, 18)
-  gsButton:SetPoint("TOPRIGHT", -2, -62)
+  gsButton:SetPoint("TOPRIGHT", -2, -98)
   gsButton:SetScript("OnClick", function()
     if ns.GearSet.Apply() then UI.RenderGearSet() end
   end)
   gsButton:Hide()
 
   gsHeader = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  gsHeader:SetPoint("TOPLEFT", 0, -64)
+  gsHeader:SetPoint("TOPLEFT", 0, -100)
   gsHeader:SetPoint("RIGHT", gsButton, "LEFT", -6, 0)
   gsHeader:SetJustifyH("LEFT")
   gsHeader:SetWordWrap(false)
@@ -825,8 +844,8 @@ local function buildImport()
   -- rows it draws, and the junk well hangs off its bottom edge, so a set of
   -- three costs three lines and no set costs none.
   gsList = CreateFrame("Frame", nil, p)
-  gsList:SetPoint("TOPLEFT", 0, -84)
-  gsList:SetPoint("TOPRIGHT", -20, -84)
+  gsList:SetPoint("TOPLEFT", 0, -120)
+  gsList:SetPoint("TOPRIGHT", -20, -120)
   gsList:SetHeight(1)
   gsRows = {}
   for i = 1, GS_ROWS do
@@ -1307,6 +1326,8 @@ local function ensureRoster(nCols, nLines)
   for i = 1, #rosterLines do growLine(rosterLines[i], nCols) end
 end
 
+local seasonBtn
+
 local function buildRoster()
   local p = panels[TAB_ROSTER]
 
@@ -1315,23 +1336,23 @@ local function buildRoster()
   rosterHead:SetPoint("TOPRIGHT", -104, 0)
   rosterHead:SetJustifyH("LEFT")
 
-  -- The season the detail answers for. One entry today â€” the wire carries this
-  -- season only â€” so it sits disabled; Roster.Seasons gaining a second entry
+  -- The season the detail answers for. One entry today · the wire carries this
+  -- season only · so it sits disabled; Roster.Seasons gaining a second entry
   -- is what enables it, and nothing here has to move then.
-  local seasonBtn = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+  seasonBtn = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
   seasonBtn:SetSize(96, 18)
   seasonBtn:SetPoint("TOPRIGHT", 0, -2)
   seasonBtn:SetText(ns.Roster.SEASON_LABEL or "Season")
   seasonBtn:Disable()
 
   rosterCols = {}
-  -- The sidebar owns the panel left edge (buildSidebar below); the strip
-  -- and grid start past it.
+
+  local well = makeWell(p)
+  rosterWell = well
+  well:SetPoint("TOPLEFT", SIDEBAR_W + 8, -50)
+  well:SetPoint("BOTTOMRIGHT", -20, 34)
   buildSidebar(p)
   buildVaultStrip(p)
-
-  rosterWell = makeWell(p)
-  rosterWell:SetPoint("TOPLEFT", SIDEBAR_W + 8, -50)
   rosterWell:SetPoint("BOTTOMRIGHT", -20, 34)
 
   local scroll = CreateFrame("ScrollFrame", "WarbandProRosterScroll", p, "UIPanelScrollFrameTemplate")
@@ -1369,7 +1390,7 @@ local function buildRoster()
 
   -- Widening the window is only worth doing because it buys columns, so the
   -- grid redraws when it happens. Watch the SCROLL frame rather than the panel,
-  -- because that is what fittingCols measures â€” and because an anchored frame
+  -- because that is what fittingCols measures — and because an anchored frame
   -- reads 0 wide until the first layout pass, so this is also what turns the
   -- opening render's fallback single column into the real one.
   --
