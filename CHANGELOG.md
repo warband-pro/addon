@@ -51,7 +51,19 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
-## [1.23.0] â€” 2026-09-23 â€” the v2 Plumber-style look
+### Changed
+
+- **The whole window is the flat dark panel now, not only its ground.** The stock parchment frame, the portrait and the red close button are gone. The title sits in its own band with the tabs under it — inside the window, where 1.23.0 had them hanging off the bottom edge with nothing behind them — and the gold rule parts the header from the content. Buttons, checkboxes, scrollbars, the paste field and the text wells are drawn the same way: dark ground, thin bronze edge, lit under the mouse. Every control does exactly what it did.
+- **Options is one click again.** Each setting is a checkbox row in the middle pane, and clicking the row or its box flips it. The pane on the right explains whichever row the mouse is on. In 1.23.0 the checkbox lived on the right, so every setting was select, then toggle.
+- **The roster sidebar scrolls, lights up, and has a hover.** Rows highlight under the mouse and the chosen one carries a ground as well as its bar. The wheel scrolls a warband taller than the window, with a thin thumb saying where you are; through 1.23.0 the rows past the bottom drew over the footer. Hovering a character shows the realm, guild, level, item level, gold and last-seen detail the grid's column headers already show.
+- **The export's scope buttons read chosen rather than dead.** Of "Whole warband" and "This character", the one you are on is the bright one. It was greyed out, which on the dark ground looked broken rather than picked.
+- **The paste field takes the caret when the "From warband.pro" tab opens**, so Ctrl+V works without clicking into it first — the same courtesy the export tab pays its string.
+
+### Fixed
+
+- **The active tab drew the stock tab art under its label, and every tab dropped to the small font after the first click.** Both were the client's own tab code putting back what it thinks a tab looks like. The theme now hands it fonts it re-applies for us, and hides the art by the names the current client uses.
+
+## [1.23.0] — 2026-09-23 — the v2 Plumber-style look
 
 ### Changed
 

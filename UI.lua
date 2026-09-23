@@ -1,10 +1,13 @@
 -- WarbandPro / UI.lua
--- One window, four tabs: Roster, Export, Import, Options. Built entirely from
--- the templates Blizzard's own panels use — ButtonFrameTemplate for the chrome,
--- PanelTabButtonTemplate for the tabs, InputBoxTemplate and InsetFrameTemplate
--- inside — so the window looks like the game and inherits whatever the player
--- has set: UI scale, font scale, colorblind text. No hand-rolled backdrop, no
--- pixel skin of our own.
+-- One window, four tabs: Roster, Export, Import, Options. Built on the
+-- templates Blizzard's own panels use — ButtonFrameTemplate for the chrome,
+-- PanelTabButtonTemplate for the tabs, InputBoxTemplate for the paste field —
+-- for their behavior, and painted by Theme.lua in Plumber's language: a dark
+-- warm ground, bronze hairlines, text-only tabs, flat buttons that light under
+-- the mouse. The window still inherits whatever the player has set — UI scale,
+-- font scale, colorblind text — because every size is in UI units and every
+-- font is copied from a game font. Nothing here styles a widget on its own;
+-- if it has a look, Theme.lua has a builder for it.
 --
 -- The jobs, in the order the tabs sit in. Roster: the grid — every character
 -- across the top, everything the addon knows about them down the side, which
@@ -89,7 +92,12 @@ local GS_ROWS, GS_LINE = 16, 16
 local LABEL_W, CELL_W, LINE_H = 152, 56, 14
 
 -- The v2 sidebar takes the left of the roster panel; the grid starts past it.
-local SIDEBAR_W, SIDE_ROW_H = 184, 16
+-- Rows are 20px — a hover highlight and a class icon need the room, and a
+-- list that scrolls (below) does not have to fit the warband in the height.
+local SIDEBAR_W, SIDE_ROW_H = 184, 20
+-- The gap between the sidebar's edge and the grid's well, with the hairline
+-- between them drawn in its middle.
+local SIDEBAR_GAP = 10
 local SLOT_SHORT = { raid = "raid", mplus = "mythic+", world = "world" }
 -- The icon a row may carry, and the room the label gives up for it. Sized off
 -- the line so the two stay in step if the grid ever changes row height.
@@ -135,10 +143,9 @@ local importPlaque
 local gsHeader, gsButton, gsList, gsRows
 local rosterHead, rosterFoot, rosterCols, rosterLines, rosterChild, rosterPrev, rosterNext
 local rosterScroll
-local sideFrame, sideRows, vaultStrip, vaultSlots, rosterWell
+local sideFrame, sideScroll, sideRows, vaultStrip, vaultSlots, rosterWell
 -- Forward-declared: buildRoster calls these before their definitions read.
 local buildSidebar, buildVaultStrip
-local optionChecks = {}
 
 -- Which characters the export covers: "bundle" is the whole warband and
 -- "current" is the character at the keyboard. It is a panel control now rather
@@ -160,14 +167,20 @@ UI.rosterSelect = nil
 
 -- ── window chrome ───────────────────────────────────────────────────────────
 
+-- The tab row sits INSIDE the window, under the title band, the way Plumber
+-- lays a header out — title, then the row of what the window holds, then a
+-- rule. Through 1.23.0 the tabs hung off the bottom edge where every stock
+-- panel keeps them, which is where a boxed tab belongs and where a text-only
+-- one floats over the world with nothing behind it.
 local function makeTab(i, text)
   local tab = CreateFrame("Button", "WarbandProFrameTab" .. i, frame, "PanelTabButtonTemplate")
   tab:SetID(i)
   tab:SetText(text)
+  local tabY = ns.Theme and ns.Theme.TAB_ROW_Y or -28
   if i == 1 then
-    tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 12, 2)
+    tab:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, tabY)
   else
-    tab:SetPoint("TOPLEFT", tabs[i - 1], "TOPRIGHT", 3, 0)
+    tab:SetPoint("TOPLEFT", tabs[i - 1], "TOPRIGHT", 0, 0)
   end
   tab:SetScript("OnClick", function(self)
     if PlaySound and SOUNDKIT then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB) end
@@ -187,11 +200,70 @@ local function makePanel()
   return p
 end
 
--- A recessed well for text, the same InsetFrameTemplate the character pane
--- nests for its stats block.
+-- A recessed well for text: the theme's, or the InsetFrameTemplate the
+-- character pane nests for its stats block when there is no theme to ask.
 local function makeWell(parent)
-  local well = CreateFrame("Frame", nil, parent, "InsetFrameTemplate")
-  return well
+  local well = ns.Theme and ns.Theme.MakeWell and ns.Theme.MakeWell(parent)
+  return well or CreateFrame("Frame", nil, parent, "InsetFrameTemplate")
+end
+
+-- A flat themed button, or the stock one where the theme is not there.
+local function makeButton(parent, text, w, h)
+  local b = ns.Theme and ns.Theme.MakeButton and ns.Theme.MakeButton(parent, text, w, h)
+  if b then return b end
+  b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+  b:SetSize(w or 96, h or 20)
+  b:SetText(text or "")
+  return b
+end
+
+-- "You are here" for a two-way choice: the themed button reads bright, the
+-- stock one reads disabled, which is the client's own idiom for the state.
+local function setSelected(b, on)
+  if ns.Theme and ns.Theme.SetSelected then
+    ns.Theme.SetSelected(b, on)
+  elseif b and b.SetEnabled then
+    b:SetEnabled(not on)
+  end
+end
+
+local function skinScroll(scroll)
+  if ns.Theme and ns.Theme.SkinScroll then ns.Theme.SkinScroll(scroll) end
+end
+
+-- A list row — the sidebar's, the options navigation's — that lights under
+-- the mouse and carries a ground and a bar when selected. The fallback is a
+-- bare button with a name and a bar, which is what 1.23.0 drew.
+local function makeListRow(parent, w, h)
+  local b = ns.Theme and ns.Theme.MakeListRow and ns.Theme.MakeListRow(parent, w, h)
+  if b then return b end
+  b = CreateFrame("Button", nil, parent)
+  b:SetSize(w, h)
+  b.name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  b.name:SetPoint("LEFT", 10, 0)
+  b.name:SetJustifyH("LEFT")
+  b.name:SetWordWrap(false)
+  b.bar = b:CreateTexture(nil, "OVERLAY")
+  b.bar:SetColorTexture(0.55, 0.42, 0.28, 1)
+  b.bar:SetSize(2, h - 6)
+  b.bar:SetPoint("LEFT", 2, 0)
+  b.bar:Hide()
+  return b
+end
+
+local function setRowSelected(b, on)
+  if ns.Theme and ns.Theme.SetRowSelected then
+    ns.Theme.SetRowSelected(b, on)
+  elseif b and b.bar then
+    b.bar:SetShown(on and true or false)
+  end
+end
+
+-- The palette's hex form for inline colour codes, with 1.23.0's literals as
+-- the fallback.
+local function ink(key, fallback)
+  local pal = ns.Theme and ns.Theme.PALETTE
+  return pal and pal[key] or fallback
 end
 
 -- ── export tab ──────────────────────────────────────────────────────────────
@@ -253,37 +325,31 @@ local function buildExport()
   -- character and the camp flow wants the warband, so the choice is one click
   -- either way and neither one is a command any more.
   --
-  -- Blizzard's own "you are here" idiom for a two-way choice: the button for
-  -- the scope the panel is already on is disabled. Same SetEnabled call the
-  -- roster's pager uses for an edge it cannot cross, so a player who has used
-  -- one has read the other.
+  -- "You are here" for a two-way choice: the button for the scope the panel
+  -- is already on reads SELECTED — bright edges, white label — rather than
+  -- disabled. It was disabled through 1.23.0, the client's idiom for the
+  -- state, and on this ground a disabled button reads as broken rather than
+  -- as chosen. The pager arrows below still disable at an edge, because that
+  -- one genuinely cannot be pressed.
   local SLICE_Y = -(18 + MAX_ROWS * 14 + 4)
 
-  scopeAll = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  scopeAll:SetSize(104, 20)
+  scopeAll = makeButton(p, "Whole warband", 104, 20)
   scopeAll:SetPoint("TOPLEFT", 0, SLICE_Y)
-  scopeAll:SetText("Whole warband")
   scopeAll:SetScript("OnClick", function() UI.SetScope("bundle") end)
 
-  scopeOne = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  scopeOne:SetSize(104, 20)
-  scopeOne:SetPoint("LEFT", scopeAll, "RIGHT", 4, 0)
-  scopeOne:SetText("This character")
+  scopeOne = makeButton(p, "This character", 104, 20)
+  scopeOne:SetPoint("LEFT", scopeAll, "RIGHT", -1, 0)
   scopeOne:SetScript("OnClick", function() UI.SetScope("current") end)
 
   -- Paging, for the warband larger than one bundle holds. The header used to
   -- name `/warband copy 2` here; the arrows are the same walk without the
   -- command, and they only exist when there is somewhere to walk to.
-  pageNext = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  pageNext:SetSize(24, 20)
+  pageNext = makeButton(p, ">", 24, 20)
   pageNext:SetPoint("TOPRIGHT", -20, SLICE_Y)
-  pageNext:SetText(">")
   pageNext:SetScript("OnClick", function() UI.SetPage(UI.page + 1) end)
 
-  pagePrev = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  pagePrev:SetSize(24, 20)
-  pagePrev:SetPoint("RIGHT", pageNext, "LEFT", -2, 0)
-  pagePrev:SetText("<")
+  pagePrev = makeButton(p, "<", 24, 20)
+  pagePrev:SetPoint("RIGHT", pageNext, "LEFT", -1, 0)
   pagePrev:SetScript("OnClick", function() UI.SetPage(UI.page - 1) end)
 
   pageLabel = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -304,6 +370,7 @@ local function buildExport()
   local scroll = CreateFrame("ScrollFrame", "WarbandProExportScroll", p, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 8, -8)
   scroll:SetPoint("BOTTOMRIGHT", well, "BOTTOMRIGHT", -8, 8)
+  skinScroll(scroll)
 
   editBox = CreateFrame("EditBox", nil, scroll)
   editBox:SetMultiLine(true)
@@ -356,10 +423,8 @@ local function buildExport()
   footer:SetPoint("BOTTOMLEFT", 0, 2)
   footer:SetJustifyH("LEFT")
 
-  local selectAll = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  selectAll:SetSize(96, 22)
+  local selectAll = makeButton(p, "Select all", 96, 22)
   selectAll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 6)
-  selectAll:SetText("Select all")
   selectAll:SetScript("OnClick", function()
     editBox:SetFocus()
     editBox:HighlightText()
@@ -373,10 +438,8 @@ local function buildExport()
   -- same scope the slice row already offers — the row is where the choice
   -- lives, this is where the warning is, and a warning you can act on without
   -- moving your eyes is worth one extra widget.
-  slimButton = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  slimButton:SetSize(136, 22)
+  slimButton = makeButton(p, "Just this character", 136, 22)
   slimButton:SetPoint("BOTTOMRIGHT", selectAll, "BOTTOMLEFT", -4, 0)
-  slimButton:SetText("Just this character")
   slimButton:SetScript("OnClick", function() UI.SetScope("current") end)
   slimButton:Hide()
 end
@@ -406,8 +469,8 @@ end
 local function refreshScope(payload, bytes)
   if not scopeAll then return end
   local current = UI.mode == "current"
-  scopeAll:SetEnabled(current)
-  scopeOne:SetEnabled(not current)
+  setSelected(scopeAll, not current)
+  setSelected(scopeOne, current)
   if exportPlaque and ns.Theme and ns.Theme.SetPlaqueText then
     ns.Theme.SetPlaqueText(exportPlaque, current and "This character" or "Whole warband")
   end
@@ -558,12 +621,20 @@ local function buildJunkRow(parent, i)
   row.label:SetJustifyH("LEFT")
   row.label:SetWordWrap(false)
 
-  row.sell = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-  row.sell:SetSize(52, 16)
+  row.sell = makeButton(row, "Sell", 52, 16)
   row.sell:SetPoint("RIGHT", -80, 0)
-  row.sell:SetText("Sell")
 
-  row.de = CreateFrame("Button", "WarbandProJunkDE" .. i, row, "SecureActionButtonTemplate,UIPanelButtonTemplate")
+  -- Secure by template and themed by skin: the theme cannot be born into a
+  -- SecureActionButtonTemplate, so it is painted on after, out of combat, at
+  -- build — and the paint is textures and font objects, none of which are
+  -- protected. Without the theme the stock button template rides along.
+  if ns.Theme and ns.Theme.SkinButton then
+    row.de = CreateFrame("Button", "WarbandProJunkDE" .. i, row, "SecureActionButtonTemplate")
+    ns.Theme.SkinButton(row.de)
+  else
+    row.de = CreateFrame("Button", "WarbandProJunkDE" .. i, row,
+      "SecureActionButtonTemplate,UIPanelButtonTemplate")
+  end
   row.de:SetSize(76, 16)
   row.de:SetPoint("RIGHT", -2, 0)
   row.de:SetText("Disenchant")
@@ -727,12 +798,13 @@ local function buildImport()
   end
 
   junkPaste = CreateFrame("EditBox", nil, p, "InputBoxTemplate")
-  junkPaste:SetPoint("TOPLEFT", 6, -54)
+  junkPaste:SetPoint("TOPLEFT", 0, -54)
   junkPaste:SetPoint("TOPRIGHT", -2, -54)
-  junkPaste:SetHeight(20)
+  junkPaste:SetHeight(22)
   junkPaste:SetAutoFocus(false)
   junkPaste:SetMaxLetters(0)
   junkPaste:SetFontObject(ChatFontNormal)
+  if ns.Theme and ns.Theme.SkinInput then ns.Theme.SkinInput(junkPaste) end
   junkPaste:SetScript("OnEscapePressed", function(self)
     self:ClearFocus()
     frame:Hide()
@@ -826,8 +898,7 @@ local function buildImport()
   -- both halves of the same paste box, so they share the tab. The button is
   -- an ordinary button, not a secure one: equipping out of combat is not
   -- protected, and the tab is already gone before combat can make it so.
-  gsButton = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  gsButton:SetSize(150, 18)
+  gsButton = makeButton(p, "", 150, 18)
   gsButton:SetPoint("TOPRIGHT", -2, -98)
   gsButton:SetScript("OnClick", function()
     if ns.GearSet.Apply() then UI.RenderGearSet() end
@@ -861,6 +932,7 @@ local function buildImport()
   local scroll = CreateFrame("ScrollFrame", "WarbandProJunkScroll", p, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 6, -6)
   scroll:SetPoint("BOTTOMRIGHT", well, "BOTTOMRIGHT", -6, 6)
+  skinScroll(scroll)
 
   junkChild = CreateFrame("Frame", nil, scroll)
   junkChild:SetSize(470, JUNK_ROWS * 18)
@@ -1341,25 +1413,33 @@ local function buildRoster()
   -- The season the detail answers for. One entry today · the wire carries this
   -- season only · so it sits disabled; Roster.Seasons gaining a second entry
   -- is what enables it, and nothing here has to move then.
-  seasonBtn = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  seasonBtn:SetSize(96, 18)
+  seasonBtn = makeButton(p, ns.Roster.SEASON_LABEL or "Season", 96, 18)
   seasonBtn:SetPoint("TOPRIGHT", 0, -2)
-  seasonBtn:SetText(ns.Roster.SEASON_LABEL or "Season")
   seasonBtn:Disable()
 
   rosterCols = {}
 
   local well = makeWell(p)
   rosterWell = well
-  well:SetPoint("TOPLEFT", SIDEBAR_W + 8, -50)
+  well:SetPoint("TOPLEFT", SIDEBAR_W + SIDEBAR_GAP, -50)
   well:SetPoint("BOTTOMRIGHT", -20, 34)
   buildSidebar(p)
   buildVaultStrip(p)
-  rosterWell:SetPoint("BOTTOMRIGHT", -20, 34)
+
+  -- The hairline between the sidebar and the grid, in the gap's middle: two
+  -- lists side by side with nothing between them read as one wide list.
+  if ns.Theme and ns.Theme.MakeRule then
+    local rule = ns.Theme.MakeRule(p, true)
+    if rule then
+      rule:SetPoint("TOP", p, "TOPLEFT", SIDEBAR_W + SIDEBAR_GAP / 2, -28)
+      rule:SetPoint("BOTTOM", p, "BOTTOMLEFT", SIDEBAR_W + SIDEBAR_GAP / 2, 30)
+    end
+  end
 
   local scroll = CreateFrame("ScrollFrame", "WarbandProRosterScroll", p, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", rosterWell, "TOPLEFT", 8, -8)
   scroll:SetPoint("BOTTOMRIGHT", rosterWell, "BOTTOMRIGHT", -8, 8)
+  skinScroll(scroll)
   rosterScroll = scroll
 
   rosterChild = CreateFrame("Frame", nil, scroll)
@@ -1372,19 +1452,15 @@ local function buildRoster()
   rosterFoot:SetPoint("BOTTOMLEFT", 0, 2)
   rosterFoot:SetJustifyH("LEFT")
 
-  rosterPrev = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  rosterPrev:SetSize(24, 20)
+  rosterPrev = makeButton(p, "<", 24, 20)
   rosterPrev:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -46, 0)
-  rosterPrev:SetText("<")
   rosterPrev:SetScript("OnClick", function()
     UI.rosterPage = UI.rosterPage - 1
     UI.RenderRoster()
   end)
 
-  rosterNext = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-  rosterNext:SetSize(24, 20)
-  rosterNext:SetPoint("LEFT", rosterPrev, "RIGHT", 2, 0)
-  rosterNext:SetText(">")
+  rosterNext = makeButton(p, ">", 24, 20)
+  rosterNext:SetPoint("LEFT", rosterPrev, "RIGHT", -1, 0)
   rosterNext:SetScript("OnClick", function()
     UI.rosterPage = UI.rosterPage + 1
     UI.RenderRoster()
@@ -1434,36 +1510,52 @@ end
 -- ── roster sidebar ──────────────────────────────────────────────────────────
 --
 -- The v2 sidebar: All plus one row per character, then the account section. A
--- row is a plain button — name on the left, compact status on the right — and
--- clicking one narrows the grid to that character (All restores the whole
--- warband). The selected row carries a bronze bar as well as bright text, so
--- selection is never color alone. Rows are pooled like every other widget
--- here and grow to whatever the warband asks for.
+-- row is a themed list row — name on the left, compact status on the right,
+-- a class icon or a currency icon between — and clicking one narrows the grid
+-- to that character (All restores the whole warband). The selected row
+-- carries a bronze ground and a bar as well as bright text, so selection is
+-- never color alone; the mouse lights whatever it is over. Rows are pooled
+-- like every other widget here and grow to whatever the warband asks for.
+--
+-- **The list scrolls, by wheel.** Twenty characters at 20px is 400px, and
+-- the window's minimum height leaves the sidebar about 300; through 1.23.0
+-- the rows past the bottom drew over the footer. The scroll frame has no
+-- bar — a hairline thumb at its right edge says where you are and only
+-- appears when there is somewhere else to be.
+
+local sideThumb
 
 local function makeSideRow(i)
-  local b = CreateFrame("Button", nil, sideFrame)
-  b:SetSize(SIDEBAR_W, SIDE_ROW_H)
+  local b = makeListRow(sideFrame, SIDEBAR_W, SIDE_ROW_H)
   b:SetPoint("TOPLEFT", sideFrame, "TOPLEFT", 0, -(i - 1) * SIDE_ROW_H)
-  b.bar = b:CreateTexture(nil, "OVERLAY")
-  b.bar:SetColorTexture(0.55, 0.42, 0.28, 1)
-  b.bar:SetSize(2, 12)
-  b.bar:SetPoint("LEFT", 3, 0)
-  b.bar:Hide()
-  b.name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  b.name:SetPoint("LEFT", 10, 0)
-  b.name:SetWidth(112)
-  b.name:SetJustifyH("LEFT")
+  b.name:SetWidth(108)
+  -- The rule a section heading sits on. Only a heading shows it; a row that
+  -- was a heading last render and a character this one hides it again.
+  b.rule = b:CreateTexture(nil, "ARTWORK")
+  b.rule:SetColorTexture(0.61, 0.48, 0.29, 0.35)
+  b.rule:SetHeight(1)
+  b.rule:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 4, 1)
+  b.rule:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -6, 1)
+  b.rule:Hide()
   b.icon = b:CreateTexture(nil, "OVERLAY")
-  b.icon:SetSize(12, 12)
-  b.icon:SetPoint("RIGHT", -4, 0)
+  b.icon:SetSize(14, 14)
+  b.icon:SetPoint("RIGHT", -6, 0)
   b.icon:Hide()
   b.status = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  b.status:SetPoint("RIGHT", -4, 0)
+  b.status:SetPoint("RIGHT", -6, 0)
   b.status:SetJustifyH("RIGHT")
+  b.status:SetWordWrap(false)
   b:SetScript("OnClick", function(self)
     UI.rosterSelect = self.selGuid
     UI.RenderRoster()
   end)
+  -- A character row's hover is the column header's: realm, guild, level,
+  -- item level, gold, last zone, when it was scanned. The same `columnTip`
+  -- the grid's headers use, so the two cannot disagree about a character.
+  b:SetScript("OnEnter", function(self)
+    if self.tipCol then showTip(self, self.tipCol.name, columnTip(self.tipCol)) end
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
   sideRows[i] = b
   return b
 end
@@ -1473,11 +1565,46 @@ local function ensureSide(n)
   for i = 1, n do if not sideRows[i] then makeSideRow(i) end end
 end
 
+--- Keep the wheel inside the list and the thumb honest about where it is.
+local function sideScrollTo(offset)
+  if not sideScroll then return end
+  local range = sideScroll:GetVerticalScrollRange() or 0
+  offset = math.max(0, math.min(offset, range))
+  sideScroll:SetVerticalScroll(offset)
+  if not sideThumb then return end
+  if range <= 0 then
+    sideThumb:Hide()
+    return
+  end
+  local h = sideScroll:GetHeight() or 0
+  local total = h + range
+  local thumbH = math.max(16, math.floor(h * h / total))
+  sideThumb:SetHeight(thumbH)
+  sideThumb:ClearAllPoints()
+  sideThumb:SetPoint("TOPRIGHT", sideScroll, "TOPRIGHT", 0, -(offset / range) * (h - thumbH))
+  sideThumb:Show()
+end
+
 function buildSidebar(p)
-  sideFrame = CreateFrame("Frame", nil, p)
-  sideFrame:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -50)
-  sideFrame:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 0, 30)
-  sideFrame:SetWidth(SIDEBAR_W)
+  sideScroll = CreateFrame("ScrollFrame", nil, p)
+  sideScroll:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -50)
+  sideScroll:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 0, 30)
+  sideScroll:SetWidth(SIDEBAR_W)
+  sideScroll:EnableMouseWheel(true)
+  sideScroll:SetScript("OnMouseWheel", function(self, delta)
+    sideScrollTo((self:GetVerticalScroll() or 0) - delta * SIDE_ROW_H * 3)
+  end)
+  -- A resize can leave the list scrolled past its new end; clamp back.
+  sideScroll:SetScript("OnSizeChanged", function(self)
+    sideScrollTo(self:GetVerticalScroll() or 0)
+  end)
+  sideFrame = CreateFrame("Frame", nil, sideScroll)
+  sideFrame:SetSize(SIDEBAR_W, SIDE_ROW_H)
+  sideScroll:SetScrollChild(sideFrame)
+  sideThumb = p:CreateTexture(nil, "OVERLAY")
+  sideThumb:SetColorTexture(0.61, 0.48, 0.29, 0.8)
+  sideThumb:SetWidth(2)
+  sideThumb:Hide()
   sideRows = {}
 end
 
@@ -1488,7 +1615,7 @@ end
 -- already has. The strip costs the well its top rows only while shown.
 function buildVaultStrip(p)
   vaultStrip = CreateFrame("Frame", nil, p)
-  vaultStrip:SetPoint("TOPLEFT", p, "TOPLEFT", SIDEBAR_W + 8, -28)
+  vaultStrip:SetPoint("TOPLEFT", p, "TOPLEFT", SIDEBAR_W + SIDEBAR_GAP, -28)
   vaultStrip:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, -28)
   vaultStrip:SetHeight(20)
   vaultStrip:Hide()
@@ -1519,9 +1646,10 @@ local function renderSidebar(side, sel)
       status = n == 1 and "1 alt" or format("%d alts", n) },
   }
   for _, r in ipairs(side.rows) do
-    entries[#entries + 1] = { kind = "char", guid = r.col.guid,
+    local cellv = r.vault or r.keystone
+    entries[#entries + 1] = { kind = "char", guid = r.col.guid, col = r.col,
       class = r.col.class, name = r.col.name,
-      status = r.vault and r.vault.text or (r.keystone and r.keystone.text or "") }
+      status = cellv and cellv.text or "", tone = cellv and cellv.tone or nil }
   end
   entries[#entries + 1] = { head = "Account" }
   for _, a in ipairs(side.account) do
@@ -1529,31 +1657,40 @@ local function renderSidebar(side, sel)
       status = a.text, icon = a.icon }
   end
   ensureSide(#entries)
+  local NORMAL, HEAD = ink("normal", "D7C0A3"), ink("nonInteractive", "947C66")
+  local selectRow = setRowSelected
   for i, b in ipairs(sideRows) do
     local e = entries[i]
     if not e then
       b:Hide()
     else
       b:Show()
+      b.tipCol = nil
       if e.head then
-        b.name:SetText(format("|cff947C66%s|r", e.head))
+        b.name:SetText(format("|cff%s%s|r", HEAD, e.head))
         b.status:SetText("")
         b.icon:Hide()
-        b.bar:Hide()
+        b.rule:Show()
+        selectRow(b, false)
         b:EnableMouse(false)
       else
         b:EnableMouse(true)
+        b.rule:Hide()
         b.selGuid = e.guid
+        b.tipCol = e.col
         local selected = (e.guid == sel)
         if e.kind == "char" then
           b.name:SetText(classText(e.class, e.name))
         elseif e.kind == "account" then
-          b.name:SetText(format("|cffEBDEC2%s|r", e.name))
+          b.name:SetText(format("|cff%s%s|r", NORMAL, e.name))
         else
           b.name:SetText(selected
-            and "|cffffffffAll|r" or format("|cffD7C0A3%s|r", e.name))
+            and "|cffffffffAll|r" or format("|cff%s%s|r", NORMAL, e.name))
         end
-        local sc = (selected or e.kind == "account") and "FFFFFF" or "D7C0A3"
+        -- A character's status keeps the model's tone (a vault with a slot
+        -- earned is green here as it is in the grid); everything else is a
+        -- value and takes the bright ink.
+        local sc = e.tone and TONE[e.tone] or "FFFFFF"
         b.status:SetText(e.status ~= "" and format("|cff%s%s|r", sc, e.status) or "")
         -- One icon slot, two owners: a class icon cut from the client's own
         -- circle sheet on character rows, the stored currency icon on account
@@ -1573,15 +1710,15 @@ local function renderSidebar(side, sel)
         else
           b.icon:Hide()
         end
-        if b.icon:IsShown() then
-          b.status:SetPoint("RIGHT", -20, 0)
-        else
-          b.status:SetPoint("RIGHT", -4, 0)
-        end
-        if selected then b.bar:Show() else b.bar:Hide() end
+        b.status:ClearAllPoints()
+        b.status:SetPoint("RIGHT", b.icon:IsShown() and -24 or -6, 0)
+        selectRow(b, selected)
       end
     end
   end
+  -- The scroll child is as tall as its rows, and the thumb follows.
+  if sideFrame then sideFrame:SetHeight(math.max(#entries, 1) * SIDE_ROW_H) end
+  sideScrollTo(sideScroll and sideScroll:GetVerticalScroll() or 0)
 end
 
 local function renderSlots(selRow, single)
@@ -1618,7 +1755,7 @@ local function renderSlots(selRow, single)
   if rosterWell then
     local parent = rosterWell:GetParent()
     rosterWell:ClearAllPoints()
-    rosterWell:SetPoint("TOPLEFT", parent, "TOPLEFT", SIDEBAR_W + 8, show and -74 or -50)
+    rosterWell:SetPoint("TOPLEFT", parent, "TOPLEFT", SIDEBAR_W + SIDEBAR_GAP, show and -74 or -50)
     rosterWell:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -20, 34)
   end
   return show
@@ -1859,66 +1996,30 @@ function UI.ToggleRosterGroup(label)
   UI.RenderRoster()
 end
 
--- ── options tab ─────────────────────────────────────────────────────────────
-
---- One native checkbox with a label beside it and a muted description under
---- it. The label and description are our own FontStrings rather than the
---- template's, so a template rename cannot silently drop the text.
 -- ── options tab: three panes ──────────────────────────────────────────────
 --
 -- Plumber's settings shape (LeftSection / CentralSection / RightSection): the
 -- left nav names the three categories, the center lists that category's
--- options, the right shows the selected option's checkbox and description.
+-- options — **each one a checkbox row, so a setting is one click** — and the
+-- right pane explains whichever option the mouse is on or last clicked.
 -- Every control keeps working and persists the same saved variables — the six
 -- get/set pairs below are the old flat tab's, moved verbatim — so this is
--- presentation only. The selected nav and list rows are disabled, the same
--- "you are here" idiom the export slice row and the roster pager use.
+-- presentation only.
+--
+-- **The checkbox moved into the list.** In 1.23.0 the middle pane was names
+-- only and the checkbox lived on the right, which made every setting two
+-- clicks — select, then toggle — where the flat tab before it had been one.
+-- Plumber's own layout is the one restored here: the toggles are the list,
+-- and the pane beside them is where the explanation goes, following the
+-- mouse so reading a description never costs a click either.
 
 local OPT_CATS = { "Data", "Automation", "Display" }
 local OPT_DEFS = {}
-local optNavBtns, optListBtns, optGroups, optDetailAnchor
-
-local function makeOption(parent, label, desc, get, set)
-  local g = CreateFrame("Frame", nil, parent)
-  g:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
-  g:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
-  g:SetHeight(140)
-  local check = CreateFrame("CheckButton", nil, g, "UICheckButtonTemplate")
-  check:SetSize(26, 26)
-  check:SetPoint("TOPLEFT", 0, 0)
-  check:SetScript("OnClick", function(self) set(self:GetChecked() and true or false) end)
-
-  local text = g:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  text:SetPoint("LEFT", check, "RIGHT", 4, 0)
-  text:SetText(label)
-  if ns.Theme and ns.Theme.Ink then ns.Theme.Ink(text, "normal") end
-
-  local sub = g:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  sub:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 30, 4)
-  sub:SetPoint("RIGHT", g, "RIGHT", 0, 0)
-  sub:SetJustifyH("LEFT")
-  sub:SetText(desc)
-  if ns.Theme and ns.Theme.Ink then ns.Theme.Ink(sub, "body") end
-
-  optionChecks[#optionChecks + 1] = { check = check, get = get }
-  g:Hide()
-  return g
-end
-
-local function optButton(parent, x, w, y)
-  local b = CreateFrame("Button", nil, parent)
-  b:SetSize(w, 20)
-  b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-  b.bar = b:CreateTexture(nil, "OVERLAY")
-  b.bar:SetColorTexture(0.55, 0.42, 0.28, 1)
-  b.bar:SetSize(2, 12)
-  b.bar:SetPoint("LEFT", 2, 0)
-  b.bar:Hide()
-  b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  b.text:SetPoint("LEFT", 10, 0)
-  b.text:SetJustifyH("LEFT")
-  return b
-end
+-- Nav, list, and the pane between them: at the window's minimum width the
+-- description pane keeps about 150px, which wraps the longest description to
+-- six lines and still clears the version line.
+local OPT_NAV_W, OPT_LIST_W, OPT_GAP, OPT_ROW_H = 108, 236, 12, 22
+local optNavBtns, optListBtns, optTitle, optDesc, optListHead
 
 local function firstOfCat(cat)
   for idx, d in ipairs(OPT_DEFS) do
@@ -1927,16 +2028,23 @@ local function firstOfCat(cat)
   return 1
 end
 
+--- The pane on the right: the option's name over what it does.
+local function renderDetail()
+  local d = OPT_DEFS[UI.optItem]
+  if not (optTitle and d) then return end
+  optTitle:SetText(d.label)
+  optDesc:SetText(d.desc)
+end
+
 local function renderOptions()
   if not optNavBtns then return end
+  local NORMAL = ink("normal", "D7C0A3")
   for i, b in ipairs(optNavBtns) do
     local selected = (i == UI.optCat)
-    b.text:SetText(selected
-      and format("|cffffffff%s|r", OPT_CATS[i])
-      or format("|cffD7C0A3%s|r", OPT_CATS[i]))
-    b:SetEnabled(not selected)
-    if selected then b.bar:Show() else b.bar:Hide() end
+    b.name:SetText(format("|cff%s%s|r", selected and "FFFFFF" or NORMAL, OPT_CATS[i]))
+    setRowSelected(b, selected)
   end
+  if optListHead and optListHead.Label then optListHead.Label:SetText(OPT_CATS[UI.optCat] or "") end
   local shown = {}
   for idx, d in ipairs(OPT_DEFS) do
     if d.cat == UI.optCat then shown[#shown + 1] = idx end
@@ -1948,18 +2056,14 @@ local function renderOptions()
     else
       b:Show()
       b.optIdx = idx
+      local d = OPT_DEFS[idx]
       local selected = (idx == UI.optItem)
-      b.text:SetText(selected
-        and format("|cffffffff%s|r", OPT_DEFS[idx].label)
-        or format("|cffD7C0A3%s|r", OPT_DEFS[idx].label))
-      b:SetEnabled(not selected)
-      if selected then b.bar:Show() else b.bar:Hide() end
+      b.name:SetText(format("|cff%s%s|r", selected and "FFFFFF" or NORMAL, d.label))
+      b.check:SetChecked(d.get() and true or false)
+      setRowSelected(b, selected)
     end
   end
-  for idx, g in ipairs(optGroups) do g:SetShown(idx == UI.optItem) end
-  for _, o in ipairs(optionChecks) do
-    o.check:SetChecked(o.get() and true or false)
-  end
+  renderDetail()
 end
 
 local function buildOptions()
@@ -2041,9 +2145,38 @@ local function buildOptions()
       end },
   }
 
+  -- The three panes: nav at the left, the list past it, the description past
+  -- that, each headed by a section label and parted by a hairline. The
+  -- headings are what make three columns of text read as three panes.
+  local listX = OPT_NAV_W + OPT_GAP
+  local detailX = listX + OPT_LIST_W + OPT_GAP
+  local HEAD_H = 20
+  local function section(text, x, w)
+    if not (ns.Theme and ns.Theme.MakeSection) then return nil end
+    local s = ns.Theme.MakeSection(p, text, w)
+    if s then
+      s:SetHeight(HEAD_H)
+      s:SetPoint("TOPLEFT", p, "TOPLEFT", x, 0)
+    end
+    return s
+  end
+  section("Settings", 0, OPT_NAV_W)
+  optListHead = section("", listX, OPT_LIST_W)
+  if ns.Theme and ns.Theme.MakeRule then
+    for _, x in ipairs({ listX - OPT_GAP / 2, detailX - OPT_GAP / 2 }) do
+      local rule = ns.Theme.MakeRule(p, true)
+      if rule then
+        rule:SetPoint("TOP", p, "TOPLEFT", x, 0)
+        rule:SetPoint("BOTTOM", p, "BOTTOMLEFT", x, 22)
+      end
+    end
+  end
+  local rowsY = -(HEAD_H + 4)
+
   optNavBtns = {}
   for i = 1, #OPT_CATS do
-    local b = optButton(p, 0, 124, -(i - 1) * 22)
+    local b = makeListRow(p, OPT_NAV_W, OPT_ROW_H)
+    b:SetPoint("TOPLEFT", p, "TOPLEFT", 0, rowsY - (i - 1) * OPT_ROW_H)
     b.navIdx = i
     b:SetScript("OnClick", function(self)
       UI.optCat = self.navIdx
@@ -2053,23 +2186,68 @@ local function buildOptions()
     optNavBtns[i] = b
   end
 
+  -- One row per option, checkbox first. The row and its checkbox are two
+  -- targets for one toggle: the box takes its own click, and a click on the
+  -- name flips the box and hands it the same click, so there is no place on
+  -- the row that selects without toggling. The mouse arriving is what puts
+  -- the row's description in the pane beside it.
+  local function toggleRow(row)
+    local d = OPT_DEFS[row.optIdx]
+    if not d then return end
+    local on = row.check:GetChecked() and true or false
+    if ns.Theme and ns.Theme.ClickSound then ns.Theme.ClickSound(on) end
+    d.set(on)
+    UI.optItem = row.optIdx
+    renderOptions()
+  end
   optListBtns = {}
   for i = 1, #OPT_DEFS do
-    local b = optButton(p, 134, 180, -(i - 1) * 22)
+    local b = makeListRow(p, OPT_LIST_W, OPT_ROW_H)
+    b:SetPoint("TOPLEFT", p, "TOPLEFT", listX, rowsY - (i - 1) * OPT_ROW_H)
+    local check = ns.Theme and ns.Theme.MakeCheck and ns.Theme.MakeCheck(b, 18)
+    if not check then
+      check = CreateFrame("CheckButton", nil, b, "UICheckButtonTemplate")
+      check:SetSize(20, 20)
+    end
+    check:SetPoint("LEFT", b, "LEFT", 6, 0)
+    check:SetScript("OnClick", function() toggleRow(b) end)
+    -- The box's own hover is the row's, so the two never light separately.
+    check:SetScript("OnEnter", function()
+      UI.optItem = b.optIdx
+      renderOptions()
+    end)
+    b.check = check
+    b.name:ClearAllPoints()
+    b.name:SetPoint("LEFT", check, "RIGHT", 6, 0)
+    b.name:SetPoint("RIGHT", b, "RIGHT", -6, 0)
     b:SetScript("OnClick", function(self)
+      self.check:SetChecked(not self.check:GetChecked())
+      toggleRow(self)
+    end)
+    b:SetScript("OnEnter", function(self)
       UI.optItem = self.optIdx
       renderOptions()
     end)
     optListBtns[i] = b
   end
 
-  optDetailAnchor = CreateFrame("Frame", nil, p)
-  optDetailAnchor:SetPoint("TOPLEFT", p, "TOPLEFT", 324, 0)
-  optDetailAnchor:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -8, 24)
-  optGroups = {}
-  for idx, d in ipairs(OPT_DEFS) do
-    optGroups[idx] = makeOption(optDetailAnchor, d.label, d.desc, d.get, d.set)
+  -- The description pane: the option's name in the heading ink, then what
+  -- it does, wrapped to the pane and top-justified so a short description
+  -- does not float to the middle of a tall window.
+  optTitle = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  optTitle:SetPoint("TOPLEFT", p, "TOPLEFT", detailX, -4)
+  optTitle:SetPoint("RIGHT", p, "RIGHT", 0, 0)
+  optTitle:SetJustifyH("LEFT")
+  optTitle:SetWordWrap(false)
+  if ns.Theme and ns.Theme.Font and ns.Theme.Font("heading") then
+    optTitle:SetFontObject(ns.Theme.Font("heading"))
   end
+  optDesc = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  optDesc:SetPoint("TOPLEFT", optTitle, "BOTTOMLEFT", 0, -8)
+  optDesc:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", 0, 22)
+  optDesc:SetJustifyH("LEFT")
+  optDesc:SetJustifyV("TOP")
+  if ns.Theme and ns.Theme.Ink then ns.Theme.Ink(optDesc, "normal") end
 
   UI.optCat, UI.optItem = 1, 1
 
@@ -2184,18 +2362,30 @@ local function build()
     frame:SetPortraitToAsset(ns.ICON)
   end
 
-
-
-  -- The v2 ground through Theme. Guarded.
-  if ns.Theme and ns.Theme.ApplyFrame then ns.Theme.ApplyFrame(frame) end
+  -- The v2 skin through Theme: the template's nine-slice, parchment and
+  -- portrait go, the title band and close X are redrawn, the ground and the
+  -- bronze edge go on. Guarded — without a theme the stock chrome stands.
+  local insetY = ns.Theme and ns.Theme.INSET_Y or -60
+  if ns.Theme and ns.Theme.SkinWindow then
+    ns.Theme.SkinWindow(frame, "Warband.pro", ns.ICON)
+  elseif ns.Theme and ns.Theme.ApplyFrame then
+    ns.Theme.ApplyFrame(frame)
+  end
 
   -- Every panel anchors to the inset. ButtonFrameTemplate has shipped one for
   -- a decade; if the parentKey ever moves, build our own rather than error.
+  -- Re-anchored either way: the title band and the tab row now sit above it,
+  -- and the template's own top offset was measured for a portrait.
   if not frame.Inset then
     frame.Inset = CreateFrame("Frame", nil, frame, "InsetFrameTemplate")
-    frame.Inset:SetPoint("TOPLEFT", 8, -60)
-    frame.Inset:SetPoint("BOTTOMRIGHT", -8, 30)
+    if ns.Theme and ns.Theme.HideRegion then
+      ns.Theme.HideRegion(frame.Inset.Bg)
+      ns.Theme.HideRegion(frame.Inset.NineSlice)
+    end
   end
+  frame.Inset:ClearAllPoints()
+  frame.Inset:SetPoint("TOPLEFT", 8, insetY)
+  frame.Inset:SetPoint("BOTTOMRIGHT", -8, 30)
 
   panels = { makePanel(), makePanel(), makePanel(), makePanel() }
 
@@ -2226,14 +2416,16 @@ local function build()
   frame.Tabs = tabs
   PanelTemplates_SetNumTabs(frame, #tabs)
 
-  -- The gold divider with its center ornament under the tab row. The ground
-  -- and bronze edge landed earlier through ApplyFrame; everything here goes
+  -- The gold divider with its center ornament under the tab row, the width
+  -- of the window: it parts the header from the content. The ground and
+  -- bronze edge landed earlier through SkinWindow; everything here goes
   -- through a Theme builder, never a one-off.
   if ns.Theme and ns.Theme.MakeDivider then
     local divider = ns.Theme.MakeDivider(frame)
     if divider then
-      divider:SetPoint("TOPLEFT", tabs[1], "BOTTOMLEFT", 0, -3)
-      divider:SetPoint("TOPRIGHT", tabs[#tabs], "BOTTOMRIGHT", 0, -3)
+      local y = ns.Theme.DIVIDER_Y or -60
+      divider:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, y)
+      divider:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -12, y)
       frame.ThemeDivider = divider
     end
   end
@@ -2273,6 +2465,13 @@ function UI.SelectTab(id)
     if not ns.Junk.Stored() then
       junkHeader:SetText(format("|cff%spaste the cleanup string from warband.pro/gear above|r", MUTED))
     end
+    -- The caret goes into the paste field on arrival, the same courtesy the
+    -- export tab pays its string: the tab exists to be pasted into, and
+    -- Ctrl+V should work without first finding a 22px field. On the same
+    -- 0-second timer, because focus set before the frame has drawn is lost.
+    C_Timer.After(0, function()
+      if junkPaste and frame:IsShown() and panels[TAB_IMPORT]:IsShown() then junkPaste:SetFocus() end
+    end)
   else
     refreshOptions()
   end
