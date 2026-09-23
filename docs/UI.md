@@ -1,34 +1,86 @@
 # UI — copy pain and import ease
 
 
-## v2 look (1.23.0) — what changed and what did not
+## v2 look (1.23.0, finished in 1.24.0) — what changed and what did not
 
 The window wears Plumber's visual language now — near-black warm-brown ground,
-thin bronze frame, text-only tabs (white active, gold idle, underline bar on
-the active one), plaque section headers, gold divider under the tab row — built
-entirely from Blizzard textures and this addon's own `Theme.lua` builders. No
-Plumber art or code ships; the MIT/GPL boundary is documented in Theme.lua.
+thin bronze hairlines, a title band with the tab row under it, text-only tabs
+(white active, gold idle, underline bar on the active one), plaque section
+headers, gold divider between the header and the content, flat buttons and
+checkboxes that light under the mouse — built entirely from Blizzard textures,
+Blizzard font objects and this addon's own `Theme.lua` builders. No Plumber
+art or code ships; the MIT/GPL boundary is documented in Theme.lua.
 
-- Tabs keep their `PanelTabButtonTemplate` behavior (click, select, resize);
-  only the boxes went away. `Theme.RefreshTabs` re-hides them after every
-  `PanelTemplates_SetTab`, which re-shows them.
-- Roster tab: persistent left sidebar (All plus one row per character with
-  class color, class icon, compact vault and keystone status, then the
-  account-wide resource rows). Clicking a row narrows the grid to that
-  character; the selected character gets Great Vault slot buttons
-  (`n/m`, locked dimmed gray, unlocked full white). The grid, its rules
+**The templates stay for their behavior and lose their paint.** The window is
+still a `ButtonFrameTemplate` (title, close button, Esc, the inset every panel
+anchors to), the tabs are still `PanelTabButtonTemplate`, the paste field is
+still an `InputBoxTemplate`, the scroll frames are still
+`UIPanelScrollFrameTemplate`. `Theme.SkinWindow`, `Theme.StyleTab`,
+`Theme.SkinInput` and `Theme.SkinScroll` hide the box art by parentKey — every
+hide guarded, so a renamed key costs the paint and never the widget — and draw
+the flat version over it. Buttons on the panels are `Theme.MakeButton` (a bare
+Button with a dark ground, a bronze edge and a HIGHLIGHT-layer sheet); the one
+secure button, Disenchant, is born a `SecureActionButtonTemplate` and skinned
+with `Theme.SkinButton`, which is textures and font objects and nothing
+protected. The vendor window's Sell-list button stays a stock
+`UIPanelButtonTemplate`: it lives in Blizzard's frame and should match it.
+
+**Fonts are Font objects, not `SetFont` calls** (1.24.0). A Button re-applies
+its state font object to its label on every Enable/Disable, and the client's
+own `PanelTemplates_SelectTab` disables the selected tab — so 1.23.0's 16px tab
+labels lasted until the first click. `Theme.Font(key)` builds named Font
+objects once (`CreateFont`, copied from a game font so the locale face comes
+along, then sized and tinted) and hands those to the buttons' normal /
+highlight / disabled slots; `Theme.RefreshTabs` re-sets the disabled slot after
+every `PanelTemplates_SetTab`, because the client's select overwrites it. The
+tab-box list covers the current client's parentKeys (`LeftActive` and friends)
+as well as the older ones, so the active tab no longer draws stock art under
+its label.
+
+**Hairlines are one physical pixel.** `PixelUtil.SetHeight(tex, 1, 1)` where
+the client has it, so a bronze rule at a UI scale below one does not blur or
+vanish. Without it the line is one UI unit, which is what 1.23.0 drew.
+
+- **Header**: a 30px title band (icon, "Warband.pro" in gold serif, the close
+  X drawn as two hairlines) over the tab row, then the divider at
+  `Theme.DIVIDER_Y`; the inset starts at `Theme.INSET_Y`. 1.23.0 hung the tabs
+  off the window's bottom edge, where every stock panel keeps its boxed tabs
+  and where a text-only tab floats over the world with nothing behind it.
+- **"You are here" is selected, not disabled** (1.24.0). The export's slice row
+  marks the scope you are on with `Theme.SetSelected` — bronze ground, bright
+  edges, white label — where 1.23.0 disabled it, the client's idiom, which on
+  this ground reads as broken. The pager arrows still disable at an edge,
+  because that one genuinely cannot be pressed.
+- **Roster tab**: persistent left sidebar (All plus one row per character with
+  class color, class icon, compact vault and keystone status in the model's
+  tone, then the account-wide resource rows), parted from the grid by a
+  hairline. Rows are `Theme.MakeListRow` — a HIGHLIGHT-layer sheet under the
+  mouse, a bronze ground and bar when selected — and a character row's hover
+  is the grid column header's `columnTip`, so the two cannot disagree. The
+  list is a bare `ScrollFrame` driven by the wheel with a 2px thumb that
+  appears only when there is somewhere to scroll to (1.24.0; through 1.23.0 a
+  warband taller than the window drew over the footer). Clicking a row narrows
+  the grid to that character; the selected character gets Great Vault slot
+  buttons (`n/m`, locked dimmed gray, unlocked full white). The grid, its rules
   (absent-is-not-zero, collapsible groups, no live reads), and the warbank
   footer are unchanged. Model: `Roster.Sidebar` (+ tests); seasons:
   `Roster.Seasons` (one entry today, the selector enables when a second lands).
-- Options tab: three panes (Data / Automation / Display nav, option list,
-  detail with the checkbox and description). Same controls, same saved
-  variables.
-- Export/Import: plaque headers name the string each tab holds (the export
-  plaque follows the slice scope); wire format, slice row, pager, and the
-  paste flow are untouched.
+- **Options tab**: three panes under section headings and parted by hairlines
+  — Data / Automation / Display nav on the left, **checkbox rows** in the
+  middle, the hovered or last-clicked option's name and description on the
+  right. A setting is one click: the row and its box are two targets for the
+  same toggle, and the mouse arriving is what puts a row's description in the
+  pane (1.24.0; 1.23.0 kept the checkbox on the right, which made every
+  setting select-then-toggle). Same controls, same saved variables.
+- **Export/Import**: plaque headers name the string each tab holds (the export
+  plaque follows the slice scope); the paste field takes the caret when the
+  tab opens, on the same 0-second timer the export tab uses for its highlight
+  (1.24.0). Wire format, slice row, pager, and the paste flow are untouched.
 
 Everything below still describes the window — read this section first for
-where the chrome went.
+where the chrome went. Where a paragraph below says a control is "disabled" for
+the scope you are on or names a stock template for the paint, this section is
+the current word.
 
 
 Copying from WoW chat is notoriously awful. This addon lives or dies by how painless we make copy + paste both sides.

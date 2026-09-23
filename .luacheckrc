@@ -45,6 +45,13 @@ read_globals = {
   -- the tabbed window (UI.lua)
   "PanelTemplates_SetNumTabs", "PanelTemplates_SetTab", "PanelTemplates_TabResize",
   "PlaySound", "SOUNDKIT",
+  -- the theme (Theme.lua): named Font objects, because a Button re-applies its
+  -- state font object to its label on every Enable/Disable and a size set on
+  -- the FontString itself lasts until the first click; and the client's own
+  -- pixel snapping, so a 1px hairline is one physical pixel at any UI scale.
+  -- Both are read through guards — a client without either costs the theme a
+  -- font size or a crisp line, never the window.
+  "CreateFont", "PixelUtil",
 
   -- the vendor window's sell-all (UI.lua): Blizzard's own merchant frame, which
   -- the button parents itself to, and the confirm it puts under the click.

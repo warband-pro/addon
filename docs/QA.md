@@ -471,6 +471,68 @@ mind rearranging, and take the backup line seriously.
       `Logs/taint.log` has no WarbandPro line
 - [ ] BugSack empty after all of the above
 
+## The v2 look (1.24.0)
+
+The chrome is impure code — Theme.lua and the layout half of UI.lua run only
+in the client — so this is the whole of its test. Every item below is a thing
+the fake-client harness cannot see: what a texture looks like, what a font
+object does when the client re-applies it, where a pixel lands at a UI scale
+that is not one.
+
+- [ ] `/warband` — no parchment, no portrait, no red close button: a flat dark
+      window with a 1px bronze edge, the icon and "Warband.pro" in gold at the
+      top left, an X drawn as two lines at the top right, the four tabs on the
+      row under the title, and the gold divider with its diamond under them
+- [ ] The X lights white under the mouse; click — window closes; Esc — closes
+- [ ] Drag the title band — the window moves; drag the corner grip — it
+      resizes, and the tab row and divider stay put at the top
+- [ ] Click every tab — the active one is white with an underline the width
+      of its word, the rest gold, and NO tab shows a box or a glow behind its
+      label, hovered or not. Click through all four twice: every label stays
+      the same 16px size (this is the check the Font objects exist for)
+- [ ] Set UI scale to 0.64 in Settings, `/reload` — the bronze edge, the
+      divider and the hairlines between the panes are still one crisp line,
+      not blurred or missing
+- [ ] Export tab: "Whole warband" is the bright one with bronze edges and
+      "This character" is dark; click the dark one — they swap, the plaque
+      above the string follows, the string rebuilds. The bright one still
+      lights under the mouse and clicking it does nothing
+- [ ] Export tab: the well behind the string is a shade darker than the ground
+      with a hairline round it, the scrollbar is a bronze thumb on a faint
+      track with no arrow art, and the wheel still scrolls it
+- [ ] Every button on the panels (Select all, Just this character, `<` `>`,
+      Sell, Disenchant, Equip N & save set, Season 2) is flat and dark with a
+      bronze edge, lights under the mouse, and its label brightens; a
+      disabled one (Season 2, an arrow at its edge) is dim with a grey label
+- [ ] From-tab: the tab opens with the caret already in the paste field and
+      the field's edge bright; Ctrl+V with a string on the clipboard pastes
+      without a click first; click elsewhere — the edge dims
+- [ ] Roster: sidebar rows light under the mouse; click a character — the
+      row gets a bronze ground and a bar, the grid narrows, the vault strip
+      appears; click All — back. Hover a character row — the same tooltip as
+      hovering its column header (realm, guild, level, item level, gold, last
+      seen, scanned)
+- [ ] Roster on an account with more characters than fit the sidebar (or
+      the window dragged to its shortest): the wheel scrolls the list, a thin
+      bronze thumb on the right edge tracks it, and no row draws over the
+      warband-bank footer. With everything fitting, no thumb at all
+- [ ] Options: three panes under "Settings" / the category's name / the
+      option's name, parted by hairlines. Click a category — the middle pane
+      lists its options as checkbox rows. Hover a row — the right pane shows
+      its description without a click. Click the box — it toggles with the
+      client's checkbox click; click the row's text — it toggles the same
+      way. Toggle "Show the minimap button" off and on from here — the icon
+      goes and comes back
+- [ ] `/dump WarbandProDB.opts` after toggling each option once — the same
+      keys 1.23.0 wrote (`includeGear`, `includeLinks`, `autoJunk`,
+      `autoLog`, `minimap`, `allCurrencies`) and nothing new
+- [ ] Open a vendor — the `Sell list (N)` button on MerchantFrame is still
+      the stock Blizzard button, untouched by the theme
+- [ ] `/console taintLog 1` — click every tab, toggle every option, sell one
+      row and disenchant one — `/reload` — `Logs/taint.log` has no WarbandPro
+      line
+- [ ] BugSack empty after all of the above
+
 ```
 PASS BugSack empty
 PASS taint 0
