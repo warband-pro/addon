@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.24.0] — 2026-09-23 — the v2 look, all the way through
+
 ### Changed
 
 - **The whole window is the flat dark panel now, not only its ground.** The stock parchment frame, the portrait and the red close button are gone. The title sits in its own band with the tabs under it — inside the window, where 1.23.0 had them hanging off the bottom edge with nothing behind them — and the gold rule parts the header from the content. Buttons, checkboxes, scrollbars, the paste field and the text wells are drawn the same way: dark ground, thin bronze edge, lit under the mouse. Every control does exactly what it did.
@@ -73,6 +75,7 @@ MAJOR has to be a wire break.**
 
 - **Options is a three-pane settings panel.** Data, Automation, and Display down the left; the middle lists the category; the right shows the checkbox and what it does. Every control persists the same saved variables.
 - **Export and Import wear the theme too.** Plaque headers name the string each tab holds; the strings, the slice row, and the paste flow behave exactly as before.
+
 ## [1.22.1] — 2026-09-22 — the Windows setup notes live in the agent contract
 
 ### Changed
