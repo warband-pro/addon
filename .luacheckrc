@@ -57,6 +57,9 @@ read_globals = {
   -- the roster grid (Roster.lua, UI.lua): the client's own class palette, so
   -- a name in this window is the colour it is on the character's own frame.
   "RAID_CLASS_COLORS",
+  -- Class icons beside the sidebar names: the client's own circle sheet, cut
+  -- with its own coordinates. Static data, read like the palette above.
+  "CLASS_ICON_TCOORDS",
 
   -- character
   "UnitGUID", "UnitName", "UnitClass", "UnitRace", "UnitLevel", "UnitXP", "UnitXPMax", "UnitFactionGroup",

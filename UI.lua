@@ -1553,12 +1553,27 @@ local function renderSidebar(side, sel)
         end
         local sc = selected and "FFFFFF" or "D7C0A3"
         b.status:SetText(e.status ~= "" and format("|cff%s%s|r", sc, e.status) or "")
+        -- One icon slot, two owners: a class icon cut from the client's own
+        -- circle sheet on character rows, the stored currency icon on account
+        -- rows. Coordinates reset on every switch, so a pooled row never crops
+        -- an item icon with the class sheet or wears a class icon for a
+        -- currency. No icon at all leaves the status full-width.
+        local coords = e.kind == "char" and e.class
+          and ns.safe(function() return CLASS_ICON_TCOORDS[e.class] end)
         if e.icon then
           b.icon:SetTexture(e.icon)
+          b.icon:SetTexCoord(0, 1, 0, 1)
           b.icon:Show()
-          b.status:SetPoint("RIGHT", -20, 0)
+        elseif coords then
+          b.icon:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
+          b.icon:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+          b.icon:Show()
         else
           b.icon:Hide()
+        end
+        if b.icon:IsShown() then
+          b.status:SetPoint("RIGHT", -20, 0)
+        else
           b.status:SetPoint("RIGHT", -4, 0)
         end
         if selected then b.bar:Show() else b.bar:Hide() end
