@@ -1,5 +1,36 @@
 # UI — copy pain and import ease
 
+
+## v2 look (1.23.0) — what changed and what did not
+
+The window wears Plumber's visual language now — near-black warm-brown ground,
+thin bronze frame, text-only tabs (white active, gold idle, underline bar on
+the active one), plaque section headers, gold divider under the tab row — built
+entirely from Blizzard textures and this addon's own `Theme.lua` builders. No
+Plumber art or code ships; the MIT/GPL boundary is documented in Theme.lua.
+
+- Tabs keep their `PanelTabButtonTemplate` behavior (click, select, resize);
+  only the boxes went away. `Theme.RefreshTabs` re-hides them after every
+  `PanelTemplates_SetTab`, which re-shows them.
+- Roster tab: persistent left sidebar (All plus one row per character with
+  class color, class icon, compact vault and keystone status, then the
+  account-wide resource rows). Clicking a row narrows the grid to that
+  character; the selected character gets Great Vault slot buttons
+  (`n/m`, locked dimmed gray, unlocked full white). The grid, its rules
+  (absent-is-not-zero, collapsible groups, no live reads), and the warbank
+  footer are unchanged. Model: `Roster.Sidebar` (+ tests); seasons:
+  `Roster.Seasons` (one entry today, the selector enables when a second lands).
+- Options tab: three panes (Data / Automation / Display nav, option list,
+  detail with the checkbox and description). Same controls, same saved
+  variables.
+- Export/Import: plaque headers name the string each tab holds (the export
+  plaque follows the slice scope); wire format, slice row, pager, and the
+  paste flow are untouched.
+
+Everything below still describes the window — read this section first for
+where the chrome went.
+
+
 Copying from WoW chat is notoriously awful. This addon lives or dies by how painless we make copy + paste both sides.
 
 ## Game side — one native window (1.5.0)

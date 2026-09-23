@@ -51,6 +51,8 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.23.0] â€” 2026-09-23 â€” the v2 Plumber-style look
+
 ### Changed
 
 - **The window wears the v2 Plumber-style chrome.** Dark bronze frame, text-only tabs (white active, gold idle, with an underline bar so the active tab never reads by color alone), and a gold divider under the tab row. Same tabs, same behavior, no wire or capture changes.
@@ -59,7 +61,6 @@ MAJOR has to be a wire break.**
 
 - **Options is a three-pane settings panel.** Data, Automation, and Display down the left; the middle lists the category; the right shows the checkbox and what it does. Every control persists the same saved variables.
 - **Export and Import wear the theme too.** Plaque headers name the string each tab holds; the strings, the slice row, and the paste flow behave exactly as before.
-
 ## [1.22.1] — 2026-09-22 — the Windows setup notes live in the agent contract
 
 ### Changed
