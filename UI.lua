@@ -174,6 +174,8 @@ local function makeTab(i, text)
     UI.SelectTab(self:GetID())
   end)
   PanelTemplates_TabResize(tab, 0)
+  -- The v2 skin: Theme owns the paint. Guarded.
+  if ns.Theme and ns.Theme.StyleTab then ns.Theme.StyleTab(tab) end
   return tab
 end
 
@@ -1551,7 +1553,7 @@ local function renderSidebar(side, sel)
           b.name:SetText(selected
             and "|cffffffffAll|r" or format("|cffD7C0A3%s|r", e.name))
         end
-        local sc = selected and "FFFFFF" or "D7C0A3"
+        local sc = (selected or e.kind == "account") and "FFFFFF" or "D7C0A3"
         b.status:SetText(e.status ~= "" and format("|cff%s%s|r", sc, e.status) or "")
         -- One icon slot, two owners: a class icon cut from the client's own
         -- circle sheet on character rows, the stored currency icon on account
@@ -1637,7 +1639,7 @@ function UI.RenderRoster()
   local view = db
   if sel and db then
     view = { chars = { [sel] = db.chars[sel] },
-      junk = db.junk, gearset = db.gearset, opts = db.opts, warbank = db.warbank }
+      junk = db.junk, gearset = db.gearset, opts = db.opts, warbandBank = db.warbandBank }
   end
   local model = ns.Roster.Build(view, selfGuid)
   local all = model.columns
@@ -1673,7 +1675,7 @@ function UI.RenderRoster()
   for i = 1, #rosterCols do
     local col, head = shown[i], rosterCols[i]
     head.hit.col = col
-    head.hit:SetShown(i <= nCols and col ~= nil)
+    head.hit:SetShown(not sel and i <= nCols and col ~= nil)
     if col then
       head.name:SetText((DOT[col.dot] or DOT.never) .. classText(col.class, col.name))
       head.meta:SetText(format("|cff%s%s%s|r", MUTED,
@@ -1821,6 +1823,21 @@ function UI.RenderRoster()
     end
   end
   renderSlots(selRow, sel ~= nil)
+  -- Single-character detail names itself in the header: class-colored name,
+  -- level and item level, keystone best as a plain number with its dungeon.
+  -- All three ride the stored tables; the render reads nothing live.
+  if sel and selRow then
+    local scol = selRow.col
+    local skey = selRow.keystone
+    local sks = db.chars and db.chars[sel] and db.chars[sel].keystone or nil
+    local sdg = type(sks) == "table" and sks.dungeonName or nil
+    rosterHead:SetText(classText(scol.class, scol.name)
+      .. format("|cff%s%s%s|r", MUTED,
+        scol.level and ("  ·  " .. scol.level
+          .. (scol.ilvl and (" · " .. scol.ilvl) or "")) or "",
+        skey and ("  ·  " .. skey.text .. (sdg and (" " .. sdg) or "")) or ""))
+  end
+
 end
 
 --- Shut a group, or open it again, and remember which.
@@ -2168,6 +2185,9 @@ local function build()
   end
 
 
+
+  -- The v2 ground through Theme. Guarded.
+  if ns.Theme and ns.Theme.ApplyFrame then ns.Theme.ApplyFrame(frame) end
 
   -- Every panel anchors to the inset. ButtonFrameTemplate has shipped one for
   -- a decade; if the parentKey ever moves, build our own rather than error.
