@@ -51,6 +51,12 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Changed
+
+- **The window wears the v2 Plumber-style chrome.** Dark bronze frame, text-only tabs (white active, gold idle, with an underline bar so the active tab never reads by color alone), and a gold divider under the tab row. Same tabs, same behavior, no wire or capture changes.
+
+- **The Roster tab grows a sidebar.** All plus one row per character with compact vault and keystone status, then the account-wide resource rows; clicking a row narrows the grid to that character, and the selected character gets Great Vault slot buttons (locked dimmed, unlocked bright). The grid itself is unchanged.
+
 ## [1.22.1] — 2026-09-22 — the Windows setup notes live in the agent contract
 
 ### Changed

@@ -44,6 +44,7 @@ Import.lua
 Junk.lua
 GearSet.lua
 Roster.lua
+Theme.lua
 UI.lua
 Core.lua
 

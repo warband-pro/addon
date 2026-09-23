@@ -87,6 +87,10 @@ local GS_ROWS, GS_LINE = 16, 16
 -- measured) scrolled off the bottom of its own grid into blank space. Both
 -- pools now grow to whatever the model and the window between them ask for.
 local LABEL_W, CELL_W, LINE_H = 152, 56, 14
+
+-- The v2 sidebar takes the left of the roster panel; the grid starts past it.
+local SIDEBAR_W, SIDE_ROW_H = 184, 16
+local SLOT_SHORT = { raid = "raid", mplus = "mythic+", world = "world" }
 -- The icon a row may carry, and the room the label gives up for it. Sized off
 -- the line so the two stay in step if the grid ever changes row height.
 local ROW_ICON = LINE_H - 2
@@ -129,6 +133,9 @@ local junkPaste, junkHeader, junkFooter, junkRows, junkChild
 local gsHeader, gsButton, gsList, gsRows
 local rosterHead, rosterFoot, rosterCols, rosterLines, rosterChild, rosterPrev, rosterNext
 local rosterScroll
+local sideFrame, sideRows, vaultStrip, vaultSlots, rosterWell
+-- Forward-declared: buildRoster calls these before their definitions read.
+local buildSidebar, buildVaultStrip
 local optionChecks = {}
 
 -- Which characters the export covers: "bundle" is the whole warband and
@@ -144,6 +151,10 @@ UI.rosterPage = 1
 -- unless `/warband copy 2` asked for another, and reset by any plain open so
 -- the panel cannot sit on page 3 days after the player went looking for it.
 UI.page = 1
+
+-- Which roster character the sidebar narrowed the grid to: a guid, or nil
+-- for the whole warband. Survives a close; a reading position, not a copy.
+UI.rosterSelect = nil
 
 -- ── window chrome ───────────────────────────────────────────────────────────
 
@@ -1307,8 +1318,11 @@ local function buildRoster()
   rosterCols = {}
 
   local well = makeWell(p)
-  well:SetPoint("TOPLEFT", 0, -50)
+  rosterWell = well
+  well:SetPoint("TOPLEFT", SIDEBAR_W + 8, -50)
   well:SetPoint("BOTTOMRIGHT", -20, 34)
+  buildSidebar(p)
+  buildVaultStrip(p)
 
   local scroll = CreateFrame("ScrollFrame", "WarbandProRosterScroll", p, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", well, "TOPLEFT", 8, -8)
@@ -1384,11 +1398,205 @@ end
 --- Flattens the model's groups into one list of lines — a group header is a
 --- line with no cells — because a scroll child of uniform 14px rows is what
 --- makes the label column and the cells stay aligned without a layout pass.
+-- ── roster sidebar ──────────────────────────────────────────────────────────
+--
+-- The v2 sidebar: All plus one row per character, then the account section. A
+-- row is a plain button — name on the left, compact status on the right — and
+-- clicking one narrows the grid to that character (All restores the whole
+-- warband). The selected row carries a bronze bar as well as bright text, so
+-- selection is never color alone. Rows are pooled like every other widget
+-- here and grow to whatever the warband asks for.
+
+local function makeSideRow(i)
+  local b = CreateFrame("Button", nil, sideFrame)
+  b:SetSize(SIDEBAR_W, SIDE_ROW_H)
+  b:SetPoint("TOPLEFT", sideFrame, "TOPLEFT", 0, -(i - 1) * SIDE_ROW_H)
+  b.bar = b:CreateTexture(nil, "OVERLAY")
+  b.bar:SetColorTexture(0.55, 0.42, 0.28, 1)
+  b.bar:SetSize(2, 12)
+  b.bar:SetPoint("LEFT", 3, 0)
+  b.bar:Hide()
+  b.name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  b.name:SetPoint("LEFT", 10, 0)
+  b.name:SetWidth(112)
+  b.name:SetJustifyH("LEFT")
+  b.icon = b:CreateTexture(nil, "OVERLAY")
+  b.icon:SetSize(12, 12)
+  b.icon:SetPoint("RIGHT", -4, 0)
+  b.icon:Hide()
+  b.status = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  b.status:SetPoint("RIGHT", -4, 0)
+  b.status:SetJustifyH("RIGHT")
+  b:SetScript("OnClick", function(self)
+    UI.rosterSelect = self.selGuid
+    UI.RenderRoster()
+  end)
+  sideRows[i] = b
+  return b
+end
+
+local function ensureSide(n)
+  if not sideRows then sideRows = {} end
+  for i = 1, n do if not sideRows[i] then makeSideRow(i) end end
+end
+
+function buildSidebar(p)
+  sideFrame = CreateFrame("Frame", nil, p)
+  sideFrame:SetPoint("TOPLEFT", p, "TOPLEFT", 0, -50)
+  sideFrame:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", 0, 30)
+  sideFrame:SetWidth(SIDEBAR_W)
+  sideRows = {}
+end
+
+-- The vault-slot strip above the grid: one small button per Great Vault
+-- bucket of the selected character, Plumber's GreatVault.lua pattern (n/m
+-- text; locked dimmed gray, unlocked full brightness white). Shown only for
+-- a single-character selection; the whole warband keeps the vault rows it
+-- already has. The strip costs the well its top rows only while shown.
+function buildVaultStrip(p)
+  vaultStrip = CreateFrame("Frame", nil, p)
+  vaultStrip:SetPoint("TOPLEFT", p, "TOPLEFT", SIDEBAR_W + 8, -28)
+  vaultStrip:SetPoint("TOPRIGHT", p, "TOPRIGHT", 0, -28)
+  vaultStrip:SetHeight(20)
+  vaultStrip:Hide()
+  vaultSlots = {}
+  for i = 1, 3 do
+    local s
+    if ns.Theme and ns.Theme.MakeSlot then
+      s = ns.Theme.MakeSlot(vaultStrip, 118)
+    end
+    if not s then
+      s = CreateFrame("Frame", nil, vaultStrip)
+      s:SetSize(118, 20)
+      s.SlotText = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      s.SlotText:SetPoint("CENTER", s, "CENTER", 0, 0)
+    end
+    s:SetPoint("LEFT", vaultStrip, "LEFT", (i - 1) * 124, 0)
+    s:Hide()
+    vaultSlots[i] = s
+  end
+end
+
+local function renderSidebar(side, sel)
+  if not sideFrame then return end
+  local n = #side.rows
+  local entries = {
+    { head = "Warband" },
+    { kind = "all", name = "All",
+      status = n == 1 and "1 alt" or format("%d alts", n) },
+  }
+  for _, r in ipairs(side.rows) do
+    entries[#entries + 1] = { kind = "char", guid = r.col.guid,
+      class = r.col.class, name = r.col.name,
+      status = r.vault and r.vault.text or (r.keystone and r.keystone.text or "") }
+  end
+  entries[#entries + 1] = { head = "Account" }
+  for _, a in ipairs(side.account) do
+    entries[#entries + 1] = { kind = "account", name = a.name,
+      status = a.text, icon = a.icon }
+  end
+  ensureSide(#entries)
+  for i, b in ipairs(sideRows) do
+    local e = entries[i]
+    if not e then
+      b:Hide()
+    else
+      b:Show()
+      if e.head then
+        b.name:SetText(format("|cff947C66%s|r", e.head))
+        b.status:SetText("")
+        b.icon:Hide()
+        b.bar:Hide()
+        b:EnableMouse(false)
+      else
+        b:EnableMouse(true)
+        b.selGuid = e.guid
+        local selected = (e.guid == sel)
+        if e.kind == "char" then
+          b.name:SetText(classText(e.class, e.name))
+        elseif e.kind == "account" then
+          b.name:SetText(format("|cffEBDEC2%s|r", e.name))
+        else
+          b.name:SetText(selected
+            and "|cffffffffAll|r" or format("|cffD7C0A3%s|r", e.name))
+        end
+        local sc = selected and "FFFFFF" or "D7C0A3"
+        b.status:SetText(e.status ~= "" and format("|cff%s%s|r", sc, e.status) or "")
+        if e.icon then
+          b.icon:SetTexture(e.icon)
+          b.icon:Show()
+          b.status:SetPoint("RIGHT", -20, 0)
+        else
+          b.icon:Hide()
+          b.status:SetPoint("RIGHT", -4, 0)
+        end
+        if selected then b.bar:Show() else b.bar:Hide() end
+      end
+    end
+  end
+end
+
+local function renderSlots(selRow, single)
+  local slots = selRow and selRow.vault and selRow.vault.slots or nil
+  local show = single and slots and #slots > 0
+  if not vaultStrip then return show end
+  if not show then
+    vaultStrip:Hide()
+  else
+    vaultStrip:Show()
+    for i, s in ipairs(vaultSlots) do
+      local sl = slots[i]
+      if not sl then
+        s:Hide()
+      else
+        s:Show()
+        local label = format("%s  %s", SLOT_SHORT[sl.key] or sl.key, sl.text)
+        local unlocked = (sl.unlocked or 0) > 0
+        if ns.Theme and ns.Theme.SetSlot then
+          ns.Theme.SetSlot(s, label, unlocked)
+        elseif s.SlotText then
+          s.SlotText:SetText(label)
+          if unlocked then
+            s.SlotText:SetTextColor(1, 1, 1)
+            s:SetAlpha(1)
+          else
+            s.SlotText:SetTextColor(0.5, 0.5, 0.5)
+            s:SetAlpha(0.6)
+          end
+        end
+      end
+    end
+  end
+  if rosterWell then
+    local parent = rosterWell:GetParent()
+    rosterWell:ClearAllPoints()
+    rosterWell:SetPoint("TOPLEFT", parent, "TOPLEFT", SIDEBAR_W + 8, show and -74 or -50)
+    rosterWell:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -20, 34)
+  end
+  return show
+end
+
 function UI.RenderRoster()
   if not rosterLines then return end
   local db = ns.Store.db
-  local model = ns.Roster.Build(db, ns.safe(UnitGUID, "player"))
+  local selfGuid = ns.safe(UnitGUID, "player")
+  -- Sidebar selection: a guid narrows the grid to that character, nil shows
+  -- the whole warband. A guid the DB no longer has (forgotten alt) falls back
+  -- to All rather than drawing an empty grid.
+  local sel = UI.rosterSelect
+  if sel and not (db and db.chars and db.chars[sel]) then
+    sel = nil
+    UI.rosterSelect = nil
+  end
+  local view = db
+  if sel and db then
+    view = { chars = { [sel] = db.chars[sel] },
+      junk = db.junk, gearset = db.gearset, opts = db.opts, warbank = db.warbank }
+  end
+  local model = ns.Roster.Build(view, selfGuid)
   local all = model.columns
+  -- The sidebar always sees the whole warband, whatever the grid is showing.
+  local side = db and ns.Roster.Sidebar(db, selfGuid) or { rows = {}, account = {} }
 
   -- Columns first, because the page arithmetic depends on how many fit.
   local nCols = fittingCols()
@@ -1405,7 +1613,7 @@ function UI.RenderRoster()
   -- of every row that it pulled out of the column list. `Roster.Lines` owns
   -- that arithmetic and the shut-group rule together, because they are the same
   -- question asked of a row and of the header above it.
-  local opts = db and db.opts
+  local opts = view and view.opts
   local lines = ns.Roster.Lines(model.groups, first, nCols,
     type(opts) == "table" and type(opts.rosterShut) == "table" and opts.rosterShut or nil)
   local n = #lines
@@ -1559,6 +1767,14 @@ function UI.RenderRoster()
   rosterNext:SetShown(pages > 1)
   rosterPrev:SetEnabled(UI.rosterPage > 1)
   rosterNext:SetEnabled(UI.rosterPage < pages)
+  renderSidebar(side, sel)
+  local selRow
+  if sel then
+    for _, r in ipairs(side.rows) do
+      if r.col.guid == sel then selRow = r break end
+    end
+  end
+  renderSlots(selRow, sel ~= nil)
 end
 
 --- Shut a group, or open it again, and remember which.
@@ -1806,6 +2022,8 @@ local function build()
     frame:SetPortraitToAsset(ns.ICON)
   end
 
+
+
   -- Every panel anchors to the inset. ButtonFrameTemplate has shipped one for
   -- a decade; if the parentKey ever moves, build our own rather than error.
   if not frame.Inset then
@@ -1843,6 +2061,18 @@ local function build()
   frame.Tabs = tabs
   PanelTemplates_SetNumTabs(frame, #tabs)
 
+  -- The gold divider with its center ornament under the tab row. The ground
+  -- and bronze edge landed earlier through ApplyFrame; everything here goes
+  -- through a Theme builder, never a one-off.
+  if ns.Theme and ns.Theme.MakeDivider then
+    local divider = ns.Theme.MakeDivider(frame)
+    if divider then
+      divider:SetPoint("TOPLEFT", tabs[1], "BOTTOMLEFT", 0, -3)
+      divider:SetPoint("TOPRIGHT", tabs[#tabs], "BOTTOMRIGHT", 0, -3)
+      frame.ThemeDivider = divider
+    end
+  end
+
   buildRoster()
   buildExport()
   buildImport()
@@ -1865,6 +2095,9 @@ function UI.SelectTab(id)
     return
   end
   PanelTemplates_SetTab(frame, id)
+  -- Selecting re-shows the template boxes; the theme hides them again and
+  -- repaints the row so behavior and look cannot drift apart.
+  if ns.Theme and ns.Theme.RefreshTabs then ns.Theme.RefreshTabs(tabs, id) end
   for i, p in ipairs(panels) do p:SetShown(i == id) end
   if id == TAB_ROSTER then
     UI.RenderRoster()

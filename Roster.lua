@@ -151,6 +151,112 @@ function Roster.Columns(db, selfGuid)
   return cols
 end
 
+-- The vault buckets in the order a player thinks about them, with the label
+-- each one gets. `world` is last because it is the one that fills itself.
+local VAULT = {
+  { key = "raid", label = "vault · raid" },
+  { key = "mplus", label = "vault · mythic+" },
+  { key = "world", label = "vault · world" },
+}
+
+-- ── sidebar ─────────────────────────────────────────────────────────────────
+--
+-- The v2 sidebar model: one row per character plus the account section. Rows
+-- reuse Columns — same sort, same freshness, same gold — and add the two
+-- compact readings the sidebar prints beside the name: the vault status
+-- (unlocked slots summed across the three buckets, absent when the vault was
+-- never read) and the keystone level. The account section is the quiet
+-- account-wide resource rows: one per account-wide currency, read off the
+-- character who saw it most recently, because a shared stash summed across
+-- its readers would count the same pile once per alt. The first icon seen
+-- answers for the row, the way the grid's currency rows already do.
+function Roster.Sidebar(db, selfGuid)
+  local cols = Roster.Columns(db, selfGuid)
+  local rows = {}
+  for i, col in ipairs(cols) do
+    local c = col.char
+    local vault, keystone
+    local v = c.weeklyVault
+    if type(v) == "table" then
+      local unlocked, read, slots = 0, false, {}
+      for _, b in ipairs(VAULT) do
+        local bucket = v[b.key]
+        if type(bucket) == "table" then
+          read = true
+          local u = unlockedN(bucket.unlocked) or 0
+          unlocked = unlocked + u
+          -- One slot button per bucket the vault actually read: n/m while a
+          -- threshold is still on the table (with the unlocked count beside
+          -- it, so locked and unlocked differ in text as well as brightness),
+          -- the unlocked count once everything is earned.
+          local t = num(bucket.threshold)
+          slots[#slots + 1] = {
+            key = b.key, label = b.label, unlocked = u,
+            text = t and format("%d/%d%s", num(bucket.progress) or 0, t,
+              u > 0 and format(" (%d)", u) or "")
+              or (u .. (u == 1 and " slot" or " slots")),
+            tone = u > 0 and "good" or "plain",
+          }
+        end
+      end
+      if read then
+        vault = cell(unlocked > 0
+          and (unlocked .. (unlocked == 1 and " slot" or " slots")) or "0",
+          unlocked > 0 and "good" or "plain")
+        vault.slots = slots
+      end
+    end
+    local k = c.keystone
+    if type(k) == "table" and num(k.level) then
+      keystone = cell("+" .. k.level, "plain")
+    end
+    rows[i] = { col = col, vault = vault, keystone = keystone }
+  end
+  local seen, account = {}, {}
+  for _, col in ipairs(cols) do
+    local c = col.char
+    local stamp = num((c.seenAt or {}).currency) or 0
+    for _, cur in ipairs(c.currencies or {}) do
+      if cur.id and cur.name and cur.isAccountWide and num(cur.quantity) then
+        local k = seen[cur.id]
+        if not k then
+          k = { id = cur.id, name = cur.name }
+          seen[cur.id] = k
+          account[#account + 1] = k
+        end
+        if k.icon == nil then k.icon = cur.icon end
+        -- Columns arrive self-first, not freshest-first, so the stamp decides
+        -- no matter the order. A tie keeps the earlier column: same stash,
+        -- same pile, either reader.
+        if stamp >= (k.stamp or -1) then
+          k.stamp = stamp
+          k.quantity = cur.quantity
+        end
+      end
+    end
+  end
+  sort(account, function(a, b) return a.name < b.name end)
+  for _, k in ipairs(account) do
+    k.text = commas(k.quantity)
+    k.stamp = nil
+  end
+  return { rows = rows, account = account }
+end
+-- Season knowledge lives here and nowhere else, for the reason PINNED below
+-- gives: the wire carries this season only, so the selector the tab draws has
+-- one entry. When the wire carries more, this function gains entries and the
+-- tab's control enables itself; until then a single disabled entry is the
+-- honest control rather than a dropdown that goes nowhere.
+Roster.SEASON_LABEL = "Season 2"
+
+--- The seasons the stored data can answer for, current first. `db` is unused
+--- today and taken anyway: it is where a second season will be found when the
+--- wire carries one, and the call shape should not move under the tab then.
+function Roster.Seasons(db)
+  return { { id = "current", label = Roster.SEASON_LABEL } }
+end
+
+
 -- ── row building ────────────────────────────────────────────────────────────
 
 -- A group under construction. `add` takes a label and a function that answers
@@ -183,14 +289,6 @@ local function push(groups, g)
 end
 
 -- ── the groups ──────────────────────────────────────────────────────────────
-
--- The vault buckets in the order a player thinks about them, with the label
--- each one gets. `world` is last because it is the one that fills itself.
-local VAULT = {
-  { key = "raid", label = "vault · raid" },
-  { key = "mplus", label = "vault · mythic+" },
-  { key = "world", label = "vault · world" },
-}
 
 local function thisWeek(groups, cols)
   local g = group("this week")

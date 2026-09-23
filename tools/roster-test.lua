@@ -1116,7 +1116,100 @@ do
     band and #band.parts == 3 and band.more == 1, band and names(band))
 end
 
+-- ── sidebar ────────────────────────────────────────────────────────────────
+--
+-- Roster.Sidebar: one row per character (Columns order plus compact vault and
+-- keystone) and the account-wide resource rows. Same absent-is-not-zero rule
+-- as the grid: a vault never read is nil, never "0".
+
+do
+  local selfGuid, altGuid = "self-1", "alt-2"
+  local d = db({
+    [selfGuid] = char({
+      name = "Vocnar", class = "WARRIOR",
+      seenAt = { lastSeen = NOW - 60, currency = NOW - 100 },
+      weeklyVault = {
+        raid = { unlocked = 1, progress = 1, threshold = 3 },
+        mplus = { unlocked = 1, progress = 8, threshold = 8 },
+        world = { unlocked = 0, progress = 0, threshold = 2 },
+      },
+      keystone = { level = 12 },
+      currencies = {
+        { id = 1, name = "Valorstones", quantity = 1900, isAccountWide = false },
+        { id = 2, name = "Restored Coffer Key", quantity = 3, isAccountWide = true, icon = 1234 },
+        { id = 3, name = "Undercoin", quantity = 1500, isAccountWide = true },
+      },
+    }),
+    [altGuid] = char({
+      name = "Voctara", class = "MAGE",
+      seenAt = { lastSeen = NOW - 3600, currency = NOW - 50 },
+      currencies = {
+        { id = 2, name = "Restored Coffer Key", quantity = 5, isAccountWide = true },
+        { id = 1, name = "Valorstones", quantity = 240, isAccountWide = false },
+      },
+    }),
+  })
+  local sb = Roster.Sidebar(d, selfGuid)
+
+  check("the sidebar lists every character", #sb.rows == 2)
+  check("the character at the keyboard still leads",
+    sb.rows[1].col.isSelf and sb.rows[1].col.name == "Vocnar")
+  check("vault status sums unlocked slots across buckets",
+    sb.rows[1].vault and sb.rows[1].vault.text == "2 slots")
+  check("an earned vault reads as good",
+    sb.rows[1].vault and sb.rows[1].vault.tone == "good")
+  check("a vault never read is absent, not zero", sb.rows[2].vault == nil)
+  check("keystone reads as the level", sb.rows[1].keystone and sb.rows[1].keystone.text == "+12")
+  check("a missing keystone is absent", sb.rows[2].keystone == nil)
+
+  check("only account-wide currencies earn account rows", #sb.account == 2)
+  check("account rows sort by name",
+    sb.account[1].name == "Restored Coffer Key" and sb.account[2].name == "Undercoin")
+  -- The alt saw the shared stash more recently: its reading wins, and the two
+  -- readers must never be summed into one pile.
+  check("a shared stash reads off its freshest reader, not the sum",
+    sb.account[1].quantity == 5)
+  check("the first icon seen answers for the row", sb.account[1].icon == 1234)
+  check("account counts print thousands-separated", sb.account[2].text == "1,500")
+
+  local unread = db({
+    [altGuid] = char({ name = "Voctara", weeklyVault = { raid = { unlocked = 0 } } }),
+  })
+  local sb2 = Roster.Sidebar(unread, altGuid)
+  check("a vault read with nothing unlocked says 0, not blank",
+    sb2.rows[1].vault and sb2.rows[1].vault.text == "0")
+  check("and the nought carries no opinion",
+    sb2.rows[1].vault and sb2.rows[1].vault.tone == "plain")
+
+  local empty = Roster.Sidebar(db({}), selfGuid)
+  check("an empty account has no sidebar rows", #empty.rows == 0)
+  check("and no account rows", #empty.account == 0)
+  check("vault slots carry one button per bucket read",
+    sb.rows[1].vault and sb.rows[1].vault.slots and #sb.rows[1].vault.slots == 3)
+  check("slot text reads progress over threshold with the unlocked count beside it",
+    sb.rows[1].vault.slots[1].text == "1/3 (1)")
+  check("an unlocked slot reads as good",
+    sb.rows[1].vault.slots[2].tone == "good")
+  check("a locked slot reads plain",
+    sb.rows[1].vault.slots[3].tone == "plain" and sb.rows[1].vault.slots[3].text == "0/2")
+  check("a vault never read carries no slots", sb.rows[2].vault == nil)
+end
+
 -- ── result ──────────────────────────────────────────────────────────────────
+
+-- ── seasons ────────────────────────────────────────────────────────────────
+--
+-- Roster.Seasons is the one entry the tab's season selector has today: the
+-- wire carries this season only, so a second entry is a wire change first.
+
+do
+  local seasons = Roster.Seasons(db({ a = char() }))
+  check("the tab answers for the current season",
+    #seasons == 1 and seasons[1].id == "current")
+  check("and names it the way the pinned currencies do",
+    seasons[1].label == Roster.SEASON_LABEL and seasons[1].label ~= "",
+    seasons[1].label)
+end
 
 print(format("\n%d passed, %d failed", pass, fail))
 os.exit(fail == 0 and 0 or 1)

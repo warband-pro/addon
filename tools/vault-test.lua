@@ -364,6 +364,49 @@ do
   }
 end
 
+-- ── the slot/row correspondence the detail buttons read ───────────────────
+--
+-- The roster's vault buttons print one n/m per bucket off `progress`,
+-- `threshold` and `unlocked`, with the per-slot detail behind them in `rows`.
+-- Every case below is that correspondence, because a button whose count and
+-- whose rows disagree is the grid stating something false at a glance.
+
+do
+  resetClient()
+  ACTIVITIES = {
+    act("Activities", 8, 8, 11),
+    act("Activities", 4, 8, 12),
+    act("Raid", 2, 4, 21),
+  }
+  Instances.Vault()
+  local v = char().weeklyVault
+  check("each activity earns its bucket a slot",
+    v.mplus.slots == 2 and #v.mplus.rows == 2,
+    v.mplus.slots .. "/" .. #v.mplus.rows)
+  check("and the unlocked count follows the earned rows",
+    v.mplus.unlocked == 1, v.mplus.unlocked)
+  check("progress names the best row", v.mplus.progress == 8, v.mplus.progress)
+  check("a locked bucket keeps the next threshold it can still reach",
+    v.raid.unlocked == 0 and v.raid.threshold == 4,
+    tostring(v.raid.unlocked) .. "/" .. tostring(v.raid.threshold))
+  check("and carries one row per slot behind it", #v.raid.rows == 1)
+end
+
+do
+  -- A bucket with everything earned carries no threshold at all, so the
+  -- buttons say how many slots it has rather than printing `3/nil`.
+  resetClient()
+  ACTIVITIES = {
+    act("World", 3, 3, 31),
+    act("World", 5, 5, 32),
+  }
+  Instances.Vault()
+  local w = char().weeklyVault.world
+  check("an earned-out bucket counts its slots", w.slots == 2 and w.unlocked == 2,
+    w.slots .. "/" .. w.unlocked)
+  check("and carries no threshold left to chase", w.threshold == nil)
+end
+
 if fail > 0 then
   print(pass .. " passed, " .. fail .. " failed")
   os.exit(1)
