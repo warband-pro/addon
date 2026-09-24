@@ -155,6 +155,8 @@ check("rejects whitespace only", codeFor("   ") == "empty")
 check("names an export string rather than calling it broken", codeFor("wb1!AAAA") == "is_export")
 check("names an equip string rather than calling it broken", codeFor("wbg1!AAAA") == "is_gearset")
 check("rejects a foreign prefix", codeFor("nope") == "wrong_prefix")
+check("names a newer wire rather than asking for another copy", codeFor("wbc2!AAAA") == "newer_wire")
+check("a bare wbc with no digit is still foreign", codeFor("wbc!AAAA") == "wrong_prefix")
 check("rejects an oversize input before inflating it", codeFor("wbc1!" .. string.rep("A", 41 * 1024)) == "too_large")
 check("rejects a body that is not base64url", codeFor("wbc1!***") == "not_base64")
 check("rejects a body that will not inflate", codeFor("wbc1!AAAA") == "not_deflate")
@@ -183,7 +185,7 @@ check("keeps the good item beside a malformed one", partial ~= nil and #partial.
 check("every code has a message", (function()
   for _, c in ipairs({
     "empty", "is_export", "wrong_prefix", "too_large", "not_base64",
-    "not_deflate", "not_json", "wrong_version", "no_items",
+    "not_deflate", "not_json", "wrong_version", "newer_wire", "no_items",
   }) do
     local m = Import.Message(c)
     if type(m) ~= "string" or m == "" or m == "that string could not be read" then return false end

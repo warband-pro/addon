@@ -451,7 +451,14 @@ function Import.DecodePlan(paste)
 
   if str:sub(1, #ns.WIRE) == ns.WIRE then return nil, "is_export" end
   if str:sub(1, #ns.GEARSET_WIRE) == ns.GEARSET_WIRE then return nil, "is_gearset" end
-  if str:sub(1, #ns.CLEANUP_WIRE) ~= ns.CLEANUP_WIRE then return nil, "wrong_prefix" end
+  -- A `wbc2!` is the site having moved the prefix, which CONTRACT.md reserves
+  -- for a break. The remedy is an update on this side, and "copy it again"
+  -- — the generic wrong-prefix answer — would send the player round in a
+  -- circle that never ends.
+  if str:sub(1, #ns.CLEANUP_WIRE) ~= ns.CLEANUP_WIRE then
+    if str:match("^wbc%d+!") then return nil, "newer_wire" end
+    return nil, "wrong_prefix"
+  end
   if #str > Import.MAX_WIRE then return nil, "too_large" end
 
   local raw = Import.Base64URLDecode(str:sub(#ns.CLEANUP_WIRE + 1))
@@ -624,19 +631,33 @@ end
 
 --- One rejection code -> the line the panel prints. Written for the person who
 --- just pasted the wrong thing, not for a log.
+---
+--- The remedy names the site's button — "copy for the addon" — rather than a
+--- route, because the button is on /gear and on every character page and the
+--- player pressed one of them a moment ago. `/warband` (no argument) is the
+--- export tab, so "your export string" says which box they are in.
 local MESSAGES = {
-  empty = "paste the string from warband.pro/gear",
-  is_export = "that is your export string — this box takes the strings warband.pro gives back",
+  empty = "press copy for the addon on warband.pro, then paste it here",
+  is_export = "that is your export string for the site — this box takes what warband.pro"
+    .. " sends back",
   is_gearset = "that is an equip string — it reads itself in this same box",
-  wrong_prefix = "a warband.pro string starts with " .. "wbc1!" .. " — copy it from warband.pro/gear",
+  wrong_prefix = "a warband.pro string starts with " .. "wbc1!"
+    .. " — press copy for the addon on the site and paste that",
   too_large = "that string is too big to have come from warband.pro",
   not_base64 = "that does not decode — copy the whole string, all on one line",
-  not_deflate = "that string is damaged — copy it again from warband.pro/gear",
+  not_deflate = "that string is damaged — press copy for the addon on warband.pro again",
   not_json = "that decoded to something warband.pro did not send",
   wrong_version = "that string is from a newer warband.pro — update this addon",
-  -- Not "nothing to clean up" any more: the string carries three things now,
-  -- and an empty one is empty of all of them.
-  no_items = "nothing in that string for any character on this account",
+  newer_wire = "that string is from a newer warband.pro than this addon reads"
+    .. " — update this addon",
+  -- Not "nothing to clean up" any more: the string carries four things now,
+  -- and an empty one is empty of all of them. The site drops a character with
+  -- nothing to send before encoding, so in practice this fires on a string
+  -- carrying a section this build does not know — which is an old addon, not
+  -- a wrong account, and the sentence says so rather than blaming the account
+  -- before the guid check has even run.
+  no_items = "nothing this addon can read in that string"
+    .. " — if warband.pro is newer than this addon, update the addon",
 }
 
 function Import.Message(code)
@@ -648,9 +669,9 @@ end
 --- failures.
 local GEARSET_MESSAGES = {
   is_cleanup = "that is a cleanup string — it reads itself in this same box",
-  wrong_prefix = "an equip string starts with " .. "wbg1!" .. " — copy it from warband.pro/gear",
+  wrong_prefix = "an equip string starts with " .. "wbg1!" .. " — copy it again from warband.pro",
   too_large = "that string is too big to be an equip string",
-  not_deflate = "that string is damaged — copy it again from warband.pro/gear",
+  not_deflate = "that string is damaged — press copy for the addon on warband.pro again",
   not_json = "that decoded to something that is not a gear set",
   wrong_version = "that equip string is from a newer warband.pro — update this addon",
   no_items = "no slots change in that string — the set is already what you are wearing",

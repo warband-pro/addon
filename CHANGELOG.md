@@ -51,6 +51,30 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+## [1.25.0] — 2026-09-24 — the paste lands wherever you put it
+
+The site says "copy for the addon". You open `/warband`, which lands on the export tab, and paste — and until now the box put its own string back and said nothing. That was the addon looking broken at the one moment the round trip closes.
+
+### Added
+
+- **A site string pasted into the export box walks itself to the From warband.pro tab and reads there.** Same receipt, same refusals as pasting on the right tab. `/warband import` (and `/warband paste`) open that tab by name; `/warband export` opens the other one; `/warband junk` still works.
+- **`/warband help` lists every command with what it does**, one per line, the four you use on a play night first. A wrong command prints the same list. It also says the minimap icon and a keybind open the window.
+- **The paste receipt says when a string had nothing in it for the character you are on.** The counts were account-wide and the rows under them are this character's, so a string sent for three alts read as a success over an empty list.
+- **After an equip, the chat line asks for a fresh export.** The site cannot see the new kit until one lands, and nothing had said so — the character page went on proposing the set you were already wearing.
+- **Clicking the minimap hover grid opens the Roster tab.** The panel took the mouse so its rows could be hovered, then did nothing when clicked; the footer sent you to a slash command instead.
+
+### Changed
+
+- **The export tab's instructions match the site.** "press i, paste, Enter" said to press a key the site stopped needing — a paste imports on its own. The From warband.pro tab's instructions name the site's *copy for the addon* button instead of a page, because the button is on `/gear` and on every character page.
+- **A refused paste stays selected**, so the next one replaces it. It used to stay put, and the second attempt landed after the first and was refused for not decoding — a sentence blaming the copy for what the leftover did.
+- **The keybind closes the window as well as opening it.** The export string and the paste field both swallow every key when they have the caret, so the key that opened the window could not close it until you clicked out. Its name in Key Bindings is "Toggle the Warband.pro window" now.
+- **Opening the clear-out list at a merchant no longer takes the keyboard.** The paste field took the caret on every auto-open, so W, A, S and D typed into it until you noticed.
+- **Every row on the clear-out list is drawn.** It stopped at twelve and counted the rest in the footer; a thirteenth disenchant had no button anywhere. The gear set rows grow the same way, so a full kit plus its gems no longer loses its last lines.
+- **The From warband.pro tab has one header.** Switching to it wrote "paste the cleanup string above" over the live line, including over three grey stacks with Sell buttons and over a stored gear set; the next bag event wrote the other sentence back.
+- **A `wbc2!` string says update the addon**, not copy it again. The tab's other refusals name where the string goes and which side to fix; "nothing for any character on this account" now says an old addon is the likelier reason.
+- **The export header stays on one line**, so a long warband bank line cannot land on the first character row. The `Select all` button sits clear of the resize grip, the footer's soft-cap button reads "This character" like the scope button it duplicates, the sidebar counts characters rather than alts, and "warband bank never seen" says to open it once on any character. `/warband clear` echoes the name as you typed it.
+- **Switching to the From warband.pro tab in combat is queued**, as the sentence always claimed. Only `/warband import` from a closed window queued before; a tab click promised a reopen that never came.
+
 ## [1.24.0] — 2026-09-23 — the v2 look, all the way through
 
 ### Changed

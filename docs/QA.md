@@ -29,7 +29,7 @@ The taint line above is the one that matters most for this panel: it is the
 only place this addon puts a secure button on screen. Run the taint check again
 after using it, not only after the export pass.
 
-- [ ] /warband junk on a character with no list — panel opens, says "paste the cleanup string from warband.pro/gear above"
+- [ ] /warband import on a character with no list — panel opens, says "nothing pasted yet — the field above takes the site's string"
 - [ ] Paste your own export string (wb1!) into the paste box — red line names it as an export string, does NOT say invalid
 - [ ] Paste rubbish — red line, panel does not close, nothing stored
 - [ ] warband.pro /gear → [ cleanup ] → [copy addon string] → paste here — list renders, paste box clears

@@ -41,6 +41,9 @@ read_globals = {
   -- held, and that is enough to stamp `lastExport` on the copy rather than on
   -- the render. See UI.lua's OnKeyDown.
   "IsControlKeyDown",
+  -- And whether the key a focused box just swallowed is the addon's own
+  -- toggle binding, so the key that opened the window can close it.
+  "GetBindingFromClick",
 
   -- the tabbed window (UI.lua)
   "PanelTemplates_SetNumTabs", "PanelTemplates_SetTab", "PanelTemplates_TabResize",

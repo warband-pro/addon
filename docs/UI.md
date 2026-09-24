@@ -87,11 +87,28 @@ Copying from WoW chat is notoriously awful. This addon lives or dies by how pain
 
 ## Game side — one native window (1.5.0)
 
-One frame, `WarbandProFrame`, with the tabs every stock panel wears along the
-bottom: **Roster · Export · Import · Options**. `/warband` and the addon
-compartment open it on Export, `/warband roster` on Roster, `/warband junk` on
-Import, `/warband options` on Options. Esc closes (`UISpecialFrames`), the whole
-window drags, and it clamps to the screen.
+One frame, `WarbandProFrame`, with four tabs under the title band (the v2
+section above says where they moved): **Roster · To warband.pro · From
+warband.pro · Options** — the prose below still calls the middle two the Export
+and Import tabs, which is what they do. `/warband` and the addon compartment
+open it on Export, `/warband roster` on Roster, `/warband import` (also `junk`)
+on Import, `/warband options` on Options. Esc closes (`UISpecialFrames`), the
+whole window drags, and it clamps to the screen.
+
+**A site string pasted into the export box walks to the Import tab (1.25.0).**
+The export box reverts whatever is typed into it, which is right for a stray
+keystroke and was wrong for the one paste this window exists to receive: the
+site says "copy for the addon", the player opens `/warband` — the Export tab —
+and pastes, and the string vanished without a word. `pastedInto` recovers what
+the paste put in, and a `wbc1!`/`wbg1!` prefix hands it to the Import tab's
+own `acceptInbound`, so the receipt and the refusals are the same ones a paste
+on the right tab gets.
+
+**The keybind closes the window as well as opening it.** A focused EditBox eats
+every key, so the toggle binding could open the window and never close it while
+the export string or the paste field had the caret. Both boxes ask
+`GetBindingFromClick` whether the key they received is `WARBANDPRO_TOGGLE` and
+hide the frame if so.
 
 **Roster is tab 1 and is not what the window opens on**, which is deliberate
 and is the one place tab order and default disagree. Reading precedes acting,
