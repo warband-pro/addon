@@ -279,7 +279,12 @@ end
 -- every line of panel prose is lowercase: the buttons are Blizzard's chrome
 -- and match "Accept" and "Cancel" beside them, and the prose is ours and
 -- matches the chat lines it shares a voice with.
-local HELP_STEPS = "1. Ctrl+C copies (already selected)   2. on warband.pro press i, paste, Enter   3. Esc closes"
+--
+-- "paste, Enter" through 1.24.0; the site has imported on the paste itself
+-- since app 2.x, so the Enter was a keystroke the player was told to make for
+-- nothing and then watched do nothing.
+local HELP_STEPS = "1. Ctrl+C copies (already selected)   2. on warband.pro press i and paste"
+  .. "   3. Esc closes"
 
 -- Repaint the instruction line for whether the string has been copied yet.
 -- `UI.copied` is per-render rather than persisted: it answers "did you copy
@@ -287,7 +292,8 @@ local HELP_STEPS = "1. Ctrl+C copies (already selected)   2. on warband.pro pres
 local function refreshHelp()
   if not help then return end
   if UI.copied then
-    help:SetText(format("|cff%scopied|r  ·  on warband.pro press i, paste, Enter", GOOD))
+    help:SetText(format("|cff%scopied|r  ·  on warband.pro press i and paste"
+      .. " — it imports on its own", GOOD))
   else
     help:SetText(HELP_STEPS)
   end
@@ -296,8 +302,41 @@ end
 -- The slice buttons rebuild the string, and refreshExport is defined below
 -- them because it needs renderRows. Forward-declared rather than reordered:
 -- the tab's builder reading before its painter is the shape every other tab
--- in this file has.
-local refreshExport
+-- in this file has. `acceptInbound` is the Import tab's paste handler, and the
+-- export box below hands it a site string pasted into the wrong tab.
+local refreshExport, acceptInbound
+
+-- What one paste put into a box whose text we set. Exact for a plain
+-- insertion — the box was fully highlighted, or the caret sat somewhere in the
+-- string — and the whole new text otherwise, which a prefix test then judges.
+local function pastedInto(before, after)
+  local n = #after - #before
+  if n > 0 then
+    local k = 1
+    while k <= #before and before:sub(k, k) == after:sub(k, k) do k = k + 1 end
+    local seg = after:sub(k, k + n - 1)
+    if before:sub(1, k - 1) .. seg .. before:sub(k) == after then return seg end
+  end
+  return after
+end
+
+-- The keybind is a toggle, and a focused EditBox eats every key — so the key
+-- that opened the window could not close it until the player clicked out or
+-- pressed Esc. Both boxes ask whether the key they just received is that
+-- binding and hide the window if so. `GetBindingFromClick` reads the
+-- modifiers held, which is why it is asked rather than the key compared.
+local function closesFromBinding(key)
+  local action = ns.safe(GetBindingFromClick, key)
+  if action ~= "WARBANDPRO_TOGGLE" then return false end
+  if frame then frame:Hide() end
+  return true
+end
+
+-- Does this look like something warband.pro sent back, whichever wire it is?
+local function looksInbound(text)
+  return text:sub(1, #ns.CLEANUP_WIRE) == ns.CLEANUP_WIRE
+    or text:sub(1, #ns.GEARSET_WIRE) == ns.GEARSET_WIRE
+end
 
 local function buildExport()
   local p = panels[TAB_EXPORT]
@@ -306,6 +345,10 @@ local function buildExport()
   header:SetPoint("TOPLEFT")
   header:SetPoint("TOPRIGHT")
   header:SetJustifyH("LEFT")
+  -- One line, whatever the warband's bank line adds to it. The rows below sit
+  -- at fixed offsets, so a header that wrapped landed its second line on the
+  -- first character.
+  header:SetWordWrap(false)
 
   rows = {}
   for i = 1, MAX_ROWS do
@@ -388,10 +431,21 @@ local function buildExport()
   -- The string is not editable in any useful sense; if the user types into it,
   -- put it back rather than let a broken paste reach the website. SetText from
   -- code passes userInput false, so this cannot loop.
+  --
+  -- **Except the one paste this window was built to receive.** The site says
+  -- "copy for the addon", the player opens `/warband` — which has always landed
+  -- here, on the export — and pastes. Through 1.24.0 the revert ate the string
+  -- without a word, which read as the addon being broken at the exact moment
+  -- the loop closes. A `wbc1!` or `wbg1!` paste now walks to the Import tab
+  -- and reads there, through the same handler that tab's own field uses.
   editBox:SetScript("OnTextChanged", function(self, userInput)
-    if userInput and UI.current then
-      self:SetText(UI.current)
-      self:HighlightText()
+    if not userInput or not UI.current then return end
+    local pasted = pastedInto(UI.current, self:GetText() or "")
+    self:SetText(UI.current)
+    self:HighlightText()
+    if acceptInbound and looksInbound(pasted:gsub("^%s+", "")) then
+      UI.SelectTab(TAB_IMPORT)
+      if frame.selectedTab == TAB_IMPORT then acceptInbound(pasted) end
     end
   end)
   -- The one moment this addon exists for, and nothing acknowledged it.
@@ -405,6 +459,7 @@ local function buildExport()
   -- was opened and closed without a keypress. A readout answering the wrong
   -- question is worse than no readout.
   editBox:SetScript("OnKeyDown", function(_, key)
+    if closesFromBinding(key) then return end
     if key ~= "C" or not IsControlKeyDown() then return end
     if not UI.current or UI.current == "" then return end
     if ns.Store.Ready() then ns.Store.db.lastExport = ns.now() end
@@ -417,14 +472,17 @@ local function buildExport()
   help:SetPoint("BOTTOMLEFT", 0, 18)
   help:SetPoint("BOTTOMRIGHT", 0, 18)
   help:SetJustifyH("LEFT")
+  help:SetWordWrap(false)
   help:SetText(HELP_STEPS)
 
   footer = p:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   footer:SetPoint("BOTTOMLEFT", 0, 2)
   footer:SetJustifyH("LEFT")
 
+  -- Clear of the resize grip in the corner, which sits above this button and
+  -- took the right edge of a click on it.
   local selectAll = makeButton(p, "Select all", 96, 22)
-  selectAll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, 6)
+  selectAll:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 6)
   selectAll:SetScript("OnClick", function()
     editBox:SetFocus()
     editBox:HighlightText()
@@ -438,7 +496,8 @@ local function buildExport()
   -- same scope the slice row already offers — the row is where the choice
   -- lives, this is where the warning is, and a warning you can act on without
   -- moving your eyes is worth one extra widget.
-  slimButton = makeButton(p, "Just this character", 136, 22)
+  -- The same label as the slice row's button, because it is the same door.
+  slimButton = makeButton(p, "This character", 110, 22)
   slimButton:SetPoint("BOTTOMRIGHT", selectAll, "BOTTOMLEFT", -4, 0)
   slimButton:SetScript("OnClick", function() UI.SetScope("current") end)
   slimButton:Hide()
@@ -536,7 +595,7 @@ function refreshExport()
     local bank = (wb and wb.seenAt)
       and format("  ·  warband bank %s (by %s)%s", ns.ago(wb.seenAt), wb.seenByName or "?",
         wb.partial and format(", %d of %d tabs", #(wb.tabs or {}), wb.tabsOwned) or "")
-      or "  ·  warband bank never seen"
+      or "  ·  warband bank not read yet — open it once on any character"
     -- Two warnings the panel used to leave for the far side of the copy.
     --
     -- A bundle where every character is red is worth knowing about *before*
@@ -736,8 +795,14 @@ local GS_TONE = { good = GOOD, warn = WARN, muted = MUTED }
 --- Lay the set out, one row per item, and size the list to what it drew.
 local function renderGearRows(r)
   local rowsData = ns.GearSet.Rows(r)
-  local shown = math.min(#rowsData, GS_ROWS)
-  for i = 1, GS_ROWS do
+  local shown = #rowsData
+  -- Sixteen was every slot until the shopping list started riding the same
+  -- rows; a full kit plus its gems ran past the pool and the last rows were
+  -- silently not drawn. These are plain frames, so the pool grows whenever.
+  for i = #gsRows + 1, shown do
+    gsRows[i] = buildGearRow(gsList, i)
+  end
+  for i = 1, #gsRows do
     local w = gsRows[i]
     local d = rowsData[i]
     if not d or i > shown then
@@ -786,7 +851,12 @@ local function buildImport()
   intro:SetPoint("TOPLEFT")
   intro:SetPoint("TOPRIGHT")
   intro:SetJustifyH("LEFT")
-  intro:SetText("paste a string from warband.pro/gear — cleanup or equip, the box reads either")
+  -- The site's control is called "copy for the addon" and lives on /gear (the
+  -- warband) and on every character page (that character); the instruction
+  -- names the button rather than a route, because the route is not the only
+  -- one and the button reads the same on both.
+  intro:SetText("paste what warband.pro's |cffffd100copy for the addon|r button gave you"
+    .. " — /gear sends the camp, a character page sends that character")
 
   -- The native single-line input, not a bare EditBox: InputBoxTemplate carries
   -- the recessed border every stock text field wears.
@@ -809,12 +879,21 @@ local function buildImport()
     self:ClearFocus()
     frame:Hide()
   end)
+  junkPaste:SetScript("OnKeyDown", function(_, key) closesFromBinding(key) end)
   -- No revert here — that rule belongs to the export box, whose text is ours.
   -- This one's text is the player's.
+  --
+  -- The body is `acceptInbound` rather than the script itself, because the
+  -- export box hands a site string pasted into it through the same door: one
+  -- decode, one set of receipts, whichever tab the paste landed on.
   junkPaste:SetScript("OnTextChanged", function(self, userInput)
     if not userInput then return end
-    local text = self:GetText()
-    if text == "" then return end
+    acceptInbound(self:GetText())
+  end)
+
+  function acceptInbound(text)
+    local self = junkPaste
+    if not text or text == "" then return end
     -- **One decode, whichever string this is.** Two wires still reach this box
     -- — `wbc1!`, which carries everything since 1.8.0, and the equip-only
     -- `wbg1!` the site sent before it — but the prefix dispatch and the two
@@ -834,6 +913,11 @@ local function buildImport()
       if #text >= #ns.CLEANUP_WIRE or #text > 24 then
         junkHeader:SetText("|cff" .. BAD .. ns.Import.InboundMessage(code, kind) .. "|r")
       end
+      -- Left selected, so the next paste replaces it. An InputBox pastes at
+      -- the caret, and through 1.24.0 a refused string stayed put: the second
+      -- attempt landed after the first and was refused for not decoding —
+      -- a sentence blaming the copy for what the leftover did.
+      self:HighlightText()
       return
     end
 
@@ -885,9 +969,15 @@ local function buildImport()
     for i = 2, #parts do
       parts[i] = format(parts[i], counts[i])
     end
-    junkHeader:SetText(format("|cff%sread %s%s|r", GOOD, table.concat(parts, ", "),
-      (had > 0 and keptJunk > 0) and ", replacing the last list" or ""))
-  end)
+    -- The counts are account-wide and the rows under them are this
+    -- character's, so a string sent for three alts reads as a success over an
+    -- empty list. Say so, and say why the list is empty.
+    local me = ns.safe(UnitGUID, "player")
+    local notMine = (me and not plan.chars[me])
+      and format("  |cff%s·  nothing in it for this character|r", MUTED) or ""
+    junkHeader:SetText(format("|cff%sread %s%s|r%s", GOOD, table.concat(parts, ", "),
+      (had > 0 and keptJunk > 0) and ", replacing the last list" or "", notMine))
+  end
 
   junkHeader = p:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   junkHeader:SetPoint("TOPLEFT", 0, -82)
@@ -1025,11 +1115,19 @@ function UI.RenderJunk()
 
   local rowsData, missing, generatedAt = ns.Junk.Resolve()
   local canDE = ns.Junk.CanDisenchant()
-  local shown = math.min(#rowsData, JUNK_ROWS)
+  local shown = #rowsData
 
+  -- The pool grows to the list. It held twelve, and a thirteenth row was
+  -- counted in the footer and never drawn — and since the vendor button sells
+  -- only the sell verdicts, a thirteenth disenchant had no surface at all.
+  -- Secure rows are built here because this function already returns in
+  -- combat, which is the one constraint on creating them.
+  for i = #junkRows + 1, shown do
+    junkRows[i] = buildJunkRow(junkChild, i)
+  end
   junkChild:SetHeight(math.max(shown, 1) * 18)
 
-  for i = 1, JUNK_ROWS do
+  for i = 1, #junkRows do
     local w = junkRows[i]
     local r = rowsData[i]
     if not r or i > shown then
@@ -1103,7 +1201,8 @@ function UI.RenderJunk()
 
   local parts = {}
   if #rowsData == 0 then
-    parts[#parts + 1] = generatedAt and "nothing on the list is in your bags" or "no cleanup list yet"
+    parts[#parts + 1] = generatedAt and "nothing on the list is in your bags"
+      or "nothing pasted yet — the field above takes the site's string"
   else
     parts[#parts + 1] = format("%d item%s to clear", #rowsData, #rowsData == 1 and "" or "s")
   end
@@ -1115,9 +1214,7 @@ function UI.RenderJunk()
   end
   junkHeader:SetText(table.concat(parts, "  ·  "))
 
-  if #rowsData > JUNK_ROWS then
-    junkFooter:SetText(format("|cff%sshowing %d of %d|r", MUTED, JUNK_ROWS, #rowsData))
-  elseif not ns.Junk.merchantOpen then
+  if not ns.Junk.merchantOpen then
     junkFooter:SetText(format("|cff%sopen a merchant to sell  ·  paste a new list any time|r", MUTED))
   else
     junkFooter:SetText(format("|cff%sat a merchant — Sell is live|r", MUTED))
@@ -1643,7 +1740,7 @@ local function renderSidebar(side, sel)
   local entries = {
     { head = "Warband" },
     { kind = "all", name = "All",
-      status = n == 1 and "1 alt" or format("%d alts", n) },
+      status = n == 1 and "1 character" or format("%d characters", n) },
   }
   for _, r in ipairs(side.rows) do
     local cellv = r.vault or r.keystone
@@ -1946,7 +2043,7 @@ function UI.RenderRoster()
       wb.gold and ("  ·  " .. wb.gold) or "",
       (wb.tabsOwned and wb.tabs < wb.tabsOwned)
         and format(", %d of %d tabs", wb.tabs, wb.tabsOwned) or "")
-    or format("|cff%swarband bank never seen|r", MUTED))
+    or format("|cff%swarband bank not read yet — open it once on any character|r", MUTED))
 
   rosterPrev:SetShown(pages > 1)
   rosterNext:SetShown(pages > 1)
@@ -2096,8 +2193,8 @@ local function buildOptions()
         ns.Store.Touch()
       end },
     { cat = 2, label = "Open the clear-out list at merchants",
-      desc = "When a merchant window opens and the cleanup list has something in your bags, "
-        .. "the Import tab opens by itself and closes when you leave the merchant.",
+      desc = "When a merchant window opens and the clear-out list has something in your bags, "
+        .. "the From warband.pro tab opens by itself and closes when you leave the merchant.",
       get = function() local o = opts() return o and o.autoJunk end,
       set = function(v)
         local o = opts()
@@ -2121,8 +2218,9 @@ local function buildOptions()
         ns.syncCombatLog()
       end },
     { cat = 3, label = "Show the minimap button",
-      desc = "The icon on the minimap ring - click it for the export string, right-click it for options, "
-        .. "drag it anywhere round the ring. Turning it off leaves /warband and the addon compartment.",
+      desc = "The icon on the minimap ring — click it to open the window on To warband.pro, "
+        .. "right-click it for options, drag it anywhere round the ring. Turning it off leaves "
+        .. "/warband, the addon compartment and the keybind under Key Bindings > Warband.pro.",
       get = function() local o = opts() return o and o.minimap end,
       set = function(v)
         local o = opts()
@@ -2448,6 +2546,10 @@ function UI.SelectTab(id)
   -- The import tab holds the secure disenchant rows, and secure attributes
   -- cannot be written in combat — so the tab cannot be entered there either.
   if id == TAB_IMPORT and InCombatLockdown() then
+    -- Queued, so the sentence is true. UI.Open queued and this did not, so a
+    -- tab click or `/warband import` mid-fight promised a reopen that never
+    -- came; AfterCombat honours pendingOpen exactly once.
+    UI.pendingOpen = { tab = TAB_IMPORT }
     ns.print("in combat — the clear-out list opens when you drop out")
     return
   end
@@ -2461,15 +2563,21 @@ function UI.SelectTab(id)
   elseif id == TAB_EXPORT then
     refreshExport()
   elseif id == TAB_IMPORT then
+    -- RenderJunk owns the header, including the "nothing pasted yet" line. A
+    -- second writer here overwrote it whenever no list was stored — over
+    -- three grey stacks with live Sell buttons, and over a stored gear set —
+    -- and the next bag event put the renderer's sentence back, so one state
+    -- had two headers.
     UI.RenderJunk()
-    if not ns.Junk.Stored() then
-      junkHeader:SetText(format("|cff%spaste the cleanup string from warband.pro/gear above|r", MUTED))
-    end
     -- The caret goes into the paste field on arrival, the same courtesy the
     -- export tab pays its string: the tab exists to be pasted into, and
     -- Ctrl+V should work without first finding a 22px field. On the same
     -- 0-second timer, because focus set before the frame has drawn is lost.
+    --
+    -- Not when the window opened itself at a merchant: a caret the player did
+    -- not ask for turns W, A, S and D into typing until they notice.
     C_Timer.After(0, function()
+      if UI.autoOpened then return end
       if junkPaste and frame:IsShown() and panels[TAB_IMPORT]:IsShown() then junkPaste:SetFocus() end
     end)
   else
@@ -3127,6 +3235,14 @@ local function makeHoverGrid()
   f:SetClampedToScreen(true)
   f:EnableMouse(true)
   f:SetScript("OnLeave", hoverLeave)
+  -- The panel takes the mouse so its rows can be hovered, and a panel that
+  -- takes the mouse gets clicked. The click goes where the footer used to
+  -- send people by slash command: the tab that is this grid, scrollable.
+  f:SetScript("OnMouseUp", function(_, button)
+    if button ~= "LeftButton" then return end
+    UI.HideHover()
+    UI.ShowRoster()
+  end)
   f:Hide()
 
   hoverFrame = f
@@ -3299,7 +3415,7 @@ local function showHoverGrid(owner)
   -- The tab is the follow-up surface and this is where it gets discovered: it
   -- scrolls, it shuts a group and it pages, which is the whole of what a
   -- tooltip cannot do.
-  place(hoverHint2, "Drag  ·  move it round the ring      /warband roster  ·  the same grid, scrollable")
+  place(hoverHint2, "Drag  ·  move it round the ring      Click the grid  ·  the Roster tab, scrollable")
   y = y - HOVER_TEXT_H
 
   f:SetSize(math.max(gridW, HOVER_MIN_W) + HOVER_PAD * 2, -y + HOVER_PAD)
@@ -3415,4 +3531,4 @@ end
 -- heading called WARBANDPRO as a row called WARBANDPRO_TOGGLE — findable, but
 -- shouting, and not the "Key Bindings > WarbandPro" docs/FLOW.md promises.
 _G.BINDING_HEADER_WARBANDPRO = "Warband.pro"
-_G.BINDING_NAME_WARBANDPRO_TOGGLE = "Open the export window"
+_G.BINDING_NAME_WARBANDPRO_TOGGLE = "Toggle the Warband.pro window"

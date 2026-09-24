@@ -648,6 +648,12 @@ local function receipt(p, verified)
   end
   if p.saved then parts[#parts + 1] = "saved as \"" .. p.set .. "\"" end
   ns.print(table.concat(parts, " · "))
+  -- The site cannot see an equip until the next export lands; nothing told
+  -- the player that, so the character page went on proposing the kit they
+  -- were already wearing. One line, only when something actually moved.
+  if verified > 0 then
+    ns.print("|cffffd100/warband|r and paste on warband.pro so it sees the new kit")
+  end
 end
 
 --- Re-check every equip the apply started; save the set once all confirm or

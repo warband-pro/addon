@@ -83,7 +83,7 @@ local function greet()
   db.greeted = true
   Store.Touch()
   ns.print("installed — play normally, then click the minimap icon (or type |cffffd100/warband|r) "
-    .. "to copy your bundle into warband.pro")
+    .. "to copy your export for warband.pro. |cffffd100/warband help|r lists the rest")
 end
 
 handlers.PLAYER_LOGIN = function()
@@ -441,7 +441,11 @@ SlashCmdList.WARBANDPRO = function(msg)
   elseif cmd:match("^clear ") then
     local name = cmd:match("^clear%s+(.+)$")
     local n = Store.Forget(name)
-    ns.print(n > 0 and format("removed %s", name) or format("no stored character called %s", name))
+    -- Echo the name as typed: `cmd` is lowercased for matching, and a receipt
+    -- reading "removed vocnar" about a character called Vocnar is a small
+    -- wrongness on the one line that confirms a deletion.
+    local typed = (msg or ""):gsub("^%s+", ""):gsub("%s+$", ""):match("^%S+%s+(.+)$") or name
+    ns.print(n > 0 and format("removed %s", typed) or format("no stored character called %s", typed))
   elseif cmd == "gear on" or cmd == "gear off" then
     local on = cmd == "gear on"
     if Store.Ready() then
@@ -468,8 +472,14 @@ SlashCmdList.WARBANDPRO = function(msg)
     else
       ns.print("saved data not loaded yet")
     end
-  elseif cmd == "junk" or cmd == "clean" then
+  -- `junk` is the name the tab carried when it held only the clear-out list;
+  -- `import` and `paste` are what the tab is called now and what the site
+  -- tells the player to type. `export` is `/warband` spelled out, for the
+  -- player who reaches for the opposite of `import` and finds it.
+  elseif cmd == "junk" or cmd == "clean" or cmd == "import" or cmd == "paste" then
     UI.ToggleJunk()
+  elseif cmd == "export" then
+    UI.Show("bundle")
   -- The grid. `roster` is the name the tab carries; `alts` is what a player
   -- who has nine of them calls the thing they are looking for.
   elseif cmd == "roster" or cmd == "alts" then
@@ -508,7 +518,8 @@ SlashCmdList.WARBANDPRO = function(msg)
         ns.print(format("no gear set for this spec — %d stored for your other spec%s",
           stored, stored == 1 and "" or "s"))
       else
-        ns.print("no gear set for this character — paste an equip string from warband.pro/gear")
+        ns.print("no gear set for this character — press copy for the addon on warband.pro, "
+          .. "then paste it in |cffffd100/warband import|r")
       end
     elseif ns.GearSet.Apply(content) then
       if UI.JunkIsShown() then UI.RenderGearSet() end
@@ -521,9 +532,29 @@ SlashCmdList.WARBANDPRO = function(msg)
     ns.Perf.Reset()
     ns.print("perf counters reset")
   else
-    ns.print("/warband · /warband roster · /warband copy current · /warband copy <page> · /warband junk · "
-      .. "/warband equip [raid|mplus|delve] · /warband options · /warband status · "
-      .. "/warband optimize · /warband clear <name> · /warband gear on|off · /warband minimap on|off · "
-      .. "/warband perf")
+    -- One line per command, saying what it does. This was every name on one
+    -- chat line with no verbs — a list a player could not read as an answer to
+    -- "what do I type", which is the only question that lands here. The
+    -- maintenance commands stay at the bottom, under a rule, so the four a
+    -- player uses every night are the four they see first.
+    if cmd ~= "help" then ns.print("no such command — here is the list") end
+    local function line(name, does)
+      ns.print(format("|cffffd100/warband %s|r  %s", name, does))
+    end
+    line("", "the export string, already selected — Ctrl+C, then press i on warband.pro")
+    line("import", "paste what the site's copy for the addon button gave you, then equip or sell")
+    line("roster", "every character across the top, vault, lockouts and currencies down the side")
+    line("equip [raid|mplus|delve]",
+      "put on the stored gear set, no window — bind it to a button")
+    line("options", "gear capture, the minimap button, auto-open at merchants, every currency")
+    line("copy current", "the export for this character only")
+    line("copy <page>", "the next twenty of a warband too large for one string")
+    line("status", "what is stored, how fresh, and why a string failed to build")
+    line("clear <name>",
+      "forget one character  ·  |cffffd100optimize|r forgets any not seen in 90 days")
+    line("gear on|off",
+      "gear capture  ·  |cffffd100minimap on|off|r the button  ·  |cffffd100perf|r timings")
+    ns.print("the minimap icon opens the window too — and a key does, once you bind one under "
+      .. "Key Bindings > Warband.pro")
   end
 end

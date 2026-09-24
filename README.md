@@ -25,7 +25,7 @@ It's the same problem Altoholic + SavedInstances solve locally — we make it we
 2. Log any character — snapshot saved silently in account-wide `WarbandProDB`.
 3. Log alts 2..6 through the week — 0 extra steps, bag updates throttled .5s.
 4. Any character: click the minimap icon (or `/warband`) → auto-highlighted box → `Ctrl+C` copies `wb1!aH...` (4-7KB for 6 chars, ~26KB with full bag contents).
-5. Second monitor, [warband.pro](https://warband.pro) open — press `i` anywhere to put the cursor in the rail's import field, paste, Enter:
+5. Second monitor, [warband.pro](https://warband.pro) open — press `i` anywhere, paste, and it imports on its own:
 
 ```
 Vocnar — 2h ago — 847g — 312 pots — fresh
@@ -87,12 +87,14 @@ In-game `/reload` (full restart needed if .toc changed), then `/warband`.
 
 ## Use
 
-One window, three tabs along the bottom the way every stock panel does it —
-**Export** (the `wb1!` string, pre-selected), **Import** (paste the cleanup
-string from warband.pro/gear, sell and disenchant from the list), **Options**
+One window, four tabs under the title — **Roster** (every character across the
+top, vault, lockouts and currencies down the side), **To warband.pro** (the
+`wb1!` string, pre-selected), **From warband.pro** (paste what the site's *copy
+for the addon* button gave you; Equip, Sell and Disenchant live here), **Options**
 (gear capture, item links, the minimap button, auto-open at merchants). Built
 from Blizzard's own frame templates, so it follows your UI scale and font
-settings with no settings of its own.
+settings with no settings of its own. A site string pasted into the wrong tab
+walks itself to the right one.
 
 The icon on your minimap ring opens it: click for the string, right-click for
 Options, drag to move it. Hover says how many characters are stored and how
@@ -100,12 +102,15 @@ fresh the freshest is. `/warband minimap off` if you would rather use the addon
 compartment — nothing else changes.
 
 ``` 
-/warband                the window, Export tab — bundle + freshness
-/warband copy           same
-/warband copy current   single-char only
-/warband junk           Import tab — the clear-out list
+/warband                the window, To warband.pro tab — the string + freshness
+/warband copy           same  ·  /warband copy current   this character only
+/warband copy <page>    the next twenty of a warband too large for one string
+/warband import         From warband.pro tab — paste, then equip, sell, disenchant
+/warband roster         the grid — every character, vault, lockouts, currencies
 /warband equip          equip the stored gear set, no window — macro-friendly
+                        /warband equip raid|mplus|delve picks the night's set
 /warband options        Options tab
+/warband help           this list, in game
 /warband clear <name>   prune from DB, clears its junk list and warbank credit
 /warband status         debug counts/len/lastSeen
 /warband optimize       prune chars not seen 90d, drops orphaned junk and warbank credit
@@ -114,7 +119,7 @@ compartment — nothing else changes.
 /warband minimap on|off show or hide the minimap button
 ```
 
-On [warband.pro](https://warband.pro): press `i` anywhere — the cursor lands in the rail's `$ import` field, on whatever route you are reading — paste, Enter. A receipt names what arrived and the tonight plan re-ranks.
+On [warband.pro](https://warband.pro): press `i` anywhere — the import panel opens on whatever page you are reading — and paste. It imports on its own; a receipt names what moved and the tonight plan re-ranks. A key can open the window too, once you bind one under Key Bindings > Warband.pro.
 
 ## Sites — this repo deploys everywhere
 

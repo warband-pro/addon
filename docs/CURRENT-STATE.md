@@ -188,7 +188,10 @@ uncapped. The single documented exception to absent-≠-empty is `restXP` when
 
 ## 4. The return leg — and what acts without a click
 
-A paste **decodes and stores, and does nothing else.** `wbc1!` carries up to
+A paste **decodes and stores, and does nothing else.** It reads on the Import
+tab (`/warband import`, also `junk`), and since 1.25.0 a site string pasted
+into the export box is handed to that same reader rather than reverted; a
+refused paste stays selected so the next one replaces it. `wbc1!` carries up to
 four sections per character: `items` (clear-out verdicts), `gear` (a solved set
 per spec), `builds` (which saved talent build is the raid one) and `shop` (gems
 and enchants to buy). Only guids already in `db.chars` are kept, and an absent
@@ -202,7 +205,7 @@ Every game-state action is behind a click or a typed command:
 | Sell the whole list | the `Sell list (N)` button on Blizzard's `MerchantFrame`, then a `StaticPopup` confirm stating the count, the take and that buyback is available. The plan is `Junk.SellPlan` — `Junk.Sellable` **and** a verdict of `sell`, so never a `de` row on an enchanter, never a `del` row, never an unsellable one — and it is rebuilt at the confirm, not read off the button's label |
 | Disenchant | a **secure** `SecureActionButtonTemplate` the player clicks; the addon only bakes the macro text out of combat |
 | Delete | **never.** No button is drawn for a `del` verdict — nor for an unsellable item, whose verdict falls back to `disenchant` or `delete by hand` — and nothing in the addon deletes an item |
-| Equip the set, load the build, save the Equipment Manager set | the `Equip N & save set` button, or `/warband equip [raid\|mplus\|delve]` |
+| Equip the set, load the build, save the Equipment Manager set | the `Equip N & save set` button, or `/warband equip [raid\|mplus\|delve]`. The receipt ends by asking for a fresh export, because the site cannot see the equip until one lands |
 | Auction-house search | a left click on a shopping row, and only while the AH is open |
 
 Three things happen without a second click, stated plainly because the promise
