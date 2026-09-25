@@ -706,6 +706,30 @@ end
 check("a scan stamps no section the wire does not document",
   #unknown == 0, table.concat(unknown, ","))
 
+-- ── gear off withholds the key and keeps the stamp ──────────────────────────
+-- /warband gear off leaves gear out of the export without losing what was
+-- captured. The website tells that apart from "never captured" by the stamp
+-- surviving the strip — so the strip must keep it, and must not touch the DB.
+
+reset()
+local keeper = Store.Char()
+keeper.name = "Vocnar"
+keeper.gear = { { slot = 1, where = "equipped", id = 212018, ilvl = 639 } }
+keeper.seenAt.gear = NOW
+Store.db.opts.includeGear = false
+
+local withheld = Bundle.Build().characters[1]
+check("gear off omits the key from the bundle", withheld.gear == nil)
+check("gear off keeps the stamp that names the omission",
+  withheld.seenAt.gear == NOW, tostring(withheld.seenAt.gear))
+check("gear off leaves the stored capture alone",
+  keeper.gear ~= nil and #keeper.gear == 1)
+
+Store.db.opts.includeGear = true
+local restored = Bundle.Build().characters[1]
+check("gear back on puts the key in the bundle without a rescan",
+  restored.gear ~= nil and #restored.gear == 1)
+
 print("")
 print(string.format("%d passed, %d failed", pass, fail))
 os.exit(fail == 0 and 0 or 1)

@@ -536,7 +536,10 @@ its own.
   ago (by Vocnar)" — readable before you copy, so you know it's not stale. In the
   smaller scope it opens with the scope in words: "this character only · 1
   character · freshest 2m ago", because "1 character" alone reads the same
-  whether the panel sliced the warband or the warband is that small.
+  whether the panel sliced the warband or the warband is that small. While gear
+  is switched off the header carries "· gear excluded — /warband gear on to
+  include it", so the string is never copied in a state the site keeps old
+  gear for without saying so.
 - **The slice row** (1.19.0): `[ Whole warband ] [ This character ]`, and on the
   right the pager. The scope was always a wire switch and never a control — the
   tab opened on the whole warband and the smaller slice lived behind `/warband

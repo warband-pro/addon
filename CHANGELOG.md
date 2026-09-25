@@ -51,6 +51,10 @@ MAJOR has to be a wire break.**
 
 ## [Unreleased]
 
+### Fixed
+
+- **The export tab says when gear is switched off.** With `/warband gear off` the string leaves gear out and the site keeps what it already has — until now nothing on the tab said so, and the gear pages quietly stopped getting fresher. The header names the exclusion and the way back on.
+
 ## [1.25.0] — 2026-09-24 — the paste lands wherever you put it
 
 The site says "copy for the addon". You open `/warband`, which lands on the export tab, and paste — and until now the box put its own string back and said nothing. That was the addon looking broken at the one moment the round trip closes.

@@ -180,6 +180,11 @@ function Bundle.Build(opts)
 
   -- Turning gear off must not destroy what was already captured — only the
   -- export omits it, on a shallow copy, so turning it back on needs no rescan.
+  -- Shallow on purpose, and the shallowness is the signal: the copy shares
+  -- the stored seenAt table, so seenAt.gear survives the strip while gear
+  -- itself does not. The website reads exactly that — the stamp without the
+  -- data — as "withheld at export", distinct from "never captured", and
+  -- keeps what it already holds. See CONTRACT.md §`gear[]`.
   if db.opts and db.opts.includeGear == false then
     local stripped = {}
     for i = 1, #chars do
