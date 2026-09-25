@@ -104,6 +104,12 @@ saved loadout per spec; `professionCooldowns`; the warband bank at the payload
 root (five tabs repeated across six characters costs ~22 KB for one shared
 vault).
 
+`/warband gear off` withholds `gear[]` from the export without losing the
+capture — and the omission is now a documented signal rather than a bare
+absence: the strip keeps `seenAt.gear`, so the site reads the stamp without
+the data as "withheld" and keeps what it holds, and the export tab header
+says so while the toggle is off (`CONTRACT.md` § Withheld gear).
+
 ### Serves Progress
 
 **Two captures, and both exist because Blizzard publishes nothing.** That is

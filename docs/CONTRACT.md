@@ -396,6 +396,19 @@ existing `bags[]`/`bank[]` arrays (which back item search), and once here with
 full detail. This keeps both consumers simple rather than teaching the search
 feature to read `gear[]` or vice versa; deflate absorbs the cost.
 
+### Withheld gear — `/warband gear off`
+
+Turning gear off leaves `gear[]` out of the export without losing what was
+captured: `Bundle.Build` strips the key from a shallow copy of each stored
+character. Shallow on purpose — the copy shares the stored `seenAt` table,
+so **`seenAt.gear` survives the strip while `gear` itself does not**, and
+that is the whole signal. An importer reads the stamp without the data as
+"withheld at export" and keeps whatever gear it already holds for that
+character; a character whose gear was never captured carries neither, and a
+present-but-empty array is a genuine scan that found nothing equippable.
+The strip touches the export only — the stored capture is untouched, and
+turning gear back on needs no rescan.
+
 ### Parsing `s` — the item string
 
 `s` is not addon-specific. It is the same substring SimulationCraft's own

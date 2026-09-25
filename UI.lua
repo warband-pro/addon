@@ -629,10 +629,17 @@ function refreshExport()
     -- The scope in words as well as in the buttons. "1 character" is not an
     -- answer for the player who has one: it reads the same whether the panel
     -- sliced the warband or the warband is that small.
+    -- Gear left out at export time is a choice the panel must show, not a
+    -- state the string hides: without this the player copies a bundle the
+    -- site keeps old gear for, and nothing here says why the gear surfaces
+    -- never get fresher.
+    local gearOff = ns.Store.db and ns.Store.db.opts and ns.Store.db.opts.includeGear == false
+    local gearLine = gearOff
+      and format("  |cff%s·  gear excluded — /warband gear on to include it|r", WARN) or ""
     local scope = UI.mode == "current" and "this character only  ·  " or ""
-    header:SetText(format("%s%d character%s  ·  freshest %s%s%s",
+    header:SetText(format("%s%d character%s  ·  freshest %s%s%s%s",
       scope, #summary, #summary == 1 and "" or "s",
-      #summary > 0 and ns.ago(payload.bundle.freshestSeenAt) or "never", bank, warnLine))
+      #summary > 0 and ns.ago(payload.bundle.freshestSeenAt) or "never", bank, warnLine, gearLine))
     -- The "(large — try /warband copy current)" note is gone from here: past the
     -- soft cap the offer is the [Just this character] button beside this line,
     -- which refreshScope shows. The byte count stays, because it is a fact.
